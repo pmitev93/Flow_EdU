@@ -2398,7 +2398,7 @@ server <- function(input, output, session) {
             grouped$Cell_line[1]
           }
           
-          ref_mut <- grouped$Mutation[grouped$Cell_line == ref_group]
+          ref_mut <- grouped$Mutation[grouped$Cell_line == ref_group][1]
           stats_text <- paste0(stats_text, sprintf("(Compared to %s #%s)\n\n", ref_mut, ref_group))
           
           ref_data <- long_data %>% filter(Cell_line == ref_group)
@@ -2414,7 +2414,7 @@ server <- function(input, output, session) {
             if(test_group == ref_group) next
             
             test_data <- long_data %>% filter(Cell_line == test_group)
-            test_mut <- grouped$Mutation[grouped$Cell_line == test_group]
+            test_mut <- grouped$Mutation[grouped$Cell_line == test_group][1]
 
             # Match by experiment - only keep experiments with both samples
             merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
