@@ -1954,11 +1954,15 @@ server <- function(input, output, session) {
     grouped <- selected_data %>%
       group_by(Cell_line, Mutation) %>%
       summarize(n = n(), .groups = 'drop') %>%
+      mutate(
+        Cell_line = as.character(Cell_line),
+        Mutation = as.character(Mutation)
+      ) %>%
       arrange(Cell_line)
     
-    paste(sprintf("%s (%s): %d replicates", 
-                  grouped$Cell_line, 
-                  grouped$Mutation,
+    paste(sprintf("%s (%s): %d replicates",
+                  as.character(grouped$Cell_line),
+                  as.character(grouped$Mutation),
                   grouped$n),
           collapse = "\n")
   })
@@ -2334,6 +2338,10 @@ server <- function(input, output, session) {
         sd_corr = ifelse(n() > 1, sd(Correlation, na.rm = TRUE), 0),
         n = n(),
         .groups = 'drop'
+      ) %>%
+      mutate(
+        Cell_line = as.character(Cell_line),
+        Mutation = as.character(Mutation)
       )
     
     stats_text <- ""
