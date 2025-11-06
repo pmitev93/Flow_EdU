@@ -2395,7 +2395,7 @@ server <- function(input, output, session) {
           ref_group <- if(!is.null(input$reference_group) && input$reference_group != "") {
             input$reference_group
           } else {
-            grouped$Cell_line[1]
+            as.character(grouped$Cell_line[1])
           }
           
           ref_mut <- as.character(grouped$Mutation[grouped$Cell_line == ref_group][1])
@@ -2408,8 +2408,8 @@ server <- function(input, output, session) {
           test_info <- list()
           
           for(i in 1:nrow(grouped)) {
-            test_group <- grouped$Cell_line[i]
-            
+            test_group <- as.character(grouped$Cell_line[i])
+
             # Skip if this is the reference group
             if(test_group == ref_group) next
             
