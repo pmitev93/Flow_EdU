@@ -31,7 +31,7 @@ source("gate_adjustment_module.r")  # NEW: Gate editing functionality
 # ==============================================================================
 
 ui <- fluidPage(
-  titlePanel("The MITEV EdU Analysis Tool"),
+  titlePanel("The MITEV Analysis Tool"),
   
   sidebarLayout(
     sidebarPanel(
