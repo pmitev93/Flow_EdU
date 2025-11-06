@@ -54,12 +54,29 @@ ui <- fluidPage(
         column(6, actionButton("deselect_all", "Deselect All", class = "btn-sm"))
       ),
       br(),
+
+      # Gating strategy selector
+      conditionalPanel(
+        condition = "output.experiments_loaded",
+        wellPanel(
+          style = "background-color: #f8f9fa;",
+          h5(strong("Gating Strategy Selection")),
+          p(style = "font-size: 0.9em; color: #666;",
+            "Select gating strategy for each experiment. Default: gates_gdef.r"),
+          fluidRow(
+            column(6, selectInput("default_gate_strategy", "Default Strategy:",
+                                  choices = NULL)),
+            column(6, actionButton("apply_default_gates", "Apply to All",
+                                   class = "btn-sm btn-info",
+                                   style = "margin-top: 25px;"))
+          ),
+          hr(style = "margin: 10px 0;"),
+          uiOutput("gate_strategy_table")
+        )
+      ),
+      br(),
       actionButton("analyze_selected", "Analyze Selected Experiments",
                    class = "btn-success"),
-      br(), br(),
-      actionButton("reset_gate_ids", "Reset Gate IDs", 
-                   class = "btn-warning btn-sm",
-                   title = "Clear gate ID mapping - use if experiments show wrong Gate IDs"),
       hr(),
       
       # Sample browser
@@ -501,9 +518,40 @@ server <- function(input, output, session) {
     gate_storage = initialize_gate_storage(),  # NEW: Store custom gates
     edit_mode = FALSE,  # NEW: Track if in edit mode
     temp_gate = NULL,  # NEW: Temporary gate during editing
-    selected_vertex = NULL  # NEW: Currently selected vertex
+    selected_vertex = NULL,  # NEW: Currently selected vertex
+    available_gate_files = NULL,  # NEW: List of available gate strategy files
+    experiment_gate_strategies = list(),  # NEW: Per-experiment gate strategy selection
+    experiments_loaded = FALSE  # NEW: Track if experiments have been loaded
   )
   
+  # Scan for available gate strategy files
+  scan_gate_files <- function() {
+    gate_dir <- "gate_definitions"
+    if(!dir.exists(gate_dir)) {
+      showNotification("gate_definitions folder not found!", type = "error")
+      return(NULL)
+    }
+
+    gate_files <- list.files(gate_dir, pattern = "^gates_.*\\.r$", full.names = FALSE)
+
+    if(length(gate_files) == 0) {
+      showNotification("No gate files found in gate_definitions/", type = "warning")
+      return(NULL)
+    }
+
+    # Extract gate IDs from filenames (gates_gdef.r -> gdef)
+    gate_ids <- gsub("^gates_(.*)\\.r$", "\\1", gate_files)
+    names(gate_files) <- gate_ids
+
+    return(gate_files)
+  }
+
+  # Output variable for conditional panel
+  output$experiments_loaded <- reactive({
+    return(rv$experiments_loaded)
+  })
+  outputOptions(output, "experiments_loaded", suspendWhenHidden = FALSE)
+
   # Browse for folder
   observeEvent(input$browse_folder, {
     folder <- choose.dir(default = getwd(), caption = "Select Master Folder")
@@ -594,16 +642,33 @@ server <- function(input, output, session) {
                                  selected = NULL)
           )
         })
-        
-        # Button to reset gate ID mapping
-        output$gate_id_reset <- renderUI({
-          actionButton("reset_gate_ids", "Reset Gate IDs", 
-                       class = "btn-warning btn-sm",
-                       title = "Clear gate ID mapping and regenerate from cache files")
-        })
-        
-        showNotification(sprintf("Found %d experiments with %d samples!", 
-                                 length(exp_names), nrow(rv$all_results)), 
+
+        # Scan for available gate files
+        rv$available_gate_files <- scan_gate_files()
+
+        # Initialize gate strategies with default (gdef)
+        default_gate <- "gates_gdef.r"
+        rv$experiment_gate_strategies <- setNames(
+          rep(list(default_gate), length(exp_names)),
+          exp_names
+        )
+
+        # Update default gate strategy dropdown
+        if(!is.null(rv$available_gate_files)) {
+          gate_choices <- setNames(
+            rv$available_gate_files,
+            names(rv$available_gate_files)
+          )
+          updateSelectInput(session, "default_gate_strategy",
+                            choices = gate_choices,
+                            selected = default_gate)
+        }
+
+        # Mark experiments as loaded
+        rv$experiments_loaded <- TRUE
+
+        showNotification(sprintf("Found %d experiments with %d samples!",
+                                 length(exp_names), nrow(rv$all_results)),
                          type = "message")
       })
       
@@ -701,21 +766,101 @@ server <- function(input, output, session) {
     updateCheckboxGroupInput(session, "experiments_to_analyze",
                              selected = character(0))
   })
-  
-  # Reset gate ID mapping
-  observeEvent(input$reset_gate_ids, {
-    gate_map_file <- file.path(CACHE_DIR, "gate_id_map.rds")
-    
-    if(file.exists(gate_map_file)) {
-      file.remove(gate_map_file)
-      showNotification("Gate ID mapping cleared. Re-analyzing will create new mapping starting with 'gdef'.", 
-                       type = "message", duration = 5)
-    } else {
-      showNotification("No gate ID mapping found to clear.", 
-                       type = "warning", duration = 3)
-    }
+
+  # Render gate strategy table
+  output$gate_strategy_table <- renderUI({
+    req(rv$experiment_folders, rv$available_gate_files)
+
+    exp_names <- names(rv$experiment_folders)
+
+    if(length(exp_names) == 0) return(NULL)
+
+    # Create a select input for each experiment
+    gate_choices <- setNames(
+      rv$available_gate_files,
+      names(rv$available_gate_files)
+    )
+
+    lapply(seq_along(exp_names), function(i) {
+      exp_name <- exp_names[i]
+      input_id <- paste0("gate_strategy_", i)
+
+      # Get current selection or default
+      current_selection <- rv$experiment_gate_strategies[[exp_name]]
+      if(is.null(current_selection)) current_selection <- "gates_gdef.r"
+
+      fluidRow(
+        style = "margin-bottom: 5px;",
+        column(6, p(style = "margin-top: 7px;", strong(exp_name))),
+        column(6, selectInput(input_id, NULL,
+                              choices = gate_choices,
+                              selected = current_selection,
+                              width = "100%"))
+      )
+    })
   })
-  
+
+  # Apply default gate strategy to all experiments
+  observeEvent(input$apply_default_gates, {
+    req(input$default_gate_strategy, rv$experiment_folders)
+
+    exp_names <- names(rv$experiment_folders)
+    default_gate <- input$default_gate_strategy
+
+    # Update all experiment gate strategies
+    rv$experiment_gate_strategies <- setNames(
+      rep(list(default_gate), length(exp_names)),
+      exp_names
+    )
+
+    # Force UI to re-render with new values
+    output$gate_strategy_table <- renderUI({
+      req(rv$experiment_folders, rv$available_gate_files)
+
+      exp_names <- names(rv$experiment_folders)
+      if(length(exp_names) == 0) return(NULL)
+
+      gate_choices <- setNames(
+        rv$available_gate_files,
+        names(rv$available_gate_files)
+      )
+
+      lapply(seq_along(exp_names), function(i) {
+        exp_name <- exp_names[i]
+        input_id <- paste0("gate_strategy_", i)
+
+        fluidRow(
+          style = "margin-bottom: 5px;",
+          column(6, p(style = "margin-top: 7px;", strong(exp_name))),
+          column(6, selectInput(input_id, NULL,
+                                choices = gate_choices,
+                                selected = default_gate,
+                                width = "100%"))
+        )
+      })
+    })
+
+    showNotification(sprintf("Applied %s to all experiments",
+                             names(rv$available_gate_files)[rv$available_gate_files == default_gate]),
+                     type = "message")
+  })
+
+  # Track individual gate strategy changes
+  observe({
+    req(rv$experiment_folders)
+
+    exp_names <- names(rv$experiment_folders)
+
+    lapply(seq_along(exp_names), function(i) {
+      exp_name <- exp_names[i]
+      input_id <- paste0("gate_strategy_", i)
+
+      observeEvent(input[[input_id]], {
+        rv$experiment_gate_strategies[[exp_name]] <- input[[input_id]]
+      }, ignoreInit = TRUE)
+    })
+  })
+
   # Update sample selector when experiment changes
   observeEvent(input$selected_experiment, {
     req(input$selected_experiment)
@@ -768,59 +913,88 @@ server <- function(input, output, session) {
       for(i in seq_along(input$experiments_to_analyze)) {
         exp_name <- input$experiments_to_analyze[i]
         exp_folder <- rv$experiment_folders[[exp_name]]
-        
+
         incProgress(1/(n_exp*2), detail = sprintf("Loading %s", exp_name))
-        
+
+        # Load the appropriate gate strategy for this experiment
+        gate_file <- rv$experiment_gate_strategies[[exp_name]]
+        if(is.null(gate_file)) gate_file <- "gates_gdef.r"
+
+        gate_path <- file.path("gate_definitions", gate_file)
+        if(!file.exists(gate_path)) {
+          showNotification(sprintf("Gate file not found: %s. Using default.", gate_file),
+                           type = "warning")
+          gate_path <- "gate_definitions/gates_gdef.r"
+        }
+
+        # Load gates from the selected file
+        GATES_env <- new.env()
+        tryCatch({
+          source(gate_path, local = GATES_env)
+          GATES_selected <- GATES_env$GATES
+          GATE_STRATEGY_selected <- GATES_env$GATE_STRATEGY
+        }, error = function(e) {
+          showNotification(sprintf("Error loading %s: %s", gate_file, e$message),
+                           type = "error")
+          GATES_selected <<- GATES  # Fallback to global GATES
+          GATE_STRATEGY_selected <<- NULL
+        })
+
         # Load experiment if not already loaded
         if(is.null(rv$experiments[[exp_name]])) {
           rv$experiments[[exp_name]] <- load_experiment(exp_folder)
         }
-        
+
         exp <- rv$experiments[[exp_name]]
-        
+
         # Find control for HA threshold
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
-        
+
         if(is.null(control_idx)) {
-          showNotification(sprintf("No control found for %s", exp_name), 
+          showNotification(sprintf("No control found for %s", exp_name),
                            type = "warning")
           next
         }
-        
+
         control_fcs <- exp$flowset[[control_idx]]
         control_name <- exp$metadata$sample_name[control_idx]
-        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name)
+        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                               gates = GATES_selected,
+                                                               channels = CHANNELS)
         ha_threshold <- control_result$threshold
-        
+
         # Check cache first
-        cache_data <- load_from_cache(exp_name, GATES, ha_threshold)
-        
+        cache_data <- load_from_cache(exp_name, GATES_selected, ha_threshold)
+
         if(!is.null(cache_data)) {
           # Use cached results
           incProgress(1/(n_exp*2), detail = sprintf("Loaded %s from cache", exp_name))
           rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
           exp_results <- cache_data$results
-          
+
           # Add Gate_ID to results
-          exp_results$Gate_ID <- substr(cache_data$fingerprint, 1, 8)
-          
+          gate_id <- if(!is.null(cache_data$gate_id)) cache_data$gate_id else gsub("^gates_(.*)\\.r$", "\\1", gate_file)
+          exp_results$Gate_ID <- gate_id
+
           n_from_cache <- n_from_cache + 1
         } else {
           # Run analysis
           incProgress(1/(n_exp*2), detail = sprintf("Analyzing %s", exp_name))
-          
+
           rv$ha_thresholds[[exp_name]] <- ha_threshold
-          exp_results <- extract_correlations(exp, ha_threshold)
-          
-          # Save to cache and get fingerprint
-          fingerprint <- save_to_cache(exp_name, exp_results, ha_threshold, GATES)
-          
+          exp_results <- extract_correlations(exp, ha_threshold,
+                                               gates = GATES_selected,
+                                               channels = CHANNELS)
+
+          # Save to cache and get gate ID
+          gate_id <- save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected)
+
           # Add Gate_ID to results
-          exp_results$Gate_ID <- substr(fingerprint, 1, 8)
-          
+          exp_results$Gate_ID <- gate_id
+
           n_analyzed <- n_analyzed + 1
         }
-        
+
         all_results[[i]] <- exp_results
       }
       
@@ -1881,8 +2055,8 @@ server <- function(input, output, session) {
     plot_summary <- plot_data %>%
       group_by(Cell_line, Mutation, Gene) %>%
       summarize(
-        mean_corr = mean(Correlation),
-        sd_corr = sd(Correlation),
+        mean_corr = mean(Correlation, na.rm = TRUE),
+        sd_corr = ifelse(n() > 1, sd(Correlation, na.rm = TRUE), 0),  # Set SD to 0 for single replicates
         n = n(),
         .groups = 'drop'
       )
@@ -1942,10 +2116,14 @@ server <- function(input, output, session) {
     # Add title with space for legend
     title(main = "Multi-Sample Correlation Comparison", line = 3.5)
     
-    # Add error bars (SD)
-    arrows(bp, plot_summary$mean_corr - plot_summary$sd_corr,
-           bp, plot_summary$mean_corr + plot_summary$sd_corr,
-           angle = 90, code = 3, length = 0.1)
+    # Add error bars (SD) - only for samples with SD > 0
+    for(i in seq_len(nrow(plot_summary))) {
+      if(!is.na(plot_summary$sd_corr[i]) && plot_summary$sd_corr[i] > 0) {
+        arrows(bp[i], plot_summary$mean_corr[i] - plot_summary$sd_corr[i],
+               bp[i], plot_summary$mean_corr[i] + plot_summary$sd_corr[i],
+               angle = 90, code = 3, length = 0.1)
+      }
+    }
     
     # Add horizontal line at 0
     abline(h = 0, lty = 2, col = "gray40")
@@ -1992,21 +2170,31 @@ server <- function(input, output, session) {
       
       for(i in 1:nrow(plot_summary)) {
         test_group <- plot_summary$Cell_line[i]
-        
+
         # Skip the reference group itself
         if(test_group == ref_group) next
-        
+
         test_data <- long_data %>% filter(Cell_line == test_group)
-        
-        # Match by experiment
+
+        # Match by experiment - only keep experiments that have both samples
         merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
-        
+
+        # Remove any rows with NA correlations
+        merged <- merged %>% filter(!is.na(Correlation_ref) & !is.na(Correlation_test))
+
         if(nrow(merged) >= 2) {
-          # Paired t-test
-          t_result <- t.test(merged$Correlation_ref, merged$Correlation_test, paired = TRUE)
-          p_values <- c(p_values, t_result$p.value)
-          test_groups <- c(test_groups, test_group)
+          # Paired t-test (only for experiments with both samples)
+          tryCatch({
+            t_result <- t.test(merged$Correlation_ref, merged$Correlation_test, paired = TRUE)
+            p_values <- c(p_values, t_result$p.value)
+            test_groups <- c(test_groups, test_group)
+          }, error = function(e) {
+            # If t-test fails, mark as NA
+            p_values <<- c(p_values, NA)
+            test_groups <<- c(test_groups, test_group)
+          })
         } else {
+          # Not enough matched pairs for comparison
           p_values <- c(p_values, NA)
           test_groups <- c(test_groups, test_group)
         }
@@ -2184,8 +2372,8 @@ server <- function(input, output, session) {
     grouped <- plot_data %>%
       group_by(Cell_line, Mutation) %>%
       summarize(
-        mean_corr = mean(Correlation),
-        sd_corr = sd(Correlation),
+        mean_corr = mean(Correlation, na.rm = TRUE),
+        sd_corr = ifelse(n() > 1, sd(Correlation, na.rm = TRUE), 0),
         n = n(),
         .groups = 'drop'
       )
@@ -2269,18 +2457,26 @@ server <- function(input, output, session) {
             
             test_data <- long_data %>% filter(Cell_line == test_group)
             test_mut <- grouped$Mutation[grouped$Cell_line == test_group]
-            
-            # Match by experiment
+
+            # Match by experiment - only keep experiments with both samples
             merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
-            
+
+            # Remove any rows with NA correlations
+            merged <- merged %>% filter(!is.na(Correlation_ref) & !is.na(Correlation_test))
+
             if(nrow(merged) >= 2) {
               # Paired t-test
-              t_result <- t.test(merged$Correlation_ref, merged$Correlation_test, paired = TRUE)
-              p_values <- c(p_values, t_result$p.value)
-              test_info[[length(test_info) + 1]] <- list(
-                test_group = test_group,
-                test_mut = test_mut
-              )
+              tryCatch({
+                t_result <- t.test(merged$Correlation_ref, merged$Correlation_test, paired = TRUE)
+                p_values <- c(p_values, t_result$p.value)
+                test_info[[length(test_info) + 1]] <- list(
+                  test_group = test_group,
+                  test_mut = test_mut,
+                  n_pairs = nrow(merged)
+                )
+              }, error = function(e) {
+                # Skip if t-test fails
+              })
             }
           }
           
