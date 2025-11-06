@@ -564,15 +564,14 @@ server <- function(input, output, session) {
   })
   
   # Auto-scan for experiments on startup and when rescan is triggered
-  observe({
-    # React to scan_trigger changes (runs on startup with trigger=0, then when button increments it)
-    rv$scan_trigger
-
+  observeEvent(rv$scan_trigger, ignoreInit = FALSE, {
     # Get folder path (isolate to prevent reactive dependency)
     master_folder <- isolate(input$master_folder)
     if(is.null(master_folder) || master_folder == "") {
       master_folder <- "Experiments/"
     }
+
+    cat(sprintf("=== SCAN TRIGGERED (trigger=%d) ===\n", rv$scan_trigger))
     
     tryCatch({
       exp_folders <- list.dirs(master_folder, recursive = FALSE, full.names = TRUE)
@@ -715,7 +714,7 @@ server <- function(input, output, session) {
               
               # Store HA threshold
               rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
-              
+
               # Also load the experiment FCS data for browsing
               if(is.null(rv$experiments)) {
                 rv$experiments <- list()
@@ -724,7 +723,7 @@ server <- function(input, output, session) {
                 exp_folder <- exp_folders[i]
                 rv$experiments[[exp_name]] <- load_experiment(exp_folder)
               }
-              
+
               n_loaded <- n_loaded + 1
               
             }, error = function(e) {
@@ -734,12 +733,12 @@ server <- function(input, output, session) {
         }
         
         if(n_loaded > 0) {
-          showNotification(sprintf("Auto-loaded %d cached analyses", n_loaded), 
+          showNotification(sprintf("Auto-loaded %d cached analyses", n_loaded),
                            type = "message", duration = 5)
-          
+
           # Update Browse Samples dropdown with loaded experiments
           if(!is.null(rv$experiments) && length(rv$experiments) > 0) {
-            updateSelectInput(session, "selected_experiment", 
+            updateSelectInput(session, "selected_experiment",
                               choices = names(rv$experiments))
           }
         }
