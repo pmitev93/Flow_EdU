@@ -39,11 +39,12 @@ ui <- fluidPage(
       
       # Folder selection
       h4("1. Select Data Folder"),
-      textInput("master_folder", "Master Folder Path:", 
+      textInput("master_folder", "Master Folder Path:",
                 value = "Experiments/"),
-      actionButton("browse_folder", "Browse...", class = "btn-secondary"),
-      actionButton("load_experiments", "Load Experiments", 
-                   class = "btn-primary"),
+      fluidRow(
+        column(6, actionButton("browse_folder", "Browse...", class = "btn-secondary btn-block")),
+        column(6, actionButton("rescan_experiments", "Rescan Folder", class = "btn-info btn-block"))
+      ),
       hr(),
       
       # Experiment selection
@@ -102,14 +103,15 @@ ui <- fluidPage(
                  p("This tool processes flow cytometry data with automated gating and correlation analysis."),
                  h4("How to use:"),
                  tags$ol(
-                   tags$li("Enter the path to your master folder containing experiment subfolders"),
-                   tags$li("Click 'Load Experiments' to scan for experiments"),
+                   tags$li("Experiments are automatically loaded from the folder path on startup"),
                    tags$li("Select which experiments to analyze"),
+                   tags$li("(Optional) Choose different gating strategies for each experiment"),
                    tags$li("Click 'Analyze Selected Experiments' to process data"),
                    tags$li("View results in the 'Results Table' tab"),
                    tags$li("Browse individual gates in the 'Gate Inspection' tabs"),
                    tags$li("Download results as Excel file")
                  ),
+                 p(strong("Tip:"), " Use the 'Rescan Folder' button if you change the experiments folder or add new data."),
                  hr(),
                  h4("Status:"),
                  verbatimTextOutput("status_text")
@@ -521,7 +523,8 @@ server <- function(input, output, session) {
     selected_vertex = NULL,  # NEW: Currently selected vertex
     available_gate_files = NULL,  # NEW: List of available gate strategy files
     experiment_gate_strategies = list(),  # NEW: Per-experiment gate strategy selection
-    experiments_loaded = FALSE  # NEW: Track if experiments have been loaded
+    experiments_loaded = FALSE,  # NEW: Track if experiments have been loaded
+    scan_trigger = 0  # NEW: Trigger for rescanning experiments
   )
   
   # Scan for available gate strategy files
@@ -560,13 +563,13 @@ server <- function(input, output, session) {
     }
   })
   
-  # Auto-scan for experiments on startup (quick metadata scan)
+  # Auto-scan for experiments on startup and when rescan is triggered
   observe({
-    isolate({
-      if(!is.null(rv$all_results)) return()  # Already scanned
-    })
-    
-    master_folder <- isolate(input$master_folder)
+    # React to scan_trigger changes (runs on startup with trigger=0, then when button increments it)
+    rv$scan_trigger
+
+    # Get folder path
+    master_folder <- input$master_folder
     if(is.null(master_folder) || master_folder == "") {
       master_folder <- "Experiments/"
     }
@@ -748,10 +751,18 @@ server <- function(input, output, session) {
   })
   
   # Rescan when button clicked
-  observeEvent(input$load_experiments, {
+  observeEvent(input$rescan_experiments, {
     req(input$master_folder)
-    rv$experiment_folders <- NULL
-    invalidateLater(100)
+
+    # Clear existing data
+    rv$experiments <- NULL
+    rv$all_results <- NULL
+    rv$experiments_loaded <- FALSE
+
+    # Increment trigger to force re-scan
+    rv$scan_trigger <- rv$scan_trigger + 1
+
+    showNotification("Rescanning experiments folder...", type = "message", duration = 2)
   })
   
   # Select all experiments
