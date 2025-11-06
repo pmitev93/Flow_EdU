@@ -35,7 +35,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      width = 3,
+      width = 4,  # Increased from 3 to give more space
       
       # Folder selection
       h4("1. Select Data Folder"),
@@ -52,21 +52,21 @@ ui <- fluidPage(
       conditionalPanel(
         condition = "output.experiments_loaded",
         wellPanel(
-          style = "background-color: #f8f9fa; padding: 10px;",
+          style = "background-color: #f8f9fa; padding: 8px;",
           fluidRow(
-            column(6,
+            column(5,
                    selectInput("default_gate_strategy", "Default Gates:",
                                choices = NULL, width = "100%")
             ),
             column(3,
-                   actionButton("apply_default_gates", "Apply to All",
+                   actionButton("apply_default_gates", "Apply All",
                                 class = "btn-sm btn-info btn-block",
-                                style = "margin-top: 25px;")
+                                style = "margin-top: 25px; font-size: 11px;")
             ),
-            column(3,
-                   actionButton("select_all", "Select All",
+            column(4,
+                   actionButton("select_all", "Select All Exps",
                                 class = "btn-sm btn-block",
-                                style = "margin-top: 25px;")
+                                style = "margin-top: 25px; font-size: 11px;")
             )
           )
         )
@@ -89,7 +89,7 @@ ui <- fluidPage(
     ),
     
     mainPanel(
-      width = 9,
+      width = 8,  # Adjusted from 9 to match sidebar width=4
       
       tabsetPanel(
         id = "main_tabs",
@@ -601,8 +601,11 @@ server <- function(input, output, session) {
           # React to UI refresh trigger to re-render after analysis
           rv$ui_refresh_trigger
 
+          # Isolate exp_names to prevent unwanted re-rendering
+          exp_names_local <- isolate(exp_names)
+
           # Check which experiments have cached analyses
-          exp_info <- lapply(exp_names, function(exp_name) {
+          exp_info <- lapply(exp_names_local, function(exp_name) {
             pattern <- paste0("^", exp_name, "_.*\\.rds$")
             cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE)
 
@@ -625,21 +628,23 @@ server <- function(input, output, session) {
               return(list(analyzed = FALSE, gate_id = NULL))
             }
           })
-          names(exp_info) <- exp_names
+          names(exp_info) <- exp_names_local
 
-          # Get gate choices
-          gate_choices <- setNames(
-            rv$available_gate_files,
-            names(rv$available_gate_files)
-          )
+          # Get gate choices (isolate to prevent reactivity)
+          gate_choices <- isolate({
+            setNames(
+              rv$available_gate_files,
+              names(rv$available_gate_files)
+            )
+          })
 
           # Create rows with checkbox + experiment name + dropdown
-          rows <- lapply(seq_along(exp_names), function(i) {
-            exp_name <- exp_names[i]
+          rows <- lapply(seq_along(exp_names_local), function(i) {
+            exp_name <- exp_names_local[i]
             info <- exp_info[[exp_name]]
 
-            # Current gate selection
-            current_gate <- rv$experiment_gate_strategies[[exp_name]]
+            # Current gate selection (isolate to prevent re-render on change)
+            current_gate <- isolate(rv$experiment_gate_strategies[[exp_name]])
             if(is.null(current_gate)) current_gate <- "gates_gdef.r"
 
             # Create label with checkmark if analyzed
@@ -650,22 +655,21 @@ server <- function(input, output, session) {
             }
 
             div(
-              style = "margin-bottom: 8px; padding: 5px; border-bottom: 1px solid #eee;",
-              fluidRow(
-                column(1,
-                       checkboxInput(paste0("exp_check_", i), NULL,
-                                     value = FALSE, width = "100%")
-                ),
-                column(6,
-                       p(style = "margin-top: 7px; margin-bottom: 0px;",
-                         strong(label_text))
-                ),
-                column(5,
-                       selectInput(paste0("gate_strategy_", i), NULL,
-                                   choices = gate_choices,
-                                   selected = current_gate,
-                                   width = "100%")
-                )
+              style = "margin-bottom: 5px; padding: 3px; border-bottom: 1px solid #eee; display: flex; align-items: center;",
+              div(style = "width: 30px; flex-shrink: 0;",
+                  checkboxInput(paste0("exp_check_", i), NULL,
+                                value = FALSE, width = "100%")
+              ),
+              div(style = "flex: 1; min-width: 0; padding: 0 8px;",
+                  p(style = "margin: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;",
+                    title = label_text,  # Show full name on hover
+                    strong(label_text))
+              ),
+              div(style = "width: 120px; flex-shrink: 0;",
+                  selectInput(paste0("gate_strategy_", i), NULL,
+                              choices = gate_choices,
+                              selected = current_gate,
+                              width = "100%")
               )
             )
           })
