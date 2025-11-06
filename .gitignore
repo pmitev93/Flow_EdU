@@ -1,0 +1,14 @@
+
+# Ignore R history and session files
+.Rhistory
+.RData
+.Rproj.user/
+
+# Ignore folders
+Backups/
+Experiments/
+GUI_Backups/
+Bootstraps/
+Other/
+analysis_cache/
+Results/
