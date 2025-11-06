@@ -568,8 +568,8 @@ server <- function(input, output, session) {
     # React to scan_trigger changes (runs on startup with trigger=0, then when button increments it)
     rv$scan_trigger
 
-    # Get folder path
-    master_folder <- input$master_folder
+    # Get folder path (isolate to prevent reactive dependency)
+    master_folder <- isolate(input$master_folder)
     if(is.null(master_folder) || master_folder == "") {
       master_folder <- "Experiments/"
     }
