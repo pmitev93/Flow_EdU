@@ -47,37 +47,34 @@ ui <- fluidPage(
       ),
       hr(),
       
-      # Experiment selection
-      h4("2. Select Experiments"),
-      uiOutput("experiment_selector"),
-      fluidRow(
-        column(6, actionButton("select_all", "Select All", class = "btn-sm")),
-        column(6, actionButton("deselect_all", "Deselect All", class = "btn-sm"))
-      ),
-      br(),
-
-      # Gating strategy selector
+      # Experiment selection with inline gating strategy
+      h4("2. Select Experiments & Gating Strategy"),
       conditionalPanel(
         condition = "output.experiments_loaded",
         wellPanel(
-          style = "background-color: #f8f9fa;",
-          h5(strong("Gating Strategy Selection")),
-          p(style = "font-size: 0.9em; color: #666;",
-            "Select gating strategy for each experiment. Default: gates_gdef.r"),
+          style = "background-color: #f8f9fa; padding: 10px;",
           fluidRow(
-            column(6, selectInput("default_gate_strategy", "Default Strategy:",
-                                  choices = NULL)),
-            column(6, actionButton("apply_default_gates", "Apply to All",
-                                   class = "btn-sm btn-info",
-                                   style = "margin-top: 25px;"))
-          ),
-          hr(style = "margin: 10px 0;"),
-          uiOutput("gate_strategy_table")
+            column(6,
+                   selectInput("default_gate_strategy", "Default Gates:",
+                               choices = NULL, width = "100%")
+            ),
+            column(3,
+                   actionButton("apply_default_gates", "Apply to All",
+                                class = "btn-sm btn-info btn-block",
+                                style = "margin-top: 25px;")
+            ),
+            column(3,
+                   actionButton("select_all", "Select All",
+                                class = "btn-sm btn-block",
+                                style = "margin-top: 25px;")
+            )
+          )
         )
       ),
+      uiOutput("experiment_selector_with_gates"),
       br(),
       actionButton("analyze_selected", "Analyze Selected Experiments",
-                   class = "btn-success"),
+                   class = "btn-success btn-block"),
       hr(),
       
       # Sample browser
@@ -524,7 +521,8 @@ server <- function(input, output, session) {
     available_gate_files = NULL,  # NEW: List of available gate strategy files
     experiment_gate_strategies = list(),  # NEW: Per-experiment gate strategy selection
     experiments_loaded = FALSE,  # NEW: Track if experiments have been loaded
-    scan_trigger = 0  # NEW: Trigger for rescanning experiments
+    scan_trigger = 0,  # NEW: Trigger for rescanning experiments
+    ui_refresh_trigger = 0  # NEW: Trigger for refreshing experiment UI
   )
   
   # Scan for available gate strategy files
@@ -596,18 +594,22 @@ server <- function(input, output, session) {
         exp_names <- basename(exp_folders)
         rv$experiment_folders <- setNames(exp_folders, exp_names)
         
-        # Update experiment selector
-        output$experiment_selector <- renderUI({
-          # Check which experiments have cached analyses and get their Gate IDs
+        # Update experiment selector with inline gate selection
+        output$experiment_selector_with_gates <- renderUI({
+          req(rv$available_gate_files)
+
+          # React to UI refresh trigger to re-render after analysis
+          rv$ui_refresh_trigger
+
+          # Check which experiments have cached analyses
           exp_info <- lapply(exp_names, function(exp_name) {
             pattern <- paste0("^", exp_name, "_.*\\.rds$")
             cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE)
-            
+
             if(length(cache_files) > 0) {
-              # Get most recent cache file
               cache_times <- file.mtime(cache_files)
               latest_cache <- cache_files[which.max(cache_times)]
-              
+
               tryCatch({
                 cache_data <- readRDS(latest_cache)
                 gate_id <- if(!is.null(cache_data$gate_id)) {
@@ -624,24 +626,53 @@ server <- function(input, output, session) {
             }
           })
           names(exp_info) <- exp_names
-          
-          # Create choice labels with ✓ and Gate ID
-          choice_labels <- sapply(exp_names, function(name) {
-            info <- exp_info[[name]]
-            if(info$analyzed) {
-              paste0(name, " ✓ (", info$gate_id, ")")
+
+          # Get gate choices
+          gate_choices <- setNames(
+            rv$available_gate_files,
+            names(rv$available_gate_files)
+          )
+
+          # Create rows with checkbox + experiment name + dropdown
+          rows <- lapply(seq_along(exp_names), function(i) {
+            exp_name <- exp_names[i]
+            info <- exp_info[[exp_name]]
+
+            # Current gate selection
+            current_gate <- rv$experiment_gate_strategies[[exp_name]]
+            if(is.null(current_gate)) current_gate <- "gates_gdef.r"
+
+            # Create label with checkmark if analyzed
+            label_text <- if(info$analyzed) {
+              paste0(exp_name, " ✓ (", info$gate_id, ")")
             } else {
-              name
+              exp_name
             }
+
+            div(
+              style = "margin-bottom: 8px; padding: 5px; border-bottom: 1px solid #eee;",
+              fluidRow(
+                column(1,
+                       checkboxInput(paste0("exp_check_", i), NULL,
+                                     value = FALSE, width = "100%")
+                ),
+                column(6,
+                       p(style = "margin-top: 7px; margin-bottom: 0px;",
+                         strong(label_text))
+                ),
+                column(5,
+                       selectInput(paste0("gate_strategy_", i), NULL,
+                                   choices = gate_choices,
+                                   selected = current_gate,
+                                   width = "100%")
+                )
+              )
+            )
           })
-          choices <- setNames(exp_names, choice_labels)
-          
-          # Create scrollable container with checkbox group
-          div(style = "max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;",
-              checkboxGroupInput("experiments_to_analyze", 
-                                 "Select experiments:",
-                                 choices = choices,
-                                 selected = NULL)
+
+          div(
+            style = "max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;",
+            rows
           )
         })
 
@@ -767,47 +798,11 @@ server <- function(input, output, session) {
   # Select all experiments
   observeEvent(input$select_all, {
     req(rv$experiment_folders)
-    updateCheckboxGroupInput(session, "experiments_to_analyze",
-                             selected = names(rv$experiment_folders))
-  })
-  
-  # Deselect all experiments
-  observeEvent(input$deselect_all, {
-    updateCheckboxGroupInput(session, "experiments_to_analyze",
-                             selected = character(0))
-  })
-
-  # Render gate strategy table
-  output$gate_strategy_table <- renderUI({
-    req(rv$experiment_folders, rv$available_gate_files)
 
     exp_names <- names(rv$experiment_folders)
-
-    if(length(exp_names) == 0) return(NULL)
-
-    # Create a select input for each experiment
-    gate_choices <- setNames(
-      rv$available_gate_files,
-      names(rv$available_gate_files)
-    )
-
-    lapply(seq_along(exp_names), function(i) {
-      exp_name <- exp_names[i]
-      input_id <- paste0("gate_strategy_", i)
-
-      # Get current selection or default
-      current_selection <- rv$experiment_gate_strategies[[exp_name]]
-      if(is.null(current_selection)) current_selection <- "gates_gdef.r"
-
-      fluidRow(
-        style = "margin-bottom: 5px;",
-        column(6, p(style = "margin-top: 7px;", strong(exp_name))),
-        column(6, selectInput(input_id, NULL,
-                              choices = gate_choices,
-                              selected = current_selection,
-                              width = "100%"))
-      )
-    })
+    for(i in seq_along(exp_names)) {
+      updateCheckboxInput(session, paste0("exp_check_", i), value = TRUE)
+    }
   })
 
   # Apply default gate strategy to all experiments
@@ -823,32 +818,10 @@ server <- function(input, output, session) {
       exp_names
     )
 
-    # Force UI to re-render with new values
-    output$gate_strategy_table <- renderUI({
-      req(rv$experiment_folders, rv$available_gate_files)
-
-      exp_names <- names(rv$experiment_folders)
-      if(length(exp_names) == 0) return(NULL)
-
-      gate_choices <- setNames(
-        rv$available_gate_files,
-        names(rv$available_gate_files)
-      )
-
-      lapply(seq_along(exp_names), function(i) {
-        exp_name <- exp_names[i]
-        input_id <- paste0("gate_strategy_", i)
-
-        fluidRow(
-          style = "margin-bottom: 5px;",
-          column(6, p(style = "margin-top: 7px;", strong(exp_name))),
-          column(6, selectInput(input_id, NULL,
-                                choices = gate_choices,
-                                selected = default_gate,
-                                width = "100%"))
-        )
-      })
-    })
+    # Update all gate dropdown selects
+    for(i in seq_along(exp_names)) {
+      updateSelectInput(session, paste0("gate_strategy_", i), selected = default_gate)
+    }
 
     showNotification(sprintf("Applied %s to all experiments",
                              names(rv$available_gate_files)[rv$available_gate_files == default_gate]),
@@ -906,22 +879,36 @@ server <- function(input, output, session) {
   
   # Analyze selected experiments (load data now)
   observeEvent(input$analyze_selected, {
-    req(rv$experiment_folders, input$experiments_to_analyze)
-    
+    req(rv$experiment_folders)
+
+    # Get selected experiments from checkboxes
+    exp_names <- names(rv$experiment_folders)
+    selected_exps <- c()
+    for(i in seq_along(exp_names)) {
+      if(isTRUE(input[[paste0("exp_check_", i)]])) {
+        selected_exps <- c(selected_exps, exp_names[i])
+      }
+    }
+
+    if(length(selected_exps) == 0) {
+      showNotification("Please select at least one experiment to analyze", type = "warning")
+      return()
+    }
+
     withProgress(message = 'Loading and analyzing experiments...', value = 0, {
-      
+
       # Load only selected experiments
       if(is.null(rv$experiments)) {
         rv$experiments <- list()
       }
-      
+
       all_results <- list()
-      n_exp <- length(input$experiments_to_analyze)
+      n_exp <- length(selected_exps)
       n_from_cache <- 0
       n_analyzed <- 0
-      
-      for(i in seq_along(input$experiments_to_analyze)) {
-        exp_name <- input$experiments_to_analyze[i]
+
+      for(exp_idx in seq_along(selected_exps)) {
+        exp_name <- selected_exps[exp_idx]
         exp_folder <- rv$experiment_folders[[exp_name]]
 
         incProgress(1/(n_exp*2), detail = sprintf("Loading %s", exp_name))
@@ -1038,51 +1025,8 @@ server <- function(input, output, session) {
         }
       }
       
-      # Re-render experiment selector to show updated Gate IDs and checkmarks
-      exp_names <- names(rv$experiment_folders)
-      
-      # Check which experiments have cached analyses and get their Gate IDs
-      exp_info <- lapply(exp_names, function(exp_name) {
-        pattern <- paste0("^", exp_name, "_.*\\.rds$")
-        cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE)
-        
-        if(length(cache_files) > 0) {
-          cache_times <- file.mtime(cache_files)
-          latest_cache <- cache_files[which.max(cache_times)]
-          
-          tryCatch({
-            cache_data <- readRDS(latest_cache)
-            gate_id <- if(!is.null(cache_data$gate_id)) {
-              cache_data$gate_id
-            } else {
-              get_readable_gate_id(cache_data$fingerprint)
-            }
-            return(list(analyzed = TRUE, gate_id = gate_id))
-          }, error = function(e) {
-            return(list(analyzed = FALSE, gate_id = NULL))
-          })
-        } else {
-          return(list(analyzed = FALSE, gate_id = NULL))
-        }
-      })
-      names(exp_info) <- exp_names
-      
-      # Create choice labels with ✓ and Gate ID
-      choice_labels <- sapply(exp_names, function(name) {
-        info <- exp_info[[name]]
-        if(info$analyzed) {
-          paste0(name, " ✓ (", info$gate_id, ")")
-        } else {
-          name
-        }
-      })
-      choices <- setNames(exp_names, choice_labels)
-      
-      # Update the checkbox group
-      current_selection <- input$experiments_to_analyze
-      updateCheckboxGroupInput(session, "experiments_to_analyze",
-                               choices = choices,
-                               selected = current_selection)
+      # Trigger UI refresh to show updated checkmarks/gate IDs
+      rv$ui_refresh_trigger <- rv$ui_refresh_trigger + 1
       
       showNotification(sprintf("Analysis complete! %d samples processed (%d from cache, %d newly analyzed).", 
                                nrow(new_results), n_from_cache, n_analyzed), 
