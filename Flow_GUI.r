@@ -31,7 +31,7 @@ source("gate_adjustment_module.r")  # NEW: Gate editing functionality
 # ==============================================================================
 
 ui <- fluidPage(
-  titlePanel("The MITEV Analysis Tool"),
+  titlePanel("The Mitev EdU Analysis Tool"),
   
   sidebarLayout(
     sidebarPanel(
@@ -81,7 +81,7 @@ ui <- fluidPage(
         
         # Welcome tab
         tabPanel("Welcome",
-                 h3("Welcome to the Multivariate Identification and Tracking of EdU-incorporating Variants (MITEV) Analysis Tool"),
+                 h3("Welcome to the Mitev EdU Analysis Tool"),
                  p("This tool processes flow cytometry data with automated gating and correlation analysis."),
                  h4("How to use:"),
                  tags$ol(
@@ -2319,7 +2319,7 @@ server <- function(input, output, session) {
   })
   
   # ==============================================================================
-  # DOWNLOAD FOR PRISM/GRAPHPAD
+  # DOWNLOAD FOR PRISM
   # ==============================================================================
   
   output$download_prism <- downloadHandler(
@@ -2336,43 +2336,34 @@ server <- function(input, output, session) {
         return()
       }
       
-      # Group by cell line and mutation to create column names
       unique_groups <- plot_data %>%
         group_by(Cell_line, Mutation) %>%
         summarize(.groups = 'drop') %>%
         arrange(Cell_line)
       
-      # Create column names: Mutation (#CellLine)
       col_names <- paste0(unique_groups$Mutation, " (#", unique_groups$Cell_line, ")")
       
-      # Get unique experiments
       unique_experiments <- unique(plot_data$Experiment)
       
-      # Create output matrix
       output_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
       
-      # Track low cell count warnings for each experiment
       low_cell_warnings <- list()
       
-      # For each cell line/mutation combo, create a column
       for(i in 1:nrow(unique_groups)) {
         cell_line <- unique_groups$Cell_line[i]
         mutation <- unique_groups$Mutation[i]
         col_name <- col_names[i]
         
-        # Extract data for this cell line
         cell_data <- plot_data %>%
           filter(Cell_line == cell_line) %>%
           select(Experiment, Correlation, N_cells)
         
-        # Create a column with correlation values, matched by experiment
         values <- sapply(unique_experiments, function(exp) {
           match_idx <- which(cell_data$Experiment == exp)
           if(length(match_idx) > 0) {
             corr <- as.numeric(cell_data$Correlation[match_idx[1]])
             n_cells <- as.numeric(cell_data$N_cells[match_idx[1]])
             
-            # Track if low cell count (exclude Empty Vector from warnings)
             is_empty_vector <- grepl("Empty.?Vector", mutation, ignore.case = TRUE)
             if(!is.na(n_cells) && n_cells < 500 && !is_empty_vector) {
               if(is.null(low_cell_warnings[[exp]])) {
@@ -2382,7 +2373,6 @@ server <- function(input, output, session) {
                                             paste0(mutation, " (#", cell_line, ")"))
             }
             
-            # Return as numeric (not text) and round to 4 decimal places
             if(!is.na(corr)) {
               return(round(corr, 4))
             } else {
@@ -2396,7 +2386,6 @@ server <- function(input, output, session) {
         output_df[[col_name]] <- values
       }
       
-      # Add warning column at the end
       warnings_col <- sapply(unique_experiments, function(exp) {
         if(!is.null(low_cell_warnings[[exp]]) && length(low_cell_warnings[[exp]]) > 0) {
           return(paste(low_cell_warnings[[exp]], collapse = "; "))
@@ -2407,13 +2396,11 @@ server <- function(input, output, session) {
       
       output_df$Low_Cell_Warning <- warnings_col
       
-      # Load writexl package
       if(!require("writexl", quietly = TRUE)) {
         install.packages("writexl", repos = "http://cran.r-project.org")
         library(writexl)
       }
       
-      # Create a second sheet with notes
       notes_df <- data.frame(
         Note = c("Correlation values are reported to 4 decimal places",
                  "Each row represents one experiment",
@@ -2423,7 +2410,6 @@ server <- function(input, output, session) {
         stringsAsFactors = FALSE
       )
       
-      # Write to Excel with two sheets
       write_xlsx(list(
         "Correlation_Data" = output_df,
         "Notes" = notes_df

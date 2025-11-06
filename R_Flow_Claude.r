@@ -12,7 +12,6 @@ setwd("/Users/petar.mitev/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Exp
 
 # Paths ####
 master_path <- "Experiments/"
-#experiment_folders <- list.dirs(master_path, recursive = FALSE, full.names = TRUE)
 
 cat("Found", length(experiment_folders), "experiments\n")
 print(experiment_folders)
@@ -22,79 +21,31 @@ CHANNELS <- list(
   FSC_A = "FSC-A",
   FSC_H = "FSC-H",
   SSC_A = "SSC-A",
-  EdU = "FL1-A",      # EdU B525-A
-  HA = "FL3-A",       # HA R660-A
-  DCM = "FL5-A",      # DCM R780-A
-  FxCycle = "FL6-A",  # FxCycle V450-A
-  SAMD9 = "FL10-A"    # SAMD9/SAMD9L Y585-A (alternative to HA)
+  EdU = "FL1-A",
+  HA = "FL3-A",
+  DCM = "FL5-A",
+  FxCycle = "FL6-A",
+  SAMD9 = "FL10-A"
 )
 
-# Gate Definitions ----
+# ==============================================================================
+# GATE LOADING
+# ==============================================================================
 
-GATES <- list()
+# Specify which gate strategy to use (default)
+GATE_STRATEGY_FILE <- "gate_definitions/gates_gdef.r"
 
-# Debris removal gate (FSC-A vs SSC-A)
-GATES$debris <- matrix(c(
-  1.4e6, 4.1e6,
-  4.0e6, 9.4e6,
-  8.7e6, 14.0e6,
-  12.0e6, 14.0e6,
-  13.0e6, 13.0e6,
-  14.0e6, 11.0e6,
-  13.0e6, 7.3e6,
-  8.7e6, 2.4e6,
-  4.8e6, 0.384e6,
-  2.7e6, 0.068e6,
-  1.8e6, 0.565e6,
-  1.1e6, 1.7e6,
-  1.4e6, 4.1e6  # Close the polygon
-), ncol = 2, byrow = TRUE)
-colnames(GATES$debris) <- c("FSC-A", "SSC-A")
+# Load the gate definitions
+if(!file.exists(GATE_STRATEGY_FILE)) {
+  warning(sprintf("Gate definition file not found: %s", GATE_STRATEGY_FILE))
+  stop("Please create gate definition file first")
+}
 
-# Singlet gate (FSC-A vs FSC-H)
-GATES$singlet <- matrix(c(
-  5.8e6, 2.5e6,
-  9.5e6, 2.5e6,
-  6.4e6, 1.3e6,
-  4.5e6, 0.740e6,
-  3.0e6, 0.461e6,
-  1.7e6, 0.489e6,
-  1.5e6, 0.525e6,
-  1.6e6, 0.658e6,
-  1.9e6, 0.987e6,
-  3.3e6, 1.6e6,
-  5.8e6, 2.5e6  # Close the polygon
-), ncol = 2, byrow = TRUE)
-colnames(GATES$singlet) <- c("FSC-A", "FSC-H")
-
-# Dead cell removal gate (DCM-A vs SSC-A)
-GATES$live_cells <- matrix(c(
-  122, 181000,
-  18000, 181000,
-  18000, 13000000,
-  122, 13000000,
-  122, 181000  # Close the rectangle
-), ncol = 2, byrow = TRUE)
-colnames(GATES$live_cells) <- c("DCM-A", "SSC-A")
-
-# S-phase gating - Stage 1: Remove outliers (FxCycle-A vs EdU-A)
-GATES$s_phase_outliers <- matrix(c(
-  1.5e6, 100,
-  9e6, 100,
-  9e6, 5e6,
-  1.5e6, 5e6,
-  1.5e6, 100  # Close the rectangle
-), ncol = 2, byrow = TRUE)
-colnames(GATES$s_phase_outliers) <- c("FxCycle-A", "EdU-A")
-
-# S-phase gating - Stage 2: FxCycle quantile filter (dynamic, 1%-99%)
-# This gate is calculated dynamically for each sample
-GATES$fxcycle_quantile <- list(
-  type = "quantile_range",
-  parameter = CHANNELS$FxCycle,  # Use the channel mapping we defined earlier
-  probs = c(0.01, 0.90),
-  description = "Remove FxCycle outliers (keep 1st-90th percentile)"
-)
+cat(sprintf("Loading gate strategy from: %s\n", GATE_STRATEGY_FILE))
+source(GATE_STRATEGY_FILE)
+if(exists("GATE_STRATEGY")) {
+  cat(sprintf("Loaded gate strategy: %s (%s)\n", GATE_STRATEGY$id, GATE_STRATEGY$name))
+}
 
 # Gating Functions ####
 
@@ -124,18 +75,6 @@ apply_quantile_gate <- function(fcs_data, gate_params) {
     bounds = c(lower = unname(lower_bound), upper = unname(upper_bound))
   ))
 }
-
-# S-phase gating - Stage 3: Top 50% EdU + FxCycle range (dynamic)
-# Select cells with highest EdU incorporation AND appropriate FxCycle range
-GATES$edu_fxcycle_sphase <- list(
-  type = "dual_quantile",
-  edu_parameter = CHANNELS$EdU,
-  edu_prob = 0.50,  # Keep cells above 50th percentile
-  fxcycle_parameter = CHANNELS$FxCycle,
-  fxcycle_probs = c(0.01, 0.90),  # Keep between 1st-90th percentile
-  description = "Select top 50% EdU AND FxCycle 1st-90th percentile"
-)
-
 
 # Apply dual quantile gate (EdU threshold + FxCycle range)
 apply_dual_quantile_gate <- function(fcs_data, gate_params) {
@@ -190,41 +129,41 @@ apply_quantile_threshold <- function(fcs_data, gate_params) {
   ))
 }
 
-# HA gating (dynamic, per-experiment)
-# Threshold set by 98th percentile of empty vector control
-GATES$ha_positive <- list(
-  type = "control_based_threshold",
-  parameter = CHANNELS$HA,
-  control_pattern = "Empty_Vector",  # Pattern to find control sample
-  prob = 0.98,
-  description = "HA-positive cells (above 98th percentile of empty vector control)"
-)
-
 # Find control sample in an experiment's metadata
-# Find control sample in an experiment's metadata
-find_control_sample <- function(metadata, pattern = "Empty_Vector_Dox-") {
-  # Look for pattern in sample names (case-insensitive, flexible matching)
-  matches <- grep(pattern, metadata$sample_name, ignore.case = TRUE)
+find_control_sample <- function(metadata, pattern = "Control") {
+  # First, try to find files ending with "Control.fcs" (case-insensitive)
+  control_pattern <- "Control\\.fcs$"
+  matches <- grep(control_pattern, metadata$full_filename, ignore.case = TRUE)
+  
+  if(length(matches) > 0) {
+    if(length(matches) > 1) {
+      warning(sprintf("Multiple control files found. Using first one: %s", 
+                      metadata$full_filename[matches[1]]))
+    }
+    cat(sprintf("Using control sample: %s (%s)\n", 
+                metadata$well[matches[1]], 
+                metadata$sample_name[matches[1]]))
+    return(matches[1])
+  }
+  
+  # Fallback: try the old pattern matching
+  matches <- grep("Empty_Vector_Dox-", metadata$sample_name, ignore.case = TRUE)
   
   if(length(matches) == 0) {
-    warning(sprintf("No control sample found matching pattern '%s'", pattern))
+    warning("No control sample found (no file ending in 'Control.fcs' or matching 'Empty_Vector_Dox-')")
     return(NULL)
   }
   
   if(length(matches) > 1) {
-    match_info <- paste(sprintf("%s (%s)", 
-                                metadata$well[matches], 
-                                metadata$sample_name[matches]), 
-                        collapse = ", ")
-    warning(sprintf("Multiple control samples found matching '%s': %s. Using first one.", 
-                    pattern, match_info))
+    warning(sprintf("Multiple control samples found. Using first one: %s", 
+                    metadata$sample_name[matches[1]]))
   }
   
   cat(sprintf("Using control sample: %s (%s)\n", 
               metadata$well[matches[1]], 
               metadata$sample_name[matches[1]]))
   
-  return(matches[1])  # Return index of control sample
+  return(matches[1])
 }
 
 # Calculate threshold from control sample
@@ -278,7 +217,6 @@ load_experiment <- function(experiment_path) {
   )
   
   # Extract well and sample info from filenames
-  # Format: 01-Well-E9_624_SAMD9_I1553T_Dox+.fcs
   metadata$well <- str_extract(metadata$full_filename, "[A-H][0-9]+")
   
   # Extract sample name (everything after first underscore, before .fcs)
@@ -292,7 +230,6 @@ load_experiment <- function(experiment_path) {
   sampleNames(fs) <- metadata$full_filename
   
   # Apply compensation if available
-  # Check if compensation matrix exists in first file
   comp_matrix <- keyword(fs[[1]])$SPILL
   if(is.null(comp_matrix)) {
     comp_matrix <- keyword(fs[[1]])$`$SPILLOVER`
@@ -346,7 +283,6 @@ calculate_edu_ha_correlation <- function(fcs_data, edu_channel, ha_channel) {
   ha_values <- exprs(fcs_data)[, ha_channel]
   
   # Apply log10 transformation
-  # Add small value to avoid log10(0) = -Inf
   edu_log <- log10(edu_values + 1)
   ha_log <- log10(ha_values + 1)
   
@@ -362,15 +298,9 @@ calculate_edu_ha_correlation <- function(fcs_data, edu_channel, ha_channel) {
   ))
 }
 
-
-
-
-
-
-
 # Full Analysis Pipeline ####
 
-# Apply all gates sequentially to a single sample ----
+# Apply all gates sequentially to a single sample
 process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
   
   cat(sprintf("\nProcessing: %s\n", sample_name))
@@ -391,8 +321,8 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
   debris_filter <- point.in.polygon(
     exprs(current_data)[, channels$FSC_A],
     exprs(current_data)[, channels$SSC_A],
-    gates$debris[, 1],  # FSC-A column
-    gates$debris[, 2]   # SSC-A column
+    gates$debris[, 1],
+    gates$debris[, 2]
   ) > 0
   current_data <- Subset(current_data, debris_filter)
   results$cell_counts$after_debris <- nrow(current_data)
@@ -403,8 +333,8 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
   singlet_filter <- point.in.polygon(
     exprs(current_data)[, channels$FSC_A],
     exprs(current_data)[, channels$FSC_H],
-    gates$singlet[, 1],  # FSC-A column
-    gates$singlet[, 2]   # FSC-H column
+    gates$singlet[, 1],
+    gates$singlet[, 2]
   ) > 0
   current_data <- Subset(current_data, singlet_filter)
   results$cell_counts$after_singlets <- nrow(current_data)
@@ -415,8 +345,8 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
   live_filter <- point.in.polygon(
     exprs(current_data)[, channels$DCM],
     exprs(current_data)[, channels$SSC_A],
-    gates$live_cells[, 1],  # DCM-A column
-    gates$live_cells[, 2]   # SSC-A column
+    gates$live_cells[, 1],
+    gates$live_cells[, 2]
   ) > 0
   current_data <- Subset(current_data, live_filter)
   results$cell_counts$after_live <- nrow(current_data)
@@ -427,14 +357,14 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
   sphase_filter <- point.in.polygon(
     exprs(current_data)[, channels$FxCycle],
     exprs(current_data)[, channels$EdU],
-    gates$s_phase_outliers[, 1],  # FxCycle-A column
-    gates$s_phase_outliers[, 2]   # EdU-A column
+    gates$s_phase_outliers[, 1],
+    gates$s_phase_outliers[, 2]
   ) > 0
   current_data <- Subset(current_data, sphase_filter)
   results$cell_counts$after_sphase_outliers <- nrow(current_data)
   cat(sprintf(" %s cells\n", format(nrow(current_data), big.mark = ",")))
   
-  # Gate 5: FxCycle quantile (1%-99%)
+  # Gate 5: FxCycle quantile (1%-90%)
   cat("  Gate 5: FxCycle quantile...")
   fxcycle_result <- apply_quantile_gate(current_data, gates$fxcycle_quantile)
   current_data <- fxcycle_result$data
@@ -460,7 +390,7 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
   cat(sprintf(" %s cells\n", format(nrow(current_data), big.mark = ",")))
   
   # Final: Calculate EdU vs HA correlation
-  if(nrow(current_data) > 10) {  # Need at least some cells for correlation
+  if(nrow(current_data) > 10) {
     cat("  Calculating correlation...")
     corr_result <- calculate_edu_ha_correlation(current_data, channels$EdU, channels$HA)
     results$correlation <- corr_result$correlation
@@ -476,12 +406,6 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
   
   return(results)
 }
-
-
-
-
-
-
 
 # Process control sample to get HA threshold
 calculate_ha_threshold_from_control <- function(control_fcs, control_name, gates = GATES, channels = CHANNELS) {
@@ -558,8 +482,6 @@ calculate_ha_threshold_from_control <- function(control_fcs, control_name, gates
   ))
 }
 
-
-
 # Helper Functions ----
 
 # Apply sequential gates (used for testing visualizations)
@@ -621,8 +543,6 @@ get_density_colors <- function(x, y, log_x = FALSE, log_y = FALSE) {
   densCols(x_plot, y_plot, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 }
 
-
-
 # Paths ####
 master_path <- "Experiments/"
 experiment_folders <- list.dirs(master_path, recursive = FALSE, full.names = TRUE)
@@ -633,7 +553,3 @@ dir.create(OUTPUT_FOLDER, showWarnings = FALSE, recursive = TRUE)
 
 cat("Found", length(experiment_folders), "experiments\n")
 print(experiment_folders)
-
-
-
-
