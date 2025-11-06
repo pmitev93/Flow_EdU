@@ -1961,8 +1961,8 @@ server <- function(input, output, session) {
       arrange(Cell_line)
     
     paste(sprintf("%s (%s): %d replicates",
-                  as.character(grouped$Cell_line),
-                  as.character(grouped$Mutation),
+                  grouped$Cell_line,
+                  grouped$Mutation,
                   grouped$n),
           collapse = "\n")
   })
@@ -2403,10 +2403,10 @@ server <- function(input, output, session) {
           ref_group <- if(!is.null(input$reference_group) && input$reference_group != "") {
             input$reference_group
           } else {
-            as.character(grouped$Cell_line[1])
+            grouped %>% slice(1) %>% pull(Cell_line)
           }
-          
-          ref_mut <- as.character(grouped$Mutation[grouped$Cell_line == ref_group][1])
+
+          ref_mut <- grouped %>% filter(Cell_line == ref_group) %>% slice(1) %>% pull(Mutation)
           stats_text <- paste0(stats_text, sprintf("(Compared to %s #%s)\n\n", ref_mut, ref_group))
           
           ref_data <- long_data %>% filter(Cell_line == ref_group)
@@ -2416,13 +2416,13 @@ server <- function(input, output, session) {
           test_info <- list()
           
           for(i in 1:nrow(grouped)) {
-            test_group <- as.character(grouped$Cell_line[i])
+            test_group <- grouped %>% slice(i) %>% pull(Cell_line)
 
             # Skip if this is the reference group
             if(test_group == ref_group) next
-            
+
             test_data <- long_data %>% filter(Cell_line == test_group)
-            test_mut <- as.character(grouped$Mutation[grouped$Cell_line == test_group][1])
+            test_mut <- grouped %>% slice(i) %>% pull(Mutation)
 
             # Match by experiment - only keep experiments with both samples
             merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
