@@ -777,18 +777,28 @@ server <- function(input, output, session) {
 
                 # Update results table with cached data
                 for(j in seq_len(nrow(cache_data$results))) {
-                  # Match on Experiment, Well, AND Gate_ID
+                  # First try to match on Experiment, Well, AND Gate_ID
                   match_idx <- which(rv$all_results$Experiment == cache_data$results$Experiment[j] &
                                        rv$all_results$Well == cache_data$results$Well[j] &
+                                       !is.na(rv$all_results$Gate_ID) &
                                        rv$all_results$Gate_ID == gate_id)
 
+                  # If no match found, try to find an unanalyzed row (Gate_ID is NA)
+                  if(length(match_idx) == 0) {
+                    match_idx <- which(rv$all_results$Experiment == cache_data$results$Experiment[j] &
+                                         rv$all_results$Well == cache_data$results$Well[j] &
+                                         is.na(rv$all_results$Gate_ID))
+                  }
+
                   if(length(match_idx) > 0) {
-                    # Update existing row
+                    # Update existing row (take first match if multiple)
+                    match_idx <- match_idx[1]
                     rv$all_results$Correlation[match_idx] <- cache_data$results$Correlation[j]
                     rv$all_results$N_cells[match_idx] <- cache_data$results$N_cells[j]
                     rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
+                    rv$all_results$Gate_ID[match_idx] <- gate_id
                   } else {
-                    # Add new row for this gate strategy
+                    # This is a second/third gate strategy for same well - add new row
                     new_row <- cache_data$results[j, ]
                     new_row$Gate_ID <- gate_id
                     rv$all_results <- bind_rows(rv$all_results, new_row)
@@ -1112,18 +1122,28 @@ server <- function(input, output, session) {
           rv$all_results$Gate_ID <- NA_character_
         }
 
-        # Find matching row in all_results (must match Experiment, Well, AND Gate_ID)
+        # First try to match on Experiment, Well, AND Gate_ID
         match_idx <- which(rv$all_results$Experiment == new_results$Experiment[i] &
                              rv$all_results$Well == new_results$Well[i] &
+                             !is.na(rv$all_results$Gate_ID) &
                              rv$all_results$Gate_ID == new_results$Gate_ID[i])
 
+        # If no match found, try to find an unanalyzed row (Gate_ID is NA)
+        if(length(match_idx) == 0) {
+          match_idx <- which(rv$all_results$Experiment == new_results$Experiment[i] &
+                               rv$all_results$Well == new_results$Well[i] &
+                               is.na(rv$all_results$Gate_ID))
+        }
+
         if(length(match_idx) > 0) {
-          # Update existing row with this gate strategy
+          # Update existing row (take first match if multiple)
+          match_idx <- match_idx[1]
           rv$all_results$Correlation[match_idx] <- new_results$Correlation[i]
           rv$all_results$N_cells[match_idx] <- new_results$N_cells[i]
           rv$all_results$Notes[match_idx] <- new_results$Notes[i]
+          rv$all_results$Gate_ID[match_idx] <- new_results$Gate_ID[i]
         } else {
-          # This is a new gate strategy for this experiment/well - add a new row
+          # This is a second/third gate strategy for same well - add new row
           rv$all_results <- bind_rows(rv$all_results, new_results[i, ])
         }
       }
@@ -1140,7 +1160,7 @@ server <- function(input, output, session) {
   # Display results table with row selection
   output$results_table <- renderDT({
     req(rv$all_results)
-    
+
     # Format correlation to 4 decimal places
     display_data <- rv$all_results
     if("Correlation" %in% names(display_data)) {
@@ -1150,11 +1170,26 @@ server <- function(input, output, session) {
         sprintf("%.4f", as.numeric(display_data$Correlation))
       )
     }
-    
-    datatable(display_data, 
+
+    # Ensure columns are character/numeric for proper filtering
+    if("N_cells" %in% names(display_data)) {
+      display_data$N_cells <- as.character(display_data$N_cells)
+    }
+    if("Notes" %in% names(display_data)) {
+      display_data$Notes <- as.character(display_data$Notes)
+    }
+    if("Gate_ID" %in% names(display_data)) {
+      display_data$Gate_ID <- as.character(display_data$Gate_ID)
+    }
+
+    datatable(display_data,
               selection = 'single',  # Enable single row selection
-              options = list(pageLength = 25, scrollX = TRUE),
-              filter = 'top')
+              options = list(
+                pageLength = 25,
+                scrollX = TRUE,
+                search = list(regex = FALSE, caseInsensitive = TRUE)
+              ),
+              filter = list(position = 'top', clear = FALSE))
   })
   
   # When a row is clicked, load that sample
