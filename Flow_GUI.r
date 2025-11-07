@@ -1139,28 +1139,35 @@ server <- function(input, output, session) {
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
     req(rv$experiments, input$overview_experiment, input$overview_gate)
-    
+
     exp <- rv$experiments[[input$overview_experiment]]
     exp_name <- input$overview_experiment
-    
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
     if(input$overview_gate == "gate1") {
-      plot_debris_gate_overview(exp)
-      
+      plot_debris_gate_overview(exp, gates = gates_to_use)
+
     } else if(input$overview_gate == "gate2") {
-      plot_singlet_gate_overview(exp)
-      
+      plot_singlet_gate_overview(exp, gates = gates_to_use)
+
     } else if(input$overview_gate == "gate3") {
-      plot_live_gate_overview(exp)
-      
+      plot_live_gate_overview(exp, gates = gates_to_use)
+
     } else if(input$overview_gate == "gate4") {
-      plot_sphase_outlier_gate_overview(exp)
-      
+      plot_sphase_outlier_gate_overview(exp, gates = gates_to_use)
+
     } else if(input$overview_gate == "gate5") {
-      plot_fxcycle_quantile_gate_overview(exp)
-      
+      plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use)
+
     } else if(input$overview_gate == "gate6") {
-      plot_edu_fxcycle_gate_overview(exp)
-      
+      plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use)
+
     } else if(input$overview_gate == "gate7") {
       # Calculate HA threshold
       control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -1171,11 +1178,13 @@ server <- function(input, output, session) {
       }
       control_fcs <- exp$flowset[[control_idx]]
       control_name <- exp$metadata$sample_name[control_idx]
-      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name)
+      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                             gates = gates_to_use,
+                                                             channels = CHANNELS)
       ha_threshold <- control_result$threshold
-      
-      plot_ha_gate_overview(exp, ha_threshold)
-      
+
+      plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use)
+
     } else if(input$overview_gate == "correlation") {
       # Calculate HA threshold
       control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -1186,10 +1195,12 @@ server <- function(input, output, session) {
       }
       control_fcs <- exp$flowset[[control_idx]]
       control_name <- exp$metadata$sample_name[control_idx]
-      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name)
+      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                             gates = gates_to_use,
+                                                             channels = CHANNELS)
       ha_threshold <- control_result$threshold
-      
-      plot_edu_ha_correlation_overview(exp, ha_threshold)
+
+      plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use)
     }
   })
   
