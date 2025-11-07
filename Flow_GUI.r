@@ -521,6 +521,7 @@ server <- function(input, output, session) {
     experiments = NULL,
     all_results = NULL,
     ha_thresholds = list(),
+    experiment_gates = list(),  # NEW: Store which gates were used for each experiment
     gate_storage = initialize_gate_storage(),  # NEW: Store custom gates
     edit_mode = FALSE,  # NEW: Track if in edit mode
     temp_gate = NULL,  # NEW: Temporary gate during editing
@@ -757,6 +758,11 @@ server <- function(input, output, session) {
               # Store HA threshold
               rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
 
+              # Store gates used for this experiment
+              if(!is.null(cache_data$gates)) {
+                rv$experiment_gates[[exp_name]] <- cache_data$gates
+              }
+
               # Also load the experiment FCS data for browsing
               if(is.null(rv$experiments)) {
                 rv$experiments <- list()
@@ -988,6 +994,14 @@ server <- function(input, output, session) {
           } else {
             "gdef"
           }
+
+          # Store gates used for this experiment (prefer from cache, fallback to selected)
+          rv$experiment_gates[[exp_name]] <- if(!is.null(cache_data$gates)) {
+            cache_data$gates
+          } else {
+            GATES_selected
+          }
+
           exp_results$Gate_ID <- gate_id
 
           n_from_cache <- n_from_cache + 1
@@ -1009,6 +1023,9 @@ server <- function(input, output, session) {
 
           save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected,
                         gate_strategy_id = gate_id)
+
+          # Store gates used for this experiment
+          rv$experiment_gates[[exp_name]] <- GATES_selected
 
           # Add Gate_ID to results
           exp_results$Gate_ID <- gate_id
@@ -1780,50 +1797,112 @@ server <- function(input, output, session) {
   output$gate1_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    plot_debris_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx])
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
+    plot_debris_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
   })
-  
+
   output$gate2_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    plot_singlet_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx])
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
+    plot_singlet_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
   })
-  
+
   output$gate3_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    plot_live_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx])
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
+    plot_live_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
   })
-  
+
   output$gate4_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    plot_sphase_outlier_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx])
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
+    plot_sphase_outlier_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
   })
   
   output$gate5_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    plot_fxcycle_quantile_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx])
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
+    plot_fxcycle_quantile_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
   })
-  
+
   output$gate6_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    plot_edu_fxcycle_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx])
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
+    plot_edu_fxcycle_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
   })
   
   output$gate7_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
     # Calculate HA threshold for this experiment
     control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
     if(is.null(control_idx)) {
@@ -1831,20 +1910,31 @@ server <- function(input, output, session) {
       text(0.5, 0.5, "No control sample found", cex = 1.5)
       return()
     }
-    
+
     control_fcs <- exp$flowset[[control_idx]]
     control_name <- exp$metadata$sample_name[control_idx]
-    control_result <- calculate_ha_threshold_from_control(control_fcs, control_name)
+    control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                           gates = gates_to_use,
+                                                           channels = CHANNELS)
     ha_threshold <- control_result$threshold
-    
-    plot_ha_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold)
+
+    plot_ha_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                        gates = gates_to_use)
   })
   
   output$correlation_plot <- renderPlot({
     req(rv$experiments, input$selected_experiment, input$selected_sample)
     exp <- rv$experiments[[input$selected_experiment]]
+    exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
-    
+
+    # Use gates for this experiment if available, otherwise use default
+    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
+      rv$experiment_gates[[exp_name]]
+    } else {
+      GATES
+    }
+
     # Calculate HA threshold for this experiment
     control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
     if(is.null(control_idx)) {
@@ -1852,13 +1942,16 @@ server <- function(input, output, session) {
       text(0.5, 0.5, "No control sample found", cex = 1.5)
       return()
     }
-    
+
     control_fcs <- exp$flowset[[control_idx]]
     control_name <- exp$metadata$sample_name[control_idx]
-    control_result <- calculate_ha_threshold_from_control(control_fcs, control_name)
+    control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                           gates = gates_to_use,
+                                                           channels = CHANNELS)
     ha_threshold <- control_result$threshold
-    
-    plot_edu_ha_correlation_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold)
+
+    plot_edu_ha_correlation_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                                     gates = gates_to_use)
   })
   
   # Status text
