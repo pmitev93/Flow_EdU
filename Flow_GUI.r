@@ -2021,6 +2021,11 @@ server <- function(input, output, session) {
         sd_corr = ifelse(n() > 1, sd(Correlation, na.rm = TRUE), 0),  # Set SD to 0 for single replicates
         n = n(),
         .groups = 'drop'
+      ) %>%
+      mutate(
+        Cell_line = as.character(Cell_line),
+        Mutation = as.character(Mutation),
+        Gene = as.character(Gene)
       )
     
     # Sort: use custom order if available, otherwise WT first then by correlation
@@ -2110,9 +2115,10 @@ server <- function(input, output, session) {
     # Add statistical significance using Holm-Sidak correction (all at same height)
     if(nrow(plot_summary) > 1) {
       # Prepare data for matched analysis
+      # If there are multiple replicates per experiment/cell_line, take the mean
       wide_data <- plot_data %>%
         select(Experiment, Cell_line, Correlation) %>%
-        pivot_wider(names_from = Cell_line, values_from = Correlation)
+        pivot_wider(names_from = Cell_line, values_from = Correlation, values_fn = mean)
       
       long_data <- wide_data %>%
         pivot_longer(cols = -Experiment, names_to = "Cell_line", values_to = "Correlation") %>%
