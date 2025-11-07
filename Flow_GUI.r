@@ -754,64 +754,71 @@ server <- function(input, output, session) {
           exp_name <- exp_names[i]
           incProgress(1/length(exp_names), detail = exp_name)
           
-          # Find most recent cache file for this experiment (scan all subfolders)
+          # Find ALL cache files for this experiment (scan all subfolders for all gate strategies)
           pattern <- paste0("^", exp_name, "_.*\\.rds$")
           cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
-          
-          if(length(cache_files) > 0) {
-            # Use the most recent cache file
-            cache_times <- file.mtime(cache_files)
-            latest_cache <- cache_files[which.max(cache_times)]
-            
-            tryCatch({
-              cache_data <- readRDS(latest_cache)
-              
-              # Add Gate_ID column if it doesn't exist
-              if(!"Gate_ID" %in% names(rv$all_results)) {
-                rv$all_results$Gate_ID <- NA_character_
-              }
-              
-              # Update results table with cached data
-              for(j in seq_len(nrow(cache_data$results))) {
-                match_idx <- which(rv$all_results$Experiment == cache_data$results$Experiment[j] & 
-                                     rv$all_results$Well == cache_data$results$Well[j])
-                
-                if(length(match_idx) > 0) {
-                  rv$all_results$Correlation[match_idx] <- cache_data$results$Correlation[j]
-                  rv$all_results$N_cells[match_idx] <- cache_data$results$N_cells[j]
-                  rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
-                  rv$all_results$Gate_ID[match_idx] <- if(!is.null(cache_data$gate_id)) cache_data$gate_id else get_readable_gate_id(cache_data$fingerprint)
-                }
-              }
-              
-              # Store HA threshold
-              rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
 
-              # Store gates used for this experiment+strategy combination
-              if(!is.null(cache_data$gates)) {
+          if(length(cache_files) > 0) {
+            # Load ALL cache files (one for each gate strategy)
+            for(cache_file in cache_files) {
+              tryCatch({
+                cache_data <- readRDS(cache_file)
+
+                # Add Gate_ID column if it doesn't exist
+                if(!"Gate_ID" %in% names(rv$all_results)) {
+                  rv$all_results$Gate_ID <- NA_character_
+                }
+
                 gate_id <- if(!is.null(cache_data$gate_id)) {
                   cache_data$gate_id
                 } else {
                   get_readable_gate_id(cache_data$fingerprint)
                 }
-                composite_key <- paste0(exp_name, "::", gate_id)
-                rv$experiment_gates[[composite_key]] <- cache_data$gates
-              }
 
-              # Also load the experiment FCS data for browsing
-              if(is.null(rv$experiments)) {
-                rv$experiments <- list()
-              }
-              if(is.null(rv$experiments[[exp_name]])) {
-                exp_folder <- exp_folders[i]
-                rv$experiments[[exp_name]] <- load_experiment(exp_folder)
-              }
+                # Update results table with cached data
+                for(j in seq_len(nrow(cache_data$results))) {
+                  # Match on Experiment, Well, AND Gate_ID
+                  match_idx <- which(rv$all_results$Experiment == cache_data$results$Experiment[j] &
+                                       rv$all_results$Well == cache_data$results$Well[j] &
+                                       rv$all_results$Gate_ID == gate_id)
 
-              n_loaded <- n_loaded + 1
-              
-            }, error = function(e) {
-              cat(sprintf("Error loading cache for %s: %s\n", exp_name, e$message))
-            })
+                  if(length(match_idx) > 0) {
+                    # Update existing row
+                    rv$all_results$Correlation[match_idx] <- cache_data$results$Correlation[j]
+                    rv$all_results$N_cells[match_idx] <- cache_data$results$N_cells[j]
+                    rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
+                  } else {
+                    # Add new row for this gate strategy
+                    new_row <- cache_data$results[j, ]
+                    new_row$Gate_ID <- gate_id
+                    rv$all_results <- bind_rows(rv$all_results, new_row)
+                  }
+                }
+
+                # Store HA threshold
+                rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
+
+                # Store gates used for this experiment+strategy combination
+                if(!is.null(cache_data$gates)) {
+                  composite_key <- paste0(exp_name, "::", gate_id)
+                  rv$experiment_gates[[composite_key]] <- cache_data$gates
+                }
+
+                # Also load the experiment FCS data for browsing (only once per experiment)
+                if(is.null(rv$experiments)) {
+                  rv$experiments <- list()
+                }
+                if(is.null(rv$experiments[[exp_name]])) {
+                  exp_folder <- exp_folders[i]
+                  rv$experiments[[exp_name]] <- load_experiment(exp_folder)
+                }
+
+                n_loaded <- n_loaded + 1
+
+              }, error = function(e) {
+                cat(sprintf("Error loading cache for %s: %s\n", basename(cache_file), e$message))
+              })
+            }
           }
         }
         
