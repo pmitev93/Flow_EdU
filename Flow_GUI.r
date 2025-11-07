@@ -2356,9 +2356,10 @@ server <- function(input, output, session) {
       
       # Prepare data for RM-ANOVA
       # Need balanced design with same experiments
+      # If there are multiple replicates per experiment/cell_line, take the mean
       wide_data <- plot_data %>%
         select(Experiment, Cell_line, Correlation) %>%
-        pivot_wider(names_from = Cell_line, values_from = Correlation)
+        pivot_wider(names_from = Cell_line, values_from = Correlation, values_fn = mean)
       
       # Check if data is suitable for RM-ANOVA
       n_complete <- sum(complete.cases(wide_data))
