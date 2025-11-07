@@ -379,9 +379,15 @@ server <- function(input, output, session) {
   }
   
   # Get cache file path for an experiment
-  get_cache_path <- function(experiment_name, fingerprint, ha_threshold) {
-    # Include HA threshold value in filename (but not in Gate ID)
-    file.path(CACHE_DIR, paste0(experiment_name, "_", fingerprint, "_", 
+  get_cache_path <- function(experiment_name, fingerprint, ha_threshold, gate_id = "gdef") {
+    # Create subfolder for this gating strategy
+    gate_dir <- file.path(CACHE_DIR, gate_id)
+    if(!dir.exists(gate_dir)) {
+      dir.create(gate_dir, recursive = TRUE)
+    }
+
+    # Include gate_id and HA threshold value in filename
+    file.path(gate_dir, paste0(experiment_name, "_", gate_id, "_", fingerprint, "_",
                                 sprintf("%.0f", ha_threshold), ".rds"))
   }
   
@@ -396,7 +402,7 @@ server <- function(input, output, session) {
       get_readable_gate_id(fingerprint)
     }
 
-    cache_file <- get_cache_path(experiment_name, fingerprint, ha_threshold)
+    cache_file <- get_cache_path(experiment_name, fingerprint, ha_threshold, gate_id)
 
     cache_data <- list(
       results = results,
@@ -419,8 +425,14 @@ server <- function(input, output, session) {
   
   # Save gate details to human-readable text file
   save_gate_details <- function(gate_id, fingerprint, gates, ha_percentile) {
+    # Create subfolder for this gating strategy
+    gate_dir <- file.path(CACHE_DIR, gate_id)
+    if(!dir.exists(gate_dir)) {
+      dir.create(gate_dir, recursive = TRUE)
+    }
+
     # Use gate ID for filename so same gates = same file
-    details_file <- file.path(CACHE_DIR, paste0("gate_", gate_id, ".txt"))
+    details_file <- file.path(gate_dir, paste0("gate_", gate_id, ".txt"))
     
     # Only create if doesn't exist (same gates = same file)
     if(file.exists(details_file)) {
@@ -490,9 +502,9 @@ server <- function(input, output, session) {
   }
   
   # Load analysis results from cache
-  load_from_cache <- function(experiment_name, gates, ha_threshold, ha_percentile = 0.98) {
+  load_from_cache <- function(experiment_name, gates, ha_threshold, ha_percentile = 0.98, gate_id = "gdef") {
     fingerprint <- get_gate_fingerprint(gates, ha_percentile)
-    cache_file <- get_cache_path(experiment_name, fingerprint, ha_threshold)
+    cache_file <- get_cache_path(experiment_name, fingerprint, ha_threshold, gate_id)
     
     if(file.exists(cache_file)) {
       cache_data <- readRDS(cache_file)
@@ -614,8 +626,9 @@ server <- function(input, output, session) {
 
           # Check which experiments have cached analyses
           exp_info <- lapply(exp_names_local, function(exp_name) {
+            # Scan all subfolders (gating strategies) for cache files
             pattern <- paste0("^", exp_name, "_.*\\.rds$")
-            cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE)
+            cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
 
             if(length(cache_files) > 0) {
               cache_times <- file.mtime(cache_files)
@@ -725,9 +738,9 @@ server <- function(input, output, session) {
           exp_name <- exp_names[i]
           incProgress(1/length(exp_names), detail = exp_name)
           
-          # Find most recent cache file for this experiment
+          # Find most recent cache file for this experiment (scan all subfolders)
           pattern <- paste0("^", exp_name, "_.*\\.rds$")
-          cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE)
+          cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
           
           if(length(cache_files) > 0) {
             # Use the most recent cache file
@@ -977,8 +990,16 @@ server <- function(input, output, session) {
                                                                channels = CHANNELS)
         ha_threshold <- control_result$threshold
 
+        # Determine gate ID for this analysis
+        gate_id_for_cache <- if(!is.null(GATE_STRATEGY_selected$id)) {
+          GATE_STRATEGY_selected$id
+        } else {
+          "gdef"
+        }
+
         # Check cache first
-        cache_data <- load_from_cache(exp_name, GATES_selected, ha_threshold)
+        cache_data <- load_from_cache(exp_name, GATES_selected, ha_threshold,
+                                       gate_id = gate_id_for_cache)
 
         if(!is.null(cache_data)) {
           # Use cached results
