@@ -1100,24 +1100,24 @@ server <- function(input, output, session) {
       
       # Update existing results table with analyzed data
       for(i in seq_len(nrow(new_results))) {
-        # Find matching row in all_results
-        match_idx <- which(rv$all_results$Experiment == new_results$Experiment[i] & 
-                             rv$all_results$Well == new_results$Well[i])
-        
+        # Ensure Gate_ID column exists
+        if(!"Gate_ID" %in% names(rv$all_results)) {
+          rv$all_results$Gate_ID <- NA_character_
+        }
+
+        # Find matching row in all_results (must match Experiment, Well, AND Gate_ID)
+        match_idx <- which(rv$all_results$Experiment == new_results$Experiment[i] &
+                             rv$all_results$Well == new_results$Well[i] &
+                             rv$all_results$Gate_ID == new_results$Gate_ID[i])
+
         if(length(match_idx) > 0) {
-          # Ensure Gate_ID column exists
-          if(!"Gate_ID" %in% names(rv$all_results)) {
-            rv$all_results$Gate_ID <- NA_character_
-          }
-          
-          # Update correlation, n_cells, notes, and Gate_ID for analyzed samples
+          # Update existing row with this gate strategy
           rv$all_results$Correlation[match_idx] <- new_results$Correlation[i]
           rv$all_results$N_cells[match_idx] <- new_results$N_cells[i]
           rv$all_results$Notes[match_idx] <- new_results$Notes[i]
-          
-          if("Gate_ID" %in% names(new_results)) {
-            rv$all_results$Gate_ID[match_idx] <- new_results$Gate_ID[i]
-          }
+        } else {
+          # This is a new gate strategy for this experiment/well - add a new row
+          rv$all_results <- bind_rows(rv$all_results, new_results[i, ])
         }
       }
       
@@ -2089,14 +2089,25 @@ server <- function(input, output, session) {
       cols_to_show <- c(cols_to_show, "Notes")
     }
     display_data <- analyzed[, cols_to_show]
-    
+
     # Format correlation to 4 decimal places
     display_data$Correlation <- sprintf("%.4f", as.numeric(display_data$Correlation))
-    
+
+    # Ensure all columns are character/factor for proper filtering
+    display_data$Gate_ID <- as.character(display_data$Gate_ID)
+    display_data$Experiment <- as.character(display_data$Experiment)
+    if("Notes" %in% names(display_data)) {
+      display_data$Notes <- as.character(display_data$Notes)
+    }
+
     datatable(display_data,
               selection = 'multiple',
-              options = list(pageLength = 10, scrollX = TRUE),
-              filter = 'top')
+              options = list(
+                pageLength = 10,
+                scrollX = TRUE,
+                search = list(regex = FALSE, caseInsensitive = TRUE)
+              ),
+              filter = list(position = 'top', clear = FALSE))
   })
   
   # Store previous selection to detect additions vs removals
