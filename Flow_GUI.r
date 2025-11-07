@@ -2407,7 +2407,7 @@ server <- function(input, output, session) {
           }
 
           ref_mut <- grouped %>% filter(Cell_line == ref_group) %>% slice(1) %>% pull(Mutation)
-          stats_text <- paste0(stats_text, sprintf("(Compared to %s #%s)\n\n", ref_mut, ref_group))
+          stats_text <- paste0(stats_text, sprintf("(Compared to %s #%s)\n\n", as.character(ref_mut), as.character(ref_group)))
           
           ref_data <- long_data %>% filter(Cell_line == ref_group)
           
@@ -2436,8 +2436,8 @@ server <- function(input, output, session) {
                 t_result <- t.test(merged$Correlation_ref, merged$Correlation_test, paired = TRUE)
                 p_values <- c(p_values, t_result$p.value)
                 test_info[[length(test_info) + 1]] <- list(
-                  test_group = test_group,
-                  test_mut = test_mut,
+                  test_group = as.character(test_group),
+                  test_mut = as.character(test_mut),
                   n_pairs = nrow(merged)
                 )
               }, error = function(e) {
@@ -2456,12 +2456,12 @@ server <- function(input, output, session) {
               else if(p_adjusted[i] < 0.05) "*"
               else "ns"
               
-              stats_text <- paste0(stats_text, 
+              stats_text <- paste0(stats_text,
                                    sprintf("%s (#%s) vs %s (#%s): p = %.4f, %s\n",
-                                           test_info[[i]]$test_mut,
-                                           test_info[[i]]$test_group,
-                                           ref_mut,
-                                           ref_group,
+                                           as.character(test_info[[i]]$test_mut),
+                                           as.character(test_info[[i]]$test_group),
+                                           as.character(ref_mut),
+                                           as.character(ref_group),
                                            p_adjusted[i],
                                            sig))
             }
