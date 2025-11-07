@@ -80,6 +80,7 @@ ui <- fluidPage(
       # Sample browser
       h4("3. Browse Samples"),
       selectInput("selected_experiment", "Experiment:", choices = NULL),
+      selectInput("browse_gate_strategy", "Gating Strategy:", choices = NULL),
       selectInput("selected_sample", "Sample:", choices = NULL),
       hr(),
       
@@ -123,9 +124,11 @@ ui <- fluidPage(
         # ADD THIS NEW TAB:
         tabPanel("Overview Plots",
                  h3("Experiment Overview"),
-                 selectInput("overview_experiment", "Select Experiment:", 
+                 selectInput("overview_experiment", "Select Experiment:",
                              choices = NULL),
-                 selectInput("overview_gate", "Select Gate:", 
+                 selectInput("overview_gate_strategy", "Gating Strategy:",
+                             choices = NULL),
+                 selectInput("overview_gate", "Select Gate:",
                              choices = c("Gate 1: Debris" = "gate1",
                                          "Gate 2: Singlets" = "gate2",
                                          "Gate 3: Live Cells" = "gate3",
@@ -533,16 +536,17 @@ server <- function(input, output, session) {
     experiments = NULL,
     all_results = NULL,
     ha_thresholds = list(),
-    experiment_gates = list(),  # NEW: Store which gates were used for each experiment
-    gate_storage = initialize_gate_storage(),  # NEW: Store custom gates
-    edit_mode = FALSE,  # NEW: Track if in edit mode
-    temp_gate = NULL,  # NEW: Temporary gate during editing
-    selected_vertex = NULL,  # NEW: Currently selected vertex
-    available_gate_files = NULL,  # NEW: List of available gate strategy files
-    experiment_gate_strategies = list(),  # NEW: Per-experiment gate strategy selection
-    experiments_loaded = FALSE,  # NEW: Track if experiments have been loaded
-    scan_trigger = 0,  # NEW: Trigger for rescanning experiments
-    ui_refresh_trigger = 0  # NEW: Trigger for refreshing experiment UI
+    experiment_gates = list(),  # Store which gates were used for each experiment (by experiment+gate_id)
+    experiment_available_gates = list(),  # Store list of available gate IDs for each experiment
+    gate_storage = initialize_gate_storage(),  # Store custom gates
+    edit_mode = FALSE,  # Track if in edit mode
+    temp_gate = NULL,  # Temporary gate during editing
+    selected_vertex = NULL,  # Currently selected vertex
+    available_gate_files = NULL,  # List of available gate strategy files
+    experiment_gate_strategies = list(),  # Per-experiment gate strategy selection
+    experiments_loaded = FALSE,  # Track if experiments have been loaded
+    scan_trigger = 0,  # Trigger for rescanning experiments
+    ui_refresh_trigger = 0  # Trigger for refreshing experiment UI
   )
   
   # Scan for available gate strategy files
@@ -631,25 +635,37 @@ server <- function(input, output, session) {
             cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
 
             if(length(cache_files) > 0) {
-              cache_times <- file.mtime(cache_files)
-              latest_cache <- cache_files[which.max(cache_times)]
+              # Collect all gate IDs for this experiment
+              gate_ids <- character(0)
+              for(cache_file in cache_files) {
+                tryCatch({
+                  cache_data <- readRDS(cache_file)
+                  gate_id <- if(!is.null(cache_data$gate_id)) {
+                    cache_data$gate_id
+                  } else {
+                    get_readable_gate_id(cache_data$fingerprint)
+                  }
+                  gate_ids <- c(gate_ids, gate_id)
+                }, error = function(e) {
+                  # Skip files that can't be read
+                })
+              }
 
-              tryCatch({
-                cache_data <- readRDS(latest_cache)
-                gate_id <- if(!is.null(cache_data$gate_id)) {
-                  cache_data$gate_id
-                } else {
-                  get_readable_gate_id(cache_data$fingerprint)
-                }
-                return(list(analyzed = TRUE, gate_id = gate_id))
-              }, error = function(e) {
-                return(list(analyzed = FALSE, gate_id = NULL))
-              })
+              # Remove duplicates and sort
+              gate_ids <- unique(gate_ids)
+              gate_ids <- sort(gate_ids)
+
+              return(list(analyzed = TRUE, gate_ids = gate_ids))
             } else {
-              return(list(analyzed = FALSE, gate_id = NULL))
+              return(list(analyzed = FALSE, gate_ids = character(0)))
             }
           })
           names(exp_info) <- exp_names_local
+
+          # Store available gate strategies for each experiment
+          for(exp_name in exp_names_local) {
+            rv$experiment_available_gates[[exp_name]] <- exp_info[[exp_name]]$gate_ids
+          }
 
           # Get gate choices (isolate to prevent reactivity)
           gate_choices <- isolate({
@@ -669,8 +685,8 @@ server <- function(input, output, session) {
             if(is.null(current_gate)) current_gate <- "gates_gdef.r"
 
             # Create label with checkmark if analyzed
-            label_text <- if(info$analyzed) {
-              paste0(exp_name, " ✓ (", info$gate_id, ")")
+            label_text <- if(info$analyzed && length(info$gate_ids) > 0) {
+              paste0(exp_name, " ✓ (", paste(info$gate_ids, collapse = ", "), ")")
             } else {
               exp_name
             }
@@ -771,9 +787,15 @@ server <- function(input, output, session) {
               # Store HA threshold
               rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
 
-              # Store gates used for this experiment
+              # Store gates used for this experiment+strategy combination
               if(!is.null(cache_data$gates)) {
-                rv$experiment_gates[[exp_name]] <- cache_data$gates
+                gate_id <- if(!is.null(cache_data$gate_id)) {
+                  cache_data$gate_id
+                } else {
+                  get_readable_gate_id(cache_data$fingerprint)
+                }
+                composite_key <- paste0(exp_name, "::", gate_id)
+                rv$experiment_gates[[composite_key]] <- cache_data$gates
               }
 
               # Also load the experiment FCS data for browsing
@@ -902,9 +924,19 @@ server <- function(input, output, session) {
     
     exp <- rv$experiments[[input$selected_experiment]]
     samples <- exp$metadata$sample_name
-    
-    updateSelectInput(session, "selected_sample", 
+
+    updateSelectInput(session, "selected_sample",
                       choices = setNames(seq_along(samples), samples))
+
+    # Update gating strategy dropdown with available strategies for this experiment
+    exp_name <- input$selected_experiment
+    available_gates <- rv$experiment_available_gates[[exp_name]]
+    if(is.null(available_gates) || length(available_gates) == 0) {
+      available_gates <- "gdef"  # Default if none available
+    }
+    updateSelectInput(session, "browse_gate_strategy",
+                      choices = available_gates,
+                      selected = available_gates[1])
   })
   
   # Analyze selected experiments (load data now)
@@ -1016,8 +1048,9 @@ server <- function(input, output, session) {
             "gdef"
           }
 
-          # Store gates used for this experiment (prefer from cache, fallback to selected)
-          rv$experiment_gates[[exp_name]] <- if(!is.null(cache_data$gates)) {
+          # Store gates used for this experiment+strategy combination (prefer from cache, fallback to selected)
+          composite_key <- paste0(exp_name, "::", gate_id)
+          rv$experiment_gates[[composite_key]] <- if(!is.null(cache_data$gates)) {
             cache_data$gates
           } else {
             GATES_selected
@@ -1045,8 +1078,9 @@ server <- function(input, output, session) {
           save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected,
                         gate_strategy_id = gate_id)
 
-          # Store gates used for this experiment
-          rv$experiment_gates[[exp_name]] <- GATES_selected
+          # Store gates used for this experiment+strategy combination
+          composite_key <- paste0(exp_name, "::", gate_id)
+          rv$experiment_gates[[composite_key]] <- GATES_selected
 
           # Add Gate_ID to results
           exp_results$Gate_ID <- gate_id
@@ -1153,20 +1187,34 @@ server <- function(input, output, session) {
   # Update overview experiment selector when experiments are loaded
   observe({
     req(rv$experiments)
-    updateSelectInput(session, "overview_experiment", 
+    updateSelectInput(session, "overview_experiment",
                       choices = names(rv$experiments))
   })
-  
+
+  # Update overview gating strategy selector when experiment changes
+  observeEvent(input$overview_experiment, {
+    req(input$overview_experiment)
+    exp_name <- input$overview_experiment
+    available_gates <- rv$experiment_available_gates[[exp_name]]
+    if(is.null(available_gates) || length(available_gates) == 0) {
+      available_gates <- "gdef"  # Default if none available
+    }
+    updateSelectInput(session, "overview_gate_strategy",
+                      choices = available_gates,
+                      selected = available_gates[1])
+  })
+
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
-    req(rv$experiments, input$overview_experiment, input$overview_gate)
+    req(rv$experiments, input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
 
     exp <- rv$experiments[[input$overview_experiment]]
     exp_name <- input$overview_experiment
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1827,14 +1875,15 @@ server <- function(input, output, session) {
   # ==============================================================================
   
   output$gate1_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1843,14 +1892,15 @@ server <- function(input, output, session) {
   })
 
   output$gate2_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1859,14 +1909,15 @@ server <- function(input, output, session) {
   })
 
   output$gate3_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1875,14 +1926,15 @@ server <- function(input, output, session) {
   })
 
   output$gate4_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1891,14 +1943,15 @@ server <- function(input, output, session) {
   })
   
   output$gate5_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1907,14 +1960,15 @@ server <- function(input, output, session) {
   })
 
   output$gate6_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1923,14 +1977,15 @@ server <- function(input, output, session) {
   })
   
   output$gate7_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -1955,14 +2010,15 @@ server <- function(input, output, session) {
   })
   
   output$correlation_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
+    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
     exp <- rv$experiments[[input$selected_experiment]]
     exp_name <- input$selected_experiment
     idx <- as.numeric(input$selected_sample)
 
-    # Use gates for this experiment if available, otherwise use default
-    gates_to_use <- if(!is.null(rv$experiment_gates[[exp_name]])) {
-      rv$experiment_gates[[exp_name]]
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
     } else {
       GATES
     }
@@ -2026,8 +2082,8 @@ server <- function(input, output, session) {
     }
     
     # Show relevant columns
-    cols_to_show <- c("Experiment", "Sample", "Cell_line", "Gene", 
-                      "Mutation", "Correlation", "N_cells")
+    cols_to_show <- c("Experiment", "Sample", "Cell_line", "Gene",
+                      "Mutation", "Correlation", "N_cells", "Gate_ID")
     # Add Notes if it exists
     if("Notes" %in% names(analyzed)) {
       cols_to_show <- c(cols_to_show, "Notes")
