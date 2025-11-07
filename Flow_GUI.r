@@ -386,11 +386,18 @@ server <- function(input, output, session) {
   }
   
   # Save analysis results to cache
-  save_to_cache <- function(experiment_name, results, ha_threshold, gates, ha_percentile = 0.98) {
+  save_to_cache <- function(experiment_name, results, ha_threshold, gates, ha_percentile = 0.98, gate_strategy_id = NULL) {
     fingerprint <- get_gate_fingerprint(gates, ha_percentile)
-    gate_id <- get_readable_gate_id(fingerprint)
+
+    # Use provided gate_strategy_id or fallback to auto-generated ID
+    gate_id <- if(!is.null(gate_strategy_id)) {
+      gate_strategy_id
+    } else {
+      get_readable_gate_id(fingerprint)
+    }
+
     cache_file <- get_cache_path(experiment_name, fingerprint, ha_threshold)
-    
+
     cache_data <- list(
       results = results,
       ha_threshold = ha_threshold,
@@ -400,13 +407,13 @@ server <- function(input, output, session) {
       gates = gates,
       timestamp = Sys.time()
     )
-    
+
     saveRDS(cache_data, cache_file)
     cat(sprintf("Saved cache: %s (Gate ID: %s)\n", basename(cache_file), gate_id))
-    
+
     # Also save human-readable gate details
     save_gate_details(gate_id, fingerprint, gates, ha_percentile)
-    
+
     return(gate_id)
   }
   
@@ -973,8 +980,14 @@ server <- function(input, output, session) {
           rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
           exp_results <- cache_data$results
 
-          # Add Gate_ID to results
-          gate_id <- if(!is.null(cache_data$gate_id)) cache_data$gate_id else gsub("^gates_(.*)\\.r$", "\\1", gate_file)
+          # Use gate strategy ID (prefer from cache, fallback to GATE_STRATEGY from file)
+          gate_id <- if(!is.null(cache_data$gate_id)) {
+            cache_data$gate_id
+          } else if(!is.null(GATE_STRATEGY_selected$id)) {
+            GATE_STRATEGY_selected$id
+          } else {
+            "gdef"
+          }
           exp_results$Gate_ID <- gate_id
 
           n_from_cache <- n_from_cache + 1
@@ -987,8 +1000,15 @@ server <- function(input, output, session) {
                                                gates = GATES_selected,
                                                channels = CHANNELS)
 
-          # Save to cache and get gate ID
-          gate_id <- save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected)
+          # Save to cache with gate strategy ID
+          gate_id <- if(!is.null(GATE_STRATEGY_selected$id)) {
+            GATE_STRATEGY_selected$id
+          } else {
+            "gdef"  # Default fallback
+          }
+
+          save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected,
+                        gate_strategy_id = gate_id)
 
           # Add Gate_ID to results
           exp_results$Gate_ID <- gate_id

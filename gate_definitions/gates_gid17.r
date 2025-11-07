@@ -22,7 +22,7 @@ GATES$debris <- matrix(c(
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$debris) <- c("FSC-A", "SSC-A")
 
-# Gate 2: Singlets (FSC-A vs FSC-H)
+# Gate 2: Singlets (FSC-A vs FSC-H) - MODIFIED vertices
 GATES$singlet <- matrix(c(
   5.8e6, 2.5e6,
   9.5e6, 2.5e6,
@@ -33,7 +33,7 @@ GATES$singlet <- matrix(c(
   1.5e6, 0.525e6,
   1.6e6, 0.658e6,
   1.9e6, 0.987e6,
-  3.3e6, 1.6e6,
+  3.5e6, 1.7e6,  # CHANGED from 3.3e6, 1.6e6
   5.8e6, 2.5e6
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$singlet) <- c("FSC-A", "FSC-H")
@@ -66,14 +66,14 @@ GATES$fxcycle_quantile <- list(
   description = "Remove FxCycle outliers (keep 1st-90th percentile)"
 )
 
-# Gate 6: Top 50% EdU + FxCycle range
+# Gate 6: Top 45% EdU + FxCycle range
 GATES$edu_fxcycle_sphase <- list(
   type = "dual_quantile",
   edu_parameter = "FL1-A",
-  edu_prob = 0.50,  # ← CHANGE THIS VALUE FOR DIFFERENT GATE STRATEGIES
+  edu_prob = 0.45,  # CHANGED from 0.50 to 0.45
   fxcycle_parameter = "FL6-A",
   fxcycle_probs = c(0.01, 0.90),
-  description = "Select top 50% EdU AND FxCycle 1st-90th percentile"
+  description = "Select top 45% EdU AND FxCycle 1st-90th percentile"
 )
 
 # Gate 7: HA positive
@@ -87,8 +87,8 @@ GATES$ha_positive <- list(
 
 # Gate strategy metadata
 GATE_STRATEGY <- list(
-  id = "gdef",
-  name = "Default Gate Strategy",
-  description = "Standard gating with 50th percentile EdU threshold",
+  id = "gid17",
+  name = "Alternative Gate Strategy 17",
+  description = "Modified gating with 45th percentile EdU threshold and adjusted singlet gate",
   created = Sys.time()
 )
