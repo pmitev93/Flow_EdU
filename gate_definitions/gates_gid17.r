@@ -22,19 +22,20 @@ GATES$debris <- matrix(c(
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$debris) <- c("FSC-A", "SSC-A")
 
-# Gate 2: Singlets (FSC-A vs FSC-H) - MODIFIED vertices
+# Gate 2: Singlets (FSC-A vs FSC-H)
 GATES$singlet <- matrix(c(
+  1.9e6, 0.972e6,
+  3.4e6, 1.5e6,
   5.8e6, 2.5e6,
-  9.5e6, 2.5e6,
-  6.4e6, 1.3e6,
-  4.5e6, 0.740e6,
-  3.0e6, 0.461e6,
-  1.7e6, 0.489e6,
-  1.5e6, 0.525e6,
-  1.6e6, 0.658e6,
-  1.9e6, 0.987e6,
-  3.5e6, 1.7e6,  # CHANGED from 3.3e6, 1.6e6
-  5.8e6, 2.5e6
+  6.8e6, 2.3e6,
+  4.9e6, 1.6e6,
+  3.7e6, 1.1e6,
+  2.8e6, 0.748e6,
+  1.9e6, 0.486e6,
+  1.7e6, 0.491e6,
+  1.5e6, 0.508e6,
+  1.6e6, 0.660e6,
+  1.9e6, 0.972e6
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$singlet) <- c("FSC-A", "FSC-H")
 
