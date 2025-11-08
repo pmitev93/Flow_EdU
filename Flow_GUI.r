@@ -761,6 +761,25 @@ server <- function(input, output, session) {
         cat("\n=== AUTO-LOAD DEBUG ===\n")
         cat(sprintf("Initial rv$all_results has %d rows\n", nrow(rv$all_results)))
 
+        # Convert Correlation and N_cells to proper types to avoid bind_rows errors
+        # (quick_scan creates them as character, but cache has numeric)
+        if("Correlation" %in% names(rv$all_results)) {
+          rv$all_results$Correlation <- ifelse(
+            rv$all_results$Correlation == "Not analyzed",
+            NA_real_,
+            as.numeric(rv$all_results$Correlation)
+          )
+          cat("Converted Correlation column to numeric\n")
+        }
+        if("N_cells" %in% names(rv$all_results)) {
+          rv$all_results$N_cells <- ifelse(
+            rv$all_results$N_cells == "Not analyzed",
+            NA_integer_,
+            as.integer(rv$all_results$N_cells)
+          )
+          cat("Converted N_cells column to numeric\n")
+        }
+
         for(i in seq_along(exp_names)) {
           exp_name <- exp_names[i]
           incProgress(1/length(exp_names), detail = exp_name)
@@ -1192,11 +1211,11 @@ server <- function(input, output, session) {
   output$results_table <- renderDT({
     req(rv$all_results)
 
-    # Format correlation to 4 decimal places
+    # Format correlation to 4 decimal places (handle both character and numeric)
     display_data <- rv$all_results
     if("Correlation" %in% names(display_data)) {
       display_data$Correlation <- ifelse(
-        display_data$Correlation == "Not analyzed",
+        is.na(display_data$Correlation) | display_data$Correlation == "Not analyzed",
         "Not analyzed",
         sprintf("%.4f", as.numeric(display_data$Correlation))
       )
@@ -1204,7 +1223,11 @@ server <- function(input, output, session) {
 
     # Ensure columns are character/numeric for proper filtering
     if("N_cells" %in% names(display_data)) {
-      display_data$N_cells <- as.character(display_data$N_cells)
+      display_data$N_cells <- ifelse(
+        is.na(display_data$N_cells) | display_data$N_cells == "Not analyzed",
+        "Not analyzed",
+        as.character(display_data$N_cells)
+      )
     }
     if("Notes" %in% names(display_data)) {
       display_data$Notes <- as.character(display_data$Notes)
@@ -2146,9 +2169,9 @@ server <- function(input, output, session) {
   # Display sample selector table (only analyzed samples)
   output$comparison_sample_selector <- renderDT({
     req(rv$all_results)
-    
-    # Filter to only analyzed samples (those with numeric correlation)
-    analyzed <- rv$all_results[rv$all_results$Correlation != "Not analyzed", ]
+
+    # Filter to only analyzed samples (those with non-NA correlation)
+    analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
     
     if(nrow(analyzed) == 0) {
       return(data.frame(Message = "No analyzed samples available. Please analyze experiments first."))
