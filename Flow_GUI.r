@@ -2212,8 +2212,8 @@ server <- function(input, output, session) {
   # Auto-select samples from same cell line (but allow deselection)
   observeEvent(input$comparison_sample_selector_rows_selected, {
     req(rv$all_results)
-    
-    analyzed <- rv$all_results[rv$all_results$Correlation != "Not analyzed", ]
+
+    analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
     selected_rows <- input$comparison_sample_selector_rows_selected
     prev_rows <- rv$prev_selected_rows()
     
@@ -2253,8 +2253,8 @@ server <- function(input, output, session) {
   # Show selected samples
   output$selected_samples_list <- renderText({
     req(input$comparison_sample_selector_rows_selected)
-    
-    analyzed <- rv$all_results[rv$all_results$Correlation != "Not analyzed", ]
+
+    analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
     selected_rows <- input$comparison_sample_selector_rows_selected
     selected_data <- analyzed[selected_rows, ]
     
@@ -2284,8 +2284,8 @@ server <- function(input, output, session) {
   # Generate comparison plot
   observeEvent(input$plot_comparison, {
     req(input$comparison_sample_selector_rows_selected)
-    
-    analyzed <- rv$all_results[rv$all_results$Correlation != "Not analyzed", ]
+
+    analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
     selected_rows <- input$comparison_sample_selector_rows_selected
     selected_data <- analyzed[selected_rows, ]
     
@@ -2378,8 +2378,8 @@ server <- function(input, output, session) {
                   names.arg = plot_summary$label,
                   las = 2,
                   xlim = c(0, x_max),  # Fixed x-range
-                  ylim = c(-0.8, 
-                           max(c(0, plot_data$Correlation, plot_summary$mean_corr)) + 0.3),
+                  ylim = c(-0.8,
+                           max(c(0, plot_data$Correlation, plot_summary$mean_corr), na.rm = TRUE) + 0.3),
                   ylab = "EdU vs HA Correlation (r)",
                   main = "",
                   col = "lightgrey",
