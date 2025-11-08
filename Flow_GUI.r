@@ -311,6 +311,38 @@ server <- function(input, output, session) {
   if(!dir.exists(CACHE_DIR)) {
     dir.create(CACHE_DIR, recursive = TRUE)
   }
+
+  # User preferences file
+  PREFS_FILE <- file.path(CACHE_DIR, "user_preferences.rds")
+
+  # Save user preference for gating strategy per experiment
+  save_gating_preference <- function(experiment_name, gating_strategy) {
+    prefs <- list()
+    if(file.exists(PREFS_FILE)) {
+      prefs <- readRDS(PREFS_FILE)
+    }
+
+    if(is.null(prefs$gating_strategies)) {
+      prefs$gating_strategies <- list()
+    }
+
+    prefs$gating_strategies[[experiment_name]] <- gating_strategy
+    saveRDS(prefs, PREFS_FILE)
+  }
+
+  # Load saved gating strategy preference for an experiment
+  load_gating_preference <- function(experiment_name) {
+    if(!file.exists(PREFS_FILE)) {
+      return(NULL)
+    }
+
+    prefs <- readRDS(PREFS_FILE)
+    if(is.null(prefs$gating_strategies)) {
+      return(NULL)
+    }
+
+    return(prefs$gating_strategies[[experiment_name]])
+  }
   
   # Generate unique fingerprint for gates (includes HA percentile method, not actual value)
   get_gate_fingerprint <- function(gates, ha_percentile = 0.98) {
@@ -1001,11 +1033,32 @@ server <- function(input, output, session) {
     if(is.null(available_gates) || length(available_gates) == 0) {
       available_gates <- "gdef"  # Default if none available
     }
+
+    # Try to load saved preference for this experiment
+    saved_strategy <- load_gating_preference(exp_name)
+    default_strategy <- available_gates[1]
+
+    # Use saved strategy if it's still available, otherwise use first available
+    if(!is.null(saved_strategy) && saved_strategy %in% available_gates) {
+      default_strategy <- saved_strategy
+    }
+
     updateSelectInput(session, "browse_gate_strategy",
                       choices = available_gates,
-                      selected = available_gates[1])
+                      selected = default_strategy)
   })
-  
+
+  # Save gating strategy preference when user changes it
+  observeEvent(input$browse_gate_strategy, {
+    req(input$selected_experiment, input$browse_gate_strategy)
+
+    exp_name <- input$selected_experiment
+    gate_strategy <- input$browse_gate_strategy
+
+    # Save the preference
+    save_gating_preference(exp_name, gate_strategy)
+  }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
+
   # Analyze selected experiments (load data now)
   observeEvent(input$analyze_selected, {
     req(rv$experiment_folders)
@@ -1295,10 +1348,31 @@ server <- function(input, output, session) {
     if(is.null(available_gates) || length(available_gates) == 0) {
       available_gates <- "gdef"  # Default if none available
     }
+
+    # Try to load saved preference for this experiment
+    saved_strategy <- load_gating_preference(exp_name)
+    default_strategy <- available_gates[1]
+
+    # Use saved strategy if it's still available, otherwise use first available
+    if(!is.null(saved_strategy) && saved_strategy %in% available_gates) {
+      default_strategy <- saved_strategy
+    }
+
     updateSelectInput(session, "overview_gate_strategy",
                       choices = available_gates,
-                      selected = available_gates[1])
+                      selected = default_strategy)
   })
+
+  # Save overview gating strategy preference when user changes it
+  observeEvent(input$overview_gate_strategy, {
+    req(input$overview_experiment, input$overview_gate_strategy)
+
+    exp_name <- input$overview_experiment
+    gate_strategy <- input$overview_gate_strategy
+
+    # Save the preference
+    save_gating_preference(exp_name, gate_strategy)
+  }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
 
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
