@@ -629,10 +629,13 @@ server <- function(input, output, session) {
           exp_names_local <- isolate(exp_names)
 
           # Check which experiments have cached analyses
+          cat("\n=== EXPERIMENT SELECTOR DEBUG ===\n")
           exp_info <- lapply(exp_names_local, function(exp_name) {
             # Scan all subfolders (gating strategies) for cache files
             pattern <- paste0("^", exp_name, "_.*\\.rds$")
             cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
+
+            cat(sprintf("Experiment: %s, found %d cache files\n", exp_name, length(cache_files)))
 
             if(length(cache_files) > 0) {
               # Collect all gate IDs for this experiment
@@ -645,9 +648,11 @@ server <- function(input, output, session) {
                   } else {
                     get_readable_gate_id(cache_data$fingerprint)
                   }
+                  cat(sprintf("  File: %s -> Gate ID: %s\n", basename(cache_file), gate_id))
                   gate_ids <- c(gate_ids, gate_id)
                 }, error = function(e) {
                   # Skip files that can't be read
+                  cat(sprintf("  ERROR reading %s: %s\n", basename(cache_file), e$message))
                 })
               }
 
@@ -655,12 +660,15 @@ server <- function(input, output, session) {
               gate_ids <- unique(gate_ids)
               gate_ids <- sort(gate_ids)
 
+              cat(sprintf("  Final gate IDs for %s: %s\n", exp_name, paste(gate_ids, collapse = ", ")))
+
               return(list(analyzed = TRUE, gate_ids = gate_ids))
             } else {
               return(list(analyzed = FALSE, gate_ids = character(0)))
             }
           })
           names(exp_info) <- exp_names_local
+          cat("=== END EXPERIMENT SELECTOR DEBUG ===\n\n")
 
           # Store available gate strategies for each experiment
           for(exp_name in exp_names_local) {
@@ -749,14 +757,21 @@ server <- function(input, output, session) {
       # AUTO-LOAD CACHED ANALYSES
       withProgress(message = 'Loading cached analyses...', value = 0, {
         n_loaded <- 0
-        
+
+        cat("\n=== AUTO-LOAD DEBUG ===\n")
+        cat(sprintf("Initial rv$all_results has %d rows\n", nrow(rv$all_results)))
+
         for(i in seq_along(exp_names)) {
           exp_name <- exp_names[i]
           incProgress(1/length(exp_names), detail = exp_name)
-          
+
           # Find ALL cache files for this experiment (scan all subfolders for all gate strategies)
           pattern <- paste0("^", exp_name, "_.*\\.rds$")
           cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
+
+          cat(sprintf("\nExperiment: %s\n", exp_name))
+          cat(sprintf("  Found %d cache files: %s\n", length(cache_files),
+                      paste(basename(cache_files), collapse = ", ")))
 
           if(length(cache_files) > 0) {
             # Load ALL cache files (one for each gate strategy)
@@ -767,6 +782,7 @@ server <- function(input, output, session) {
                 # Add Gate_ID column if it doesn't exist
                 if(!"Gate_ID" %in% names(rv$all_results)) {
                   rv$all_results$Gate_ID <- NA_character_
+                  cat("  Added Gate_ID column to rv$all_results\n")
                 }
 
                 gate_id <- if(!is.null(cache_data$gate_id)) {
@@ -775,7 +791,12 @@ server <- function(input, output, session) {
                   get_readable_gate_id(cache_data$fingerprint)
                 }
 
+                cat(sprintf("  Loading cache file: %s (Gate ID: %s, %d wells)\n",
+                            basename(cache_file), gate_id, nrow(cache_data$results)))
+
                 # Update results table with cached data
+                n_updated <- 0
+                n_added <- 0
                 for(j in seq_len(nrow(cache_data$results))) {
                   # First try to match on Experiment, Well, AND Gate_ID
                   match_idx <- which(rv$all_results$Experiment == cache_data$results$Experiment[j] &
@@ -797,13 +818,17 @@ server <- function(input, output, session) {
                     rv$all_results$N_cells[match_idx] <- cache_data$results$N_cells[j]
                     rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
                     rv$all_results$Gate_ID[match_idx] <- gate_id
+                    n_updated <- n_updated + 1
                   } else {
                     # This is a second/third gate strategy for same well - add new row
                     new_row <- cache_data$results[j, ]
                     new_row$Gate_ID <- gate_id
                     rv$all_results <- bind_rows(rv$all_results, new_row)
+                    n_added <- n_added + 1
                   }
                 }
+
+                cat(sprintf("    Updated %d rows, added %d rows\n", n_updated, n_added))
 
                 # Store HA threshold
                 rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
@@ -812,6 +837,7 @@ server <- function(input, output, session) {
                 if(!is.null(cache_data$gates)) {
                   composite_key <- paste0(exp_name, "::", gate_id)
                   rv$experiment_gates[[composite_key]] <- cache_data$gates
+                  cat(sprintf("    Stored gates with key: %s\n", composite_key))
                 }
 
                 # Also load the experiment FCS data for browsing (only once per experiment)
@@ -826,11 +852,16 @@ server <- function(input, output, session) {
                 n_loaded <- n_loaded + 1
 
               }, error = function(e) {
-                cat(sprintf("Error loading cache for %s: %s\n", basename(cache_file), e$message))
+                cat(sprintf("  ERROR loading cache for %s: %s\n", basename(cache_file), e$message))
               })
             }
           }
         }
+
+        cat(sprintf("\nFinal rv$all_results has %d rows\n", nrow(rv$all_results)))
+        cat(sprintf("Gate_ID distribution:\n"))
+        print(table(rv$all_results$Gate_ID, useNA = "ifany"))
+        cat("=== END AUTO-LOAD DEBUG ===\n\n")
         
         if(n_loaded > 0) {
           showNotification(sprintf("Auto-loaded %d cached analyses", n_loaded),
