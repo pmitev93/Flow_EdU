@@ -31,7 +31,7 @@ source("gate_adjustment_module.r")  # NEW: Gate editing functionality
 # ==============================================================================
 
 ui <- fluidPage(
-  titlePanel("The Mitev EdU Analysis Tool"),
+  titlePanel("The MITEV EdU Analysis Tool"),
   
   sidebarLayout(
     sidebarPanel(
@@ -97,7 +97,7 @@ ui <- fluidPage(
         
         # Welcome tab
         tabPanel("Welcome",
-                 h3("Welcome to the Mitev EdU Analysis Tool"),
+                 h3("Welcome to the Multivariate Identification and Tracking of EdU-incorporating Variants (MITEV) EdU Analysis Tool"),
                  p("This tool processes flow cytometry data with automated gating and correlation analysis."),
                  h4("How to use:"),
                  tags$ol(
