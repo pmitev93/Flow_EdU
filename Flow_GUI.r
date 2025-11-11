@@ -1769,13 +1769,22 @@ server <- function(input, output, session) {
 
     gates <- list()
 
+    # Helper function to safely get input value with default fallback
+    safe_input <- function(input_id, default_val) {
+      val <- input[[input_id]]
+      if(is.null(val)) return(default_val)
+      return(val)
+    }
+
     # Debris gate
     if(!is.null(creator_rv$current_gates$debris)) {
       n <- nrow(creator_rv$current_gates$debris)
       coords <- matrix(nrow = n, ncol = 2)
       for(i in 1:n) {
-        coords[i, 1] <- input[[paste0("creator_debris_x", i)]]
-        coords[i, 2] <- input[[paste0("creator_debris_y", i)]]
+        coords[i, 1] <- safe_input(paste0("creator_debris_x", i),
+                                   creator_rv$current_gates$debris[i, 1])
+        coords[i, 2] <- safe_input(paste0("creator_debris_y", i),
+                                   creator_rv$current_gates$debris[i, 2])
       }
       colnames(coords) <- colnames(creator_rv$current_gates$debris)
       gates$debris <- coords
@@ -1786,8 +1795,10 @@ server <- function(input, output, session) {
       n <- nrow(creator_rv$current_gates$singlet)
       coords <- matrix(nrow = n, ncol = 2)
       for(i in 1:n) {
-        coords[i, 1] <- input[[paste0("creator_singlet_x", i)]]
-        coords[i, 2] <- input[[paste0("creator_singlet_y", i)]]
+        coords[i, 1] <- safe_input(paste0("creator_singlet_x", i),
+                                   creator_rv$current_gates$singlet[i, 1])
+        coords[i, 2] <- safe_input(paste0("creator_singlet_y", i),
+                                   creator_rv$current_gates$singlet[i, 2])
       }
       colnames(coords) <- colnames(creator_rv$current_gates$singlet)
       gates$singlet <- coords
@@ -1798,8 +1809,10 @@ server <- function(input, output, session) {
       n <- nrow(creator_rv$current_gates$live_cells)
       coords <- matrix(nrow = n, ncol = 2)
       for(i in 1:n) {
-        coords[i, 1] <- input[[paste0("creator_live_x", i)]]
-        coords[i, 2] <- input[[paste0("creator_live_y", i)]]
+        coords[i, 1] <- safe_input(paste0("creator_live_x", i),
+                                   creator_rv$current_gates$live_cells[i, 1])
+        coords[i, 2] <- safe_input(paste0("creator_live_y", i),
+                                   creator_rv$current_gates$live_cells[i, 2])
       }
       colnames(coords) <- colnames(creator_rv$current_gates$live_cells)
       gates$live_cells <- coords
@@ -1810,38 +1823,45 @@ server <- function(input, output, session) {
       n <- nrow(creator_rv$current_gates$s_phase_outliers)
       coords <- matrix(nrow = n, ncol = 2)
       for(i in 1:n) {
-        coords[i, 1] <- input[[paste0("creator_sphase_x", i)]]
-        coords[i, 2] <- input[[paste0("creator_sphase_y", i)]]
+        coords[i, 1] <- safe_input(paste0("creator_sphase_x", i),
+                                   creator_rv$current_gates$s_phase_outliers[i, 1])
+        coords[i, 2] <- safe_input(paste0("creator_sphase_y", i),
+                                   creator_rv$current_gates$s_phase_outliers[i, 2])
       }
       colnames(coords) <- colnames(creator_rv$current_gates$s_phase_outliers)
       gates$s_phase_outliers <- coords
     }
 
     # FxCycle quantile gate
+    fxcycle_gate <- creator_rv$current_gates$fxcycle_quantile
     gates$fxcycle_quantile <- list(
       type = "quantile_range",
-      parameter = input$creator_fxcycle_param,
-      probs = c(input$creator_fxcycle_prob_low, input$creator_fxcycle_prob_high),
-      description = input$creator_fxcycle_desc
+      parameter = safe_input("creator_fxcycle_param", fxcycle_gate$parameter),
+      probs = c(safe_input("creator_fxcycle_prob_low", fxcycle_gate$probs[1]),
+                safe_input("creator_fxcycle_prob_high", fxcycle_gate$probs[2])),
+      description = safe_input("creator_fxcycle_desc", fxcycle_gate$description)
     )
 
     # EdU + FxCycle gate
+    edu_gate <- creator_rv$current_gates$edu_fxcycle_sphase
     gates$edu_fxcycle_sphase <- list(
       type = "dual_quantile",
-      edu_parameter = input$creator_edu_param,
-      edu_prob = input$creator_edu_prob,
-      fxcycle_parameter = input$creator_edu_fxcycle_param,
-      fxcycle_probs = c(input$creator_edu_fxcycle_prob_low, input$creator_edu_fxcycle_prob_high),
-      description = input$creator_edu_fxcycle_desc
+      edu_parameter = safe_input("creator_edu_param", edu_gate$edu_parameter),
+      edu_prob = safe_input("creator_edu_prob", edu_gate$edu_prob),
+      fxcycle_parameter = safe_input("creator_edu_fxcycle_param", edu_gate$fxcycle_parameter),
+      fxcycle_probs = c(safe_input("creator_edu_fxcycle_prob_low", edu_gate$fxcycle_probs[1]),
+                        safe_input("creator_edu_fxcycle_prob_high", edu_gate$fxcycle_probs[2])),
+      description = safe_input("creator_edu_fxcycle_desc", edu_gate$description)
     )
 
     # HA positive gate
+    ha_gate <- creator_rv$current_gates$ha_positive
     gates$ha_positive <- list(
       type = "control_based_threshold",
-      parameter = input$creator_ha_param,
-      control_pattern = input$creator_ha_control,
-      prob = input$creator_ha_prob,
-      description = input$creator_ha_desc
+      parameter = safe_input("creator_ha_param", ha_gate$parameter),
+      control_pattern = safe_input("creator_ha_control", ha_gate$control_pattern),
+      prob = safe_input("creator_ha_prob", ha_gate$prob),
+      description = safe_input("creator_ha_desc", ha_gate$description)
     )
 
     gates
