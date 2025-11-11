@@ -1528,24 +1528,30 @@ server <- function(input, output, session) {
       ha_threshold <- control_result$threshold
     }
 
-    # Create all gate plots
-    p1 <- plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
-    p2 <- plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
-    p3 <- plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
-    p4 <- plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
-    p5 <- plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
-    p6 <- plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
-
+    # Set up multi-panel layout
     if(!is.null(ha_threshold)) {
-      p7 <- plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
-      p8 <- plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                           gates = gates_to_use, channels = CHANNELS)
+      # 4x2 grid for 8 plots
+      par(mfrow = c(4, 2), mar = c(4, 4, 2, 1))
 
-      # Arrange all 8 plots in a 4x2 grid
-      gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+      plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                     gates = gates_to_use, channels = CHANNELS)
     } else {
-      # If no control found, show only first 6 gates in 3x2 grid
-      gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 2)
+      # 3x2 grid for 6 plots
+      par(mfrow = c(3, 2), mar = c(4, 4, 2, 1))
+
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
     }
   })
 
