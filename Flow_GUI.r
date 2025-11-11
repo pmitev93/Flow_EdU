@@ -152,30 +152,75 @@ ui <- fluidPage(
                  plotOutput("sample_overview_plot", height = "1200px")
         ),
 
-        # Gate Editing Tab
-        tabPanel("Edit Gates",
-                 h3("Interactive Gate Editor"),
-                 p("Use this panel to adjust gates for your samples."),
-                 
+        # Gating Strategy Creator Tab
+        tabPanel("Gating Strategy Creator",
+                 h3("Create or Modify Gating Strategies"),
+                 p("Load an existing strategy, modify parameters, and save as a new strategy file."),
+
                  fluidRow(
-                   column(4,
+                   column(3,
                           wellPanel(
-                            h4("Select Gate to Edit"),
-                            selectInput("gate_to_edit", "Gate:",
-                                        choices = c("Gate 1: Debris" = "debris",
-                                                    "Gate 2: Singlets" = "singlet",
-                                                    "Gate 3: Live Cells" = "live_cells",
-                                                    "Gate 4: S-phase Outliers" = "s_phase_outliers"),
-                                        selected = "debris"),
+                            h4("1. Load Base Strategy"),
+                            selectInput("creator_base_strategy", "Base Strategy:",
+                                        choices = NULL),
+                            actionButton("creator_load", "Load Strategy",
+                                        class = "btn-primary btn-block"),
                             hr(),
-                            gate_edit_ui("Selected Gate", "main")
+
+                            h4("2. Select Sample for Preview"),
+                            selectInput("creator_experiment", "Experiment:",
+                                       choices = NULL),
+                            selectInput("creator_sample", "Sample:",
+                                       choices = NULL),
+                            hr(),
+
+                            h4("3. Save New Strategy"),
+                            textInput("creator_new_id", "Strategy ID:",
+                                     placeholder = "e.g., gid18"),
+                            textInput("creator_new_name", "Strategy Name:",
+                                     placeholder = "e.g., My Custom Strategy"),
+                            textAreaInput("creator_new_desc", "Description:",
+                                         placeholder = "Describe your changes...",
+                                         rows = 3),
+                            actionButton("creator_save", "Save as New Strategy",
+                                        class = "btn-success btn-block")
                           )
                    ),
-                   column(8,
-                          plotOutput("gate_edit_plot", height = "600px",
-                                     click = "gate_plot_click",
-                                     brush = brushOpts(id = "gate_plot_brush", 
-                                                       resetOnNew = TRUE))
+                   column(9,
+                          tabsetPanel(
+                            id = "creator_tabs",
+                            tabPanel("Preview Plots",
+                                    plotOutput("creator_preview_plot", height = "1200px")
+                            ),
+                            tabPanel("Gate 1: Debris",
+                                    h4("Debris Gate Coordinates (FSC-A, SSC-A)"),
+                                    uiOutput("creator_debris_ui")
+                            ),
+                            tabPanel("Gate 2: Singlets",
+                                    h4("Singlet Gate Coordinates (FSC-A, FSC-H)"),
+                                    uiOutput("creator_singlet_ui")
+                            ),
+                            tabPanel("Gate 3: Live Cells",
+                                    h4("Live Cells Gate Coordinates (DCM-A, SSC-A)"),
+                                    uiOutput("creator_live_ui")
+                            ),
+                            tabPanel("Gate 4: S-phase Outliers",
+                                    h4("S-phase Outliers Gate Coordinates (FxCycle-A, EdU-A)"),
+                                    uiOutput("creator_sphase_ui")
+                            ),
+                            tabPanel("Gate 5: FxCycle Quantile",
+                                    h4("FxCycle Quantile Parameters"),
+                                    uiOutput("creator_fxcycle_ui")
+                            ),
+                            tabPanel("Gate 6: EdU + FxCycle",
+                                    h4("EdU + FxCycle Dual Quantile Parameters"),
+                                    uiOutput("creator_edu_fxcycle_ui")
+                            ),
+                            tabPanel("Gate 7: HA Positive",
+                                    h4("HA Positive Threshold Parameters"),
+                                    uiOutput("creator_ha_ui")
+                            )
+                          )
                    )
                  )
         ),
@@ -1554,6 +1599,437 @@ server <- function(input, output, session) {
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
     }
   })
+
+  # ============================================================================
+  # GATING STRATEGY CREATOR
+  # ============================================================================
+
+  # Reactive values for creator
+  creator_rv <- reactiveValues(
+    current_gates = NULL,
+    current_strategy = NULL
+  )
+
+  # Populate base strategy dropdown
+  observe({
+    req(rv$available_gate_files)
+    updateSelectInput(session, "creator_base_strategy",
+                      choices = rv$available_gate_files,
+                      selected = "gates_gdef.r")
+  })
+
+  # Populate experiment dropdown
+  observe({
+    req(rv$experiments)
+    updateSelectInput(session, "creator_experiment",
+                      choices = names(rv$experiments))
+  })
+
+  # Update sample selector when experiment changes
+  observeEvent(input$creator_experiment, {
+    req(input$creator_experiment, rv$experiments)
+    exp <- rv$experiments[[input$creator_experiment]]
+    if(!is.null(exp)) {
+      sample_choices <- setNames(seq_along(exp$metadata$sample_name),
+                                  exp$metadata$sample_name)
+      updateSelectInput(session, "creator_sample",
+                        choices = sample_choices)
+    }
+  })
+
+  # Load strategy when button clicked
+  observeEvent(input$creator_load, {
+    req(input$creator_base_strategy)
+
+    gate_file <- input$creator_base_strategy
+    gate_path <- file.path("gate_definitions", gate_file)
+
+    if(!file.exists(gate_path)) {
+      showNotification("Gate file not found!", type = "error")
+      return()
+    }
+
+    # Load gates from file
+    GATES_env <- new.env()
+    tryCatch({
+      source(gate_path, local = GATES_env)
+      creator_rv$current_gates <- GATES_env$GATES
+      creator_rv$current_strategy <- GATES_env$GATE_STRATEGY
+
+      showNotification("Strategy loaded successfully!", type = "message", duration = 2)
+    }, error = function(e) {
+      showNotification(sprintf("Error loading strategy: %s", e$message), type = "error")
+    })
+  })
+
+  # Generate edit UI for matrix gates
+  generate_matrix_ui <- function(gate_matrix, gate_name) {
+    if(is.null(gate_matrix)) return(NULL)
+
+    n_vertices <- nrow(gate_matrix)
+    col_names <- colnames(gate_matrix)
+
+    rows <- lapply(1:n_vertices, function(i) {
+      fluidRow(
+        column(1, p(sprintf("V%d:", i), style = "margin-top: 5px;")),
+        column(5,
+               numericInput(paste0("creator_", gate_name, "_x", i),
+                           label = col_names[1],
+                           value = gate_matrix[i, 1],
+                           width = "100%")
+        ),
+        column(5,
+               numericInput(paste0("creator_", gate_name, "_y", i),
+                           label = col_names[2],
+                           value = gate_matrix[i, 2],
+                           width = "100%")
+        )
+      )
+    })
+
+    div(rows)
+  }
+
+  # Render UI for each gate type
+  output$creator_debris_ui <- renderUI({
+    req(creator_rv$current_gates)
+    generate_matrix_ui(creator_rv$current_gates$debris, "debris")
+  })
+
+  output$creator_singlet_ui <- renderUI({
+    req(creator_rv$current_gates)
+    generate_matrix_ui(creator_rv$current_gates$singlet, "singlet")
+  })
+
+  output$creator_live_ui <- renderUI({
+    req(creator_rv$current_gates)
+    generate_matrix_ui(creator_rv$current_gates$live_cells, "live")
+  })
+
+  output$creator_sphase_ui <- renderUI({
+    req(creator_rv$current_gates)
+    generate_matrix_ui(creator_rv$current_gates$s_phase_outliers, "sphase")
+  })
+
+  output$creator_fxcycle_ui <- renderUI({
+    req(creator_rv$current_gates)
+    gate <- creator_rv$current_gates$fxcycle_quantile
+
+    div(
+      numericInput("creator_fxcycle_prob_low", "Lower Percentile:",
+                   value = gate$probs[1], min = 0, max = 1, step = 0.01),
+      numericInput("creator_fxcycle_prob_high", "Upper Percentile:",
+                   value = gate$probs[2], min = 0, max = 1, step = 0.01),
+      textInput("creator_fxcycle_param", "Parameter:",
+                value = gate$parameter),
+      textInput("creator_fxcycle_desc", "Description:",
+                value = gate$description)
+    )
+  })
+
+  output$creator_edu_fxcycle_ui <- renderUI({
+    req(creator_rv$current_gates)
+    gate <- creator_rv$current_gates$edu_fxcycle_sphase
+
+    div(
+      numericInput("creator_edu_prob", "EdU Percentile (top %):",
+                   value = gate$edu_prob, min = 0, max = 1, step = 0.01),
+      textInput("creator_edu_param", "EdU Parameter:",
+                value = gate$edu_parameter),
+      numericInput("creator_edu_fxcycle_prob_low", "FxCycle Lower Percentile:",
+                   value = gate$fxcycle_probs[1], min = 0, max = 1, step = 0.01),
+      numericInput("creator_edu_fxcycle_prob_high", "FxCycle Upper Percentile:",
+                   value = gate$fxcycle_probs[2], min = 0, max = 1, step = 0.01),
+      textInput("creator_edu_fxcycle_param", "FxCycle Parameter:",
+                value = gate$fxcycle_parameter),
+      textInput("creator_edu_fxcycle_desc", "Description:",
+                value = gate$description)
+    )
+  })
+
+  output$creator_ha_ui <- renderUI({
+    req(creator_rv$current_gates)
+    gate <- creator_rv$current_gates$ha_positive
+
+    div(
+      numericInput("creator_ha_prob", "Control Percentile:",
+                   value = gate$prob, min = 0, max = 1, step = 0.01),
+      textInput("creator_ha_param", "Parameter:",
+                value = gate$parameter),
+      textInput("creator_ha_control", "Control Pattern:",
+                value = gate$control_pattern),
+      textInput("creator_ha_desc", "Description:",
+                value = gate$description)
+    )
+  })
+
+  # Get currently edited gates (read from UI inputs)
+  get_edited_gates <- reactive({
+    req(creator_rv$current_gates)
+
+    gates <- list()
+
+    # Debris gate
+    if(!is.null(creator_rv$current_gates$debris)) {
+      n <- nrow(creator_rv$current_gates$debris)
+      coords <- matrix(nrow = n, ncol = 2)
+      for(i in 1:n) {
+        coords[i, 1] <- input[[paste0("creator_debris_x", i)]]
+        coords[i, 2] <- input[[paste0("creator_debris_y", i)]]
+      }
+      colnames(coords) <- colnames(creator_rv$current_gates$debris)
+      gates$debris <- coords
+    }
+
+    # Singlet gate
+    if(!is.null(creator_rv$current_gates$singlet)) {
+      n <- nrow(creator_rv$current_gates$singlet)
+      coords <- matrix(nrow = n, ncol = 2)
+      for(i in 1:n) {
+        coords[i, 1] <- input[[paste0("creator_singlet_x", i)]]
+        coords[i, 2] <- input[[paste0("creator_singlet_y", i)]]
+      }
+      colnames(coords) <- colnames(creator_rv$current_gates$singlet)
+      gates$singlet <- coords
+    }
+
+    # Live cells gate
+    if(!is.null(creator_rv$current_gates$live_cells)) {
+      n <- nrow(creator_rv$current_gates$live_cells)
+      coords <- matrix(nrow = n, ncol = 2)
+      for(i in 1:n) {
+        coords[i, 1] <- input[[paste0("creator_live_x", i)]]
+        coords[i, 2] <- input[[paste0("creator_live_y", i)]]
+      }
+      colnames(coords) <- colnames(creator_rv$current_gates$live_cells)
+      gates$live_cells <- coords
+    }
+
+    # S-phase outliers gate
+    if(!is.null(creator_rv$current_gates$s_phase_outliers)) {
+      n <- nrow(creator_rv$current_gates$s_phase_outliers)
+      coords <- matrix(nrow = n, ncol = 2)
+      for(i in 1:n) {
+        coords[i, 1] <- input[[paste0("creator_sphase_x", i)]]
+        coords[i, 2] <- input[[paste0("creator_sphase_y", i)]]
+      }
+      colnames(coords) <- colnames(creator_rv$current_gates$s_phase_outliers)
+      gates$s_phase_outliers <- coords
+    }
+
+    # FxCycle quantile gate
+    gates$fxcycle_quantile <- list(
+      type = "quantile_range",
+      parameter = input$creator_fxcycle_param,
+      probs = c(input$creator_fxcycle_prob_low, input$creator_fxcycle_prob_high),
+      description = input$creator_fxcycle_desc
+    )
+
+    # EdU + FxCycle gate
+    gates$edu_fxcycle_sphase <- list(
+      type = "dual_quantile",
+      edu_parameter = input$creator_edu_param,
+      edu_prob = input$creator_edu_prob,
+      fxcycle_parameter = input$creator_edu_fxcycle_param,
+      fxcycle_probs = c(input$creator_edu_fxcycle_prob_low, input$creator_edu_fxcycle_prob_high),
+      description = input$creator_edu_fxcycle_desc
+    )
+
+    # HA positive gate
+    gates$ha_positive <- list(
+      type = "control_based_threshold",
+      parameter = input$creator_ha_param,
+      control_pattern = input$creator_ha_control,
+      prob = input$creator_ha_prob,
+      description = input$creator_ha_desc
+    )
+
+    gates
+  })
+
+  # Render preview plot with edited gates
+  output$creator_preview_plot <- renderPlot({
+    req(rv$experiments, input$creator_experiment, input$creator_sample)
+    req(creator_rv$current_gates)
+
+    exp <- rv$experiments[[input$creator_experiment]]
+    idx <- as.numeric(input$creator_sample)
+    sample_name <- exp$metadata$sample_name[idx]
+    fcs <- exp$flowset[[idx]]
+
+    # Get edited gates
+    gates_to_use <- get_edited_gates()
+
+    # Calculate HA threshold
+    control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+    ha_threshold <- NULL
+    if(!is.null(control_idx)) {
+      control_fcs <- exp$flowset[[control_idx]]
+      control_name <- exp$metadata$sample_name[control_idx]
+      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                             gates = gates_to_use,
+                                                             channels = CHANNELS)
+      ha_threshold <- control_result$threshold
+    }
+
+    # Set up multi-panel layout
+    if(!is.null(ha_threshold)) {
+      par(mfrow = c(4, 2), mar = c(4, 4, 2, 1))
+
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+      plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                     gates = gates_to_use, channels = CHANNELS)
+    } else {
+      par(mfrow = c(3, 2), mar = c(4, 4, 2, 1))
+
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+    }
+  })
+
+  # Save new strategy
+  observeEvent(input$creator_save, {
+    req(input$creator_new_id, input$creator_new_name)
+
+    if(input$creator_new_id == "" || input$creator_new_name == "") {
+      showNotification("Please provide both Strategy ID and Name", type = "warning")
+      return()
+    }
+
+    # Get edited gates
+    gates_to_save <- get_edited_gates()
+
+    # Create file content
+    file_content <- sprintf('# ==============================================================================
+# GATE DEFINITIONS - %s
+# ==============================================================================
+
+GATES <- list()
+
+# Gate 1: Debris removal (FSC-A vs SSC-A)
+GATES$debris <- matrix(c(
+%s
+), ncol = 2, byrow = TRUE)
+colnames(GATES$debris) <- c("FSC-A", "SSC-A")
+
+# Gate 2: Singlets (FSC-A vs FSC-H)
+GATES$singlet <- matrix(c(
+%s
+), ncol = 2, byrow = TRUE)
+colnames(GATES$singlet) <- c("FSC-A", "FSC-H")
+
+# Gate 3: Live cells (DCM-A vs SSC-A)
+GATES$live_cells <- matrix(c(
+%s
+), ncol = 2, byrow = TRUE)
+colnames(GATES$live_cells) <- c("DCM-A", "SSC-A")
+
+# Gate 4: S-phase outliers (FxCycle-A vs EdU-A)
+GATES$s_phase_outliers <- matrix(c(
+%s
+), ncol = 2, byrow = TRUE)
+colnames(GATES$s_phase_outliers) <- c("FxCycle-A", "EdU-A")
+
+# Gate 5: FxCycle quantile
+GATES$fxcycle_quantile <- list(
+  type = "quantile_range",
+  parameter = "%s",
+  probs = c(%g, %g),
+  description = "%s"
+)
+
+# Gate 6: Top %.0f%%%% EdU + FxCycle range
+GATES$edu_fxcycle_sphase <- list(
+  type = "dual_quantile",
+  edu_parameter = "%s",
+  edu_prob = %g,
+  fxcycle_parameter = "%s",
+  fxcycle_probs = c(%g, %g),
+  description = "%s"
+)
+
+# Gate 7: HA positive
+GATES$ha_positive <- list(
+  type = "control_based_threshold",
+  parameter = "%s",
+  control_pattern = "%s",
+  prob = %g,
+  description = "%s"
+)
+
+# Gate strategy metadata
+GATE_STRATEGY <- list(
+  id = "%s",
+  name = "%s",
+  description = "%s",
+  created = "%s"
+)
+',
+      input$creator_new_id,
+      # Debris coordinates
+      paste(apply(gates_to_save$debris, 1, function(row) sprintf("  %g, %g", row[1], row[2])), collapse = ",\n"),
+      # Singlet coordinates
+      paste(apply(gates_to_save$singlet, 1, function(row) sprintf("  %g, %g", row[1], row[2])), collapse = ",\n"),
+      # Live cells coordinates
+      paste(apply(gates_to_save$live_cells, 1, function(row) sprintf("  %g, %g", row[1], row[2])), collapse = ",\n"),
+      # S-phase outliers coordinates
+      paste(apply(gates_to_save$s_phase_outliers, 1, function(row) sprintf("  %g, %g", row[1], row[2])), collapse = ",\n"),
+      # FxCycle quantile
+      gates_to_save$fxcycle_quantile$parameter,
+      gates_to_save$fxcycle_quantile$probs[1],
+      gates_to_save$fxcycle_quantile$probs[2],
+      gates_to_save$fxcycle_quantile$description,
+      # EdU + FxCycle
+      gates_to_save$edu_fxcycle_sphase$edu_prob * 100,
+      gates_to_save$edu_fxcycle_sphase$edu_parameter,
+      gates_to_save$edu_fxcycle_sphase$edu_prob,
+      gates_to_save$edu_fxcycle_sphase$fxcycle_parameter,
+      gates_to_save$edu_fxcycle_sphase$fxcycle_probs[1],
+      gates_to_save$edu_fxcycle_sphase$fxcycle_probs[2],
+      gates_to_save$edu_fxcycle_sphase$description,
+      # HA positive
+      gates_to_save$ha_positive$parameter,
+      gates_to_save$ha_positive$control_pattern,
+      gates_to_save$ha_positive$prob,
+      gates_to_save$ha_positive$description,
+      # Metadata
+      input$creator_new_id,
+      input$creator_new_name,
+      input$creator_new_desc,
+      as.character(Sys.time())
+    )
+
+    # Save to file
+    file_name <- paste0("gates_", input$creator_new_id, ".r")
+    file_path <- file.path("gate_definitions", file_name)
+
+    tryCatch({
+      writeLines(file_content, file_path)
+      showNotification(sprintf("Strategy saved as %s", file_name), type = "message", duration = 5)
+
+      # Rescan gate files
+      rv$available_gate_files <- scan_gate_files()
+      updateSelectInput(session, "creator_base_strategy",
+                        choices = rv$available_gate_files,
+                        selected = file_name)
+    }, error = function(e) {
+      showNotification(sprintf("Error saving file: %s", e$message), type = "error")
+    })
+  })
+
+  # ============================================================================
+  # END GATING STRATEGY CREATOR
+  # ============================================================================
 
   # Gate plots
   
