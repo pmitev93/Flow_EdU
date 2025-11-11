@@ -139,7 +139,19 @@ ui <- fluidPage(
                                          "Final: Correlation" = "correlation")),
                  plotOutput("overview_plot", height = "800px")
         ),
-        
+
+        # Sample Overview Tab
+        tabPanel("Sample Overview",
+                 h3("All Gates for Single Sample"),
+                 selectInput("sample_overview_experiment", "Select Experiment:",
+                             choices = NULL),
+                 selectInput("sample_overview_gate_strategy", "Gating Strategy:",
+                             choices = NULL),
+                 selectInput("sample_overview_sample", "Select Sample:",
+                             choices = NULL),
+                 plotOutput("sample_overview_plot", height = "1200px")
+        ),
+
         # Gate Editing Tab
         tabPanel("Edit Gates",
                  h3("Interactive Gate Editor"),
@@ -1374,6 +1386,48 @@ server <- function(input, output, session) {
     save_gating_preference(exp_name, gate_strategy)
   }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
 
+  # Update sample overview experiment selector when experiments are loaded
+  observe({
+    req(rv$experiments)
+    updateSelectInput(session, "sample_overview_experiment",
+                      choices = names(rv$experiments))
+  })
+
+  # Update sample overview gating strategy selector when experiment changes
+  observeEvent(input$sample_overview_experiment, {
+    req(input$sample_overview_experiment)
+    exp_name <- input$sample_overview_experiment
+    available_gates <- rv$experiment_available_gates[[exp_name]]
+    if(is.null(available_gates) || length(available_gates) == 0) {
+      available_gates <- "gdef"  # Default if none available
+    }
+
+    # Try to load saved preference for this experiment
+    saved_strategy <- load_gating_preference(exp_name)
+    default_strategy <- available_gates[1]
+
+    # Use saved strategy if it's still available, otherwise use first available
+    if(!is.null(saved_strategy) && saved_strategy %in% available_gates) {
+      default_strategy <- saved_strategy
+    }
+
+    updateSelectInput(session, "sample_overview_gate_strategy",
+                      choices = available_gates,
+                      selected = default_strategy)
+  })
+
+  # Update sample overview sample selector when experiment or strategy changes
+  observeEvent(c(input$sample_overview_experiment, input$sample_overview_gate_strategy), {
+    req(input$sample_overview_experiment, rv$experiments)
+    exp <- rv$experiments[[input$sample_overview_experiment]]
+    if(!is.null(exp)) {
+      sample_choices <- setNames(seq_along(exp$metadata$sample_name),
+                                  exp$metadata$sample_name)
+      updateSelectInput(session, "sample_overview_sample",
+                        choices = sample_choices)
+    }
+  })
+
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
     req(rv$experiments, input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
@@ -1442,7 +1496,59 @@ server <- function(input, output, session) {
       plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use)
     }
   })
-  
+
+  # Render sample overview plot (all gates for one sample)
+  output$sample_overview_plot <- renderPlot({
+    req(rv$experiments, input$sample_overview_experiment,
+        input$sample_overview_gate_strategy, input$sample_overview_sample)
+
+    exp <- rv$experiments[[input$sample_overview_experiment]]
+    exp_name <- input$sample_overview_experiment
+    idx <- as.numeric(input$sample_overview_sample)
+    sample_name <- exp$metadata$sample_name[idx]
+    fcs <- exp$flowset[[idx]]
+
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$sample_overview_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
+    } else {
+      GATES
+    }
+
+    # Calculate HA threshold for gate 7
+    control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+    ha_threshold <- NULL
+    if(!is.null(control_idx)) {
+      control_fcs <- exp$flowset[[control_idx]]
+      control_name <- exp$metadata$sample_name[control_idx]
+      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                             gates = gates_to_use,
+                                                             channels = CHANNELS)
+      ha_threshold <- control_result$threshold
+    }
+
+    # Create all gate plots
+    p1 <- plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
+    p2 <- plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
+    p3 <- plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
+    p4 <- plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+    p5 <- plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
+    p6 <- plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+
+    if(!is.null(ha_threshold)) {
+      p7 <- plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+      p8 <- plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                           gates = gates_to_use, channels = CHANNELS)
+
+      # Arrange all 8 plots in a 4x2 grid
+      gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
+    } else {
+      # If no control found, show only first 6 gates in 3x2 grid
+      gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 2)
+    }
+  })
+
   # Gate plots
   
   # Display current sample name
