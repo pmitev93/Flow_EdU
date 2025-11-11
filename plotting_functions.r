@@ -673,10 +673,11 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
 plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
   # Apply Gates 1-4
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Calculate FxCycle quantile bounds
+
+  # Calculate FxCycle quantile bounds - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  quantile_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  quantile_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   lower_bound <- quantile_limits[1]
   upper_bound <- quantile_limits[2]
   
@@ -728,19 +729,22 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
   n_samples <- length(experiment$flowset)
   n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Apply Gates 1-4
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Calculate quantile bounds
+
+    # Calculate quantile bounds - read from gates
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    quantile_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    quantile_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     lower_bound <- quantile_limits[1]
     upper_bound <- quantile_limits[2]
     
@@ -784,38 +788,42 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
   par(mfrow = c(1, 1), mar = c(5, 4, 4, 2), oma = c(0, 0, 0, 0))
 }
 
-## Gate 6: Top 50% EdU + FxCycle Range ----
+## Gate 6: EdU + FxCycle Range (reads percentile from gates) ----
 
 plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
   # Apply Gates 1-5
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Apply Gate 5 (FxCycle quantile)
+
+  # Apply Gate 5 (FxCycle quantile) - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   fcs_data <- Subset(fcs_data, fxcycle_filter)
-  
-  # Calculate EdU threshold (50th percentile) and FxCycle bounds
+
+  # Calculate EdU threshold and FxCycle bounds - read from gates
+  edu_gate <- gates$edu_fxcycle_sphase
+  edu_prob <- edu_gate$edu_prob
+
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-  
+  edu_threshold <- quantile(edu_values, probs = edu_prob, na.rm = TRUE)
+
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_bounds <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
-  
+  fxcycle_bounds <- quantile(fxcycle_values, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
   # Plot settings
   x <- exprs(fcs_data)[, channels$FxCycle]
   y <- exprs(fcs_data)[, channels$EdU]
-  
+
   dens <- get_density_colors(x, y, log_x = FALSE, log_y = TRUE)
-  
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 6: Top 50%% EdU + FxCycle Range\n%s", sample_name),
+       main = sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range\n%s", edu_prob * 100, sample_name),
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -860,28 +868,32 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
   n_samples <- length(experiment$flowset)
   n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+  edu_gate <- gates$edu_fxcycle_sphase
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Apply Gates 1-5
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Apply Gate 5
+
+    # Apply Gate 5 - read from gates
     fxcycle_values_temp <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits_temp <- quantile(fxcycle_values_temp, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits_temp <- quantile(fxcycle_values_temp, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values_temp >= fxcycle_limits_temp[1] & fxcycle_values_temp <= fxcycle_limits_temp[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Calculate thresholds
+
+    # Calculate thresholds - read from gates
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     x <- exprs(fcs_data)[, channels$FxCycle]
     y <- exprs(fcs_data)[, channels$EdU]
@@ -937,19 +949,21 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
 plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
   # Apply Gates 1-4
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Apply Gate 5: FxCycle quantile (1-90%)
+
+  # Apply Gate 5: FxCycle quantile - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   fcs_data <- Subset(fcs_data, fxcycle_filter)
-  
-  # Apply Gate 6: EdU top 50% + FxCycle range (1-90%)
+
+  # Apply Gate 6: EdU + FxCycle - read from gates
+  edu_gate <- gates$edu_fxcycle_sphase
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-  
+  edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
   fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
   
   edu_fxcycle_filter <- edu_values >= edu_threshold & 
     fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -1010,28 +1024,32 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
   n_samples <- length(experiment$flowset)
   n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+  edu_gate <- gates$edu_fxcycle_sphase
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Apply Gates 1-4
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Apply Gate 5: FxCycle quantile
+
+    # Apply Gate 5: FxCycle quantile - read from gates
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Apply Gate 6: EdU top 50% + FxCycle range
+
+    # Apply Gate 6: EdU + FxCycle - read from gates
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     edu_fxcycle_filter <- edu_values >= edu_threshold & 
       fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -1113,19 +1131,21 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
 plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
   # Apply Gates 1-6
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Gate 5: FxCycle quantile
+
+  # Gate 5: FxCycle quantile - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   fcs_data <- Subset(fcs_data, fxcycle_filter)
-  
-  # Gate 6: EdU + FxCycle
+
+  # Gate 6: EdU + FxCycle - read from gates
+  edu_gate <- gates$edu_fxcycle_sphase
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-  
+  edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
   fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
   
   edu_fxcycle_filter <- edu_values >= edu_threshold & 
     fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -1195,34 +1215,38 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
   n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
   n_cols <- ceiling(sqrt(n_dox_plus))
   n_rows <- ceiling(n_dox_plus / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+  edu_gate <- gates$edu_fxcycle_sphase
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Skip Dox- samples entirely
     is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
     if(is_dox_minus) {
       next
     }
-    
+
     # Apply all gates
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Gate 5
+
+    # Gate 5 - read from gates
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Gate 6
+
+    # Gate 6 - read from gates
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     edu_fxcycle_filter <- edu_values >= edu_threshold & 
       fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -1320,19 +1344,21 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
     
     # Apply all gates
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Gate 5: FxCycle quantile
+
+    # Gate 5: FxCycle quantile - read from gates
+    fxcycle_gate <- gates$fxcycle_quantile
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Gate 6: EdU + FxCycle
+
+    # Gate 6: EdU + FxCycle - read from gates
+    edu_gate <- gates$edu_fxcycle_sphase
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     edu_fxcycle_filter <- edu_values >= edu_threshold & 
       fxcycle_values2 >= fxcycle_bounds[1] & 
