@@ -3,6 +3,7 @@
 # ==============================================================================
 
 library(shiny)
+library(shinyjs)
 library(flowCore)
 library(tidyverse)
 library(sp)
@@ -31,12 +32,42 @@ source("gate_adjustment_module.r")  # NEW: Gate editing functionality
 # ==============================================================================
 
 ui <- fluidPage(
+  useShinyjs(),
   titlePanel("The MITEV EdU Analysis Tool"),
-  
+
+  # Add custom CSS for sidebar collapse
+  tags$head(
+    tags$style(HTML("
+      #sidebar_panel {
+        transition: all 0.3s;
+      }
+      .sidebar-collapsed {
+        display: none;
+      }
+      #toggle_sidebar {
+        position: fixed;
+        left: 0;
+        top: 100px;
+        z-index: 1000;
+        border-radius: 0 5px 5px 0;
+      }
+      #toggle_sidebar.collapsed {
+        left: 0;
+      }
+    "))
+  ),
+
+  # Toggle button (always visible)
+  actionButton("toggle_sidebar",
+               HTML("<i class='glyphicon glyphicon-chevron-left'></i>"),
+               class = "btn-primary btn-sm",
+               style = "position: fixed; left: 0; top: 100px; z-index: 1000; border-radius: 0 5px 5px 0;"),
+
   sidebarLayout(
     sidebarPanel(
+      id = "sidebar_panel",
       width = 4,  # Increased from 3 to give more space
-      
+
       # Folder selection
       h4("1. Select Data Folder"),
       textInput("master_folder", "Master Folder Path:",
@@ -255,18 +286,31 @@ ui <- fluidPage(
                    # Right panel: Plot viewer with toggle
                    column(5,
                           wellPanel(
-                            radioButtons("creator_plot_view", "Select View:",
-                                        choices = c("Preview (All Gates)" = "preview",
-                                                   "Final Correlation" = "correlation"),
-                                        selected = "preview",
+                            radioButtons("creator_plot_mode", "View Mode:",
+                                        choices = c("All Gates" = "all",
+                                                   "Individual Plot" = "single"),
+                                        selected = "all",
                                         inline = TRUE),
                             conditionalPanel(
-                              condition = "input.creator_plot_view == 'preview'",
+                              condition = "input.creator_plot_mode == 'single'",
+                              selectInput("creator_single_plot", "Select Plot:",
+                                         choices = c("Gate 1: Debris" = "gate1",
+                                                    "Gate 2: Singlets" = "gate2",
+                                                    "Gate 3: Live Cells" = "gate3",
+                                                    "Gate 4: S-phase Outliers" = "gate4",
+                                                    "Gate 5: FxCycle Quantile" = "gate5",
+                                                    "Gate 6: EdU + FxCycle" = "gate6",
+                                                    "Gate 7: HA Positive" = "gate7",
+                                                    "Final Correlation" = "correlation"),
+                                         selected = "correlation")
+                            ),
+                            conditionalPanel(
+                              condition = "input.creator_plot_mode == 'all'",
                               plotOutput("creator_preview_plot", height = "900px")
                             ),
                             conditionalPanel(
-                              condition = "input.creator_plot_view == 'correlation'",
-                              plotOutput("creator_correlation_plot", height = "900px")
+                              condition = "input.creator_plot_mode == 'single'",
+                              plotOutput("creator_single_plot_output", height = "900px")
                             )
                           )
                    )
@@ -400,11 +444,33 @@ ui <- fluidPage(
 # ==============================================================================
 
 server <- function(input, output, session) {
-  
+
+  # ==============================================================================
+  # SIDEBAR TOGGLE
+  # ==============================================================================
+
+  # Track sidebar state
+  sidebar_visible <- reactiveVal(TRUE)
+
+  observeEvent(input$toggle_sidebar, {
+    sidebar_visible(!sidebar_visible())
+    if(sidebar_visible()) {
+      # Show sidebar
+      shinyjs::removeClass(id = "sidebar_panel", class = "sidebar-collapsed")
+      shinyjs::html(id = "toggle_sidebar",
+                   html = "<i class='glyphicon glyphicon-chevron-left'></i>")
+    } else {
+      # Hide sidebar
+      shinyjs::addClass(id = "sidebar_panel", class = "sidebar-collapsed")
+      shinyjs::html(id = "toggle_sidebar",
+                   html = "<i class='glyphicon glyphicon-chevron-right'></i>")
+    }
+  })
+
   # ==============================================================================
   # ANALYSIS CACHE SYSTEM
   # ==============================================================================
-  
+
   # Ensure digest package is available for fingerprinting
   if(!require("digest", quietly = TRUE)) {
     install.packages("digest", repos = "http://cran.r-project.org")
@@ -1965,10 +2031,10 @@ server <- function(input, output, session) {
     }
   })
 
-  # Render correlation plot for Final Correlation tab
-  output$creator_correlation_plot <- renderPlot({
+  # Render individual plot based on user selection
+  output$creator_single_plot_output <- renderPlot({
     req(rv$experiments, input$creator_experiment, input$creator_sample)
-    req(creator_rv$current_gates)
+    req(creator_rv$current_gates, input$creator_single_plot)
 
     exp <- rv$experiments[[input$creator_experiment]]
     idx <- as.numeric(input$creator_sample)
@@ -1978,7 +2044,7 @@ server <- function(input, output, session) {
     # Get edited gates
     gates_to_use <- get_edited_gates()
 
-    # Calculate HA threshold
+    # Calculate HA threshold if needed
     control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
     ha_threshold <- NULL
     if(!is.null(control_idx)) {
@@ -1988,16 +2054,36 @@ server <- function(input, output, session) {
                                                              gates = gates_to_use,
                                                              channels = CHANNELS)
       ha_threshold <- control_result$threshold
-
-      # Plot just the correlation
-      plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                     gates = gates_to_use, channels = CHANNELS)
-    } else {
-      # No control found - show message
-      plot.new()
-      text(0.5, 0.5, "No control sample found\n(needed to calculate HA threshold)",
-           cex = 1.5, col = "red")
     }
+
+    # Render the selected plot
+    switch(input$creator_single_plot,
+           "gate1" = plot_debris_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate2" = plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate3" = plot_live_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate4" = plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate5" = plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate6" = plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate7" = {
+             if(!is.null(ha_threshold)) {
+               plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+             } else {
+               plot.new()
+               text(0.5, 0.5, "No control sample found\n(needed to calculate HA threshold)",
+                    cex = 1.5, col = "red")
+             }
+           },
+           "correlation" = {
+             if(!is.null(ha_threshold)) {
+               plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                              gates = gates_to_use, channels = CHANNELS)
+             } else {
+               plot.new()
+               text(0.5, 0.5, "No control sample found\n(needed to calculate HA threshold)",
+                    cex = 1.5, col = "red")
+             }
+           }
+    )
   })
 
   # Save new strategy
