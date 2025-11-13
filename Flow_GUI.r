@@ -344,11 +344,12 @@ ui <- fluidPage(
                             ),
                             conditionalPanel(
                               condition = "input.creator_plot_mode == 'all'",
+                              h4(textOutput("creator_preview_sample_title"), align = "center", style = "font-weight: bold; margin-bottom: 10px;"),
                               plotOutput("creator_preview_plot", height = "900px")
                             ),
                             conditionalPanel(
                               condition = "input.creator_plot_mode == 'single'",
-                              plotOutput("creator_single_plot_output", height = "900px")
+                              plotOutput("creator_single_plot_output", height = "500px")
                             )
                           )
                    )
@@ -2087,6 +2088,14 @@ server <- function(input, output, session) {
     gates
   })
 
+  # Render sample name title for preview plot
+  output$creator_preview_sample_title <- renderText({
+    req(rv$experiments, input$creator_experiment, input$creator_sample)
+    exp <- rv$experiments[[input$creator_experiment]]
+    idx <- as.numeric(input$creator_sample)
+    exp$metadata$sample_name[idx]
+  })
+
   # Render preview plot with edited gates
   output$creator_preview_plot <- renderPlot({
     req(rv$experiments, input$creator_experiment, input$creator_sample)
@@ -2116,24 +2125,24 @@ server <- function(input, output, session) {
     if(!is.null(ha_threshold)) {
       par(mfrow = c(4, 2), mar = c(5, 4, 3, 1))
 
-      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
       plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                     gates = gates_to_use, channels = CHANNELS)
+                                     gates = gates_to_use, channels = CHANNELS, show_sample_name = FALSE)
     } else {
       par(mfrow = c(3, 2), mar = c(5, 4, 3, 1))
 
-      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
     }
   })
 

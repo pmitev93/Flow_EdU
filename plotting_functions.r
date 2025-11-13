@@ -52,20 +52,27 @@ quick_scan_experiment <- function(experiment_path) {
 
 ## Gate 1 ----
 # Single sample visualization 
-plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Plot settings
   x <- exprs(fcs_data)[, channels$FSC_A]
   y <- exprs(fcs_data)[, channels$SSC_A]
-  
+
   # Calculate 2D density
   dens <- densCols(x, y, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 1: Debris Removal\n%s", sample_name)
+  } else {
+    "Gate 1: Debris Removal"
+  }
+
   plot(x, y,
        pch = ".",
        col = dens,
        xlab = "FSC-A",
        ylab = "SSC-A",
-       main = sprintf("Gate 1: Debris Removal\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 20e6),
        ylim = c(0, 20e6),
        mgp = c(3, 0.5, 0),
@@ -188,7 +195,7 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
 
 ## Gate 2: Singlets (FSC-A vs FSC-H) ####
 
-plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gate 1 first (debris removal)
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -197,19 +204,26 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
     gates$debris[, 2]
   ) > 0
   fcs_data <- Subset(fcs_data, debris_filter)
-  
+
   # Plot settings
   x <- exprs(fcs_data)[, channels$FSC_A]
   y <- exprs(fcs_data)[, channels$FSC_H]
   dens <- densCols(x, y, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 2: Singlets\n%s", sample_name)
+  } else {
+    "Gate 2: Singlets"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FSC-A",
        ylab = "FSC-H",
-       main = sprintf("Gate 2: Singlets\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 15e6),
        ylim = c(0, 4e6),
        xaxt = "n",
@@ -335,7 +349,7 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
 
 ## Gate 3: Live Cells (DCM-A vs SSC-A) ####
 
-plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gate 1: Debris removal
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -358,19 +372,26 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
   # Plot settings with log-scaled DCM
   x <- exprs(fcs_data)[, channels$DCM]
   y <- exprs(fcs_data)[, channels$SSC_A]
-  
+
   # Log transform DCM for density calculation and plotting
   x_log <- log10(x + 1)  # +1 to avoid log(0)
-  
+
   dens <- densCols(x_log, y, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 3: Live Cells\n%s", sample_name)
+  } else {
+    "Gate 3: Live Cells"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "DCM-A",
        ylab = "SSC-A",
-       main = sprintf("Gate 3: Live Cells\n%s", sample_name),
+       main = plot_title,
        xlim = c(100, 1000000),
        ylim = c(0, 15e6),
        xaxt = "n",
@@ -496,7 +517,7 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
 
 ## Gate 4: S-phase Outlier Removal (FxCycle-A vs EdU-A) ----
 
-plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-3
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -528,16 +549,23 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
   x <- exprs(fcs_data)[, channels$FxCycle]
   y <- exprs(fcs_data)[, channels$EdU]
   y_log <- log10(y + 1)
-  
+
   dens <- densCols(x, y_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 4: S-phase Outlier Removal\n%s", sample_name)
+  } else {
+    "Gate 4: S-phase Outlier Removal"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 4: S-phase Outlier Removal\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -670,7 +698,7 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
 
 ## Gate 5: FxCycle Quantile (1%-90%) ----
 
-plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-4
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -684,16 +712,23 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
   # Plot settings
   x <- exprs(fcs_data)[, channels$FxCycle]
   y <- exprs(fcs_data)[, channels$EdU]
-  
+
   dens <- get_density_colors(x, y, log_x = FALSE, log_y = TRUE)
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 5: FxCycle Quantile (1%%-90%%)\n%s", sample_name)
+  } else {
+    "Gate 5: FxCycle Quantile (1%-90%)"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 5: FxCycle Quantile (1%%-90%%)\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -790,7 +825,7 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
 
 ## Gate 6: EdU + FxCycle Range (reads percentile from gates) ----
 
-plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-5
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -817,13 +852,20 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
 
   dens <- get_density_colors(x, y, log_x = FALSE, log_y = TRUE)
 
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range\n%s", edu_prob * 100, sample_name)
+  } else {
+    sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range", edu_prob * 100)
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range\n%s", edu_prob * 100, sample_name),
+       main = plot_title,
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -946,7 +988,7 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
 
 ## Gate 7: HA-Positive ----
 
-plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
+plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-4
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -973,16 +1015,23 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
   # Plot settings
   x <- exprs(fcs_data)[, channels$HA]
   y <- exprs(fcs_data)[, channels$EdU]
-  
+
   dens <- get_density_colors(x, y, log_x = TRUE, log_y = TRUE)
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 7: HA-Positive\n%s", sample_name)
+  } else {
+    "Gate 7: HA-Positive"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "HA-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 7: HA-Positive\n%s", sample_name),
+       main = plot_title,
        xlim = c(100, 1e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -1128,7 +1177,7 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
 
 ## Gate 8: Final EdU vs HA Correlation ----
 
-plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
+plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-6
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -1173,26 +1222,37 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   
   # Plot
   dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
   par(mgp = c(3, 0.7, 0))
-  
+
+  # Create title based on show_sample_name parameter
+  plot_title <- if(show_sample_name) {
+    sprintf("EdU vs HA Correlation\n%s", sample_name)
+  } else {
+    "EdU vs HA Correlation"
+  }
+
   plot(ha_log, edu_log,
        pch = 16,
        cex = 0.5,
        col = dens,
        xlab = "log10(HA-A)",
        ylab = "log10(EdU-A)",
-       main = sprintf("EdU vs HA Correlation\n%s", sample_name),
+       main = plot_title,
        xlim = c(3.5, 7),
        ylim = c(4, 7),
 
        xaxs = "i",
        yaxs = "i")
-  
+
   # Add regression line
   abline(lm_fit, col = "black", lwd = 1.5, lty=2)
-  
-  # Add correlation info
+
+  # Add r and n label at top center (bold)
+  text(5.25, 6.85, sprintf("r = %.3f, n = %s", correlation, format(length(ha_log), big.mark = ",")),
+       cex = 1, font = 2, col = "black")
+
+  # Add correlation info at bottom right (keep for single plots)
   legend("bottomright",
          legend = c(sprintf("Pearson r = %.3f", correlation),
                     sprintf("n = %s cells", format(length(ha_log), big.mark = ","))),
