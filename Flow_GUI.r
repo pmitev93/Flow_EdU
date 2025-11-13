@@ -59,6 +59,24 @@ ui <- fluidPage(
       #toggle_sidebar.collapsed {
         left: 0;
       }
+
+      /* Gating Strategy Creator panel toggles */
+      .creator-panel-collapsed {
+        display: none !important;
+        width: 0 !important;
+      }
+      .creator-plot-width-12 {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      .creator-plot-width-9 {
+        width: 75% !important;
+        max-width: 75% !important;
+      }
+      .creator-plot-width-8 {
+        width: 66.66666667% !important;
+        max-width: 66.66666667% !important;
+      }
     "))
   ),
 
@@ -194,9 +212,21 @@ ui <- fluidPage(
                  h3("Create or Modify Gating Strategies"),
                  p("Load an existing strategy, modify parameters, and save as a new strategy file."),
 
+                 # Toggle buttons for creator panels
+                 div(style = "margin-bottom: 10px;",
+                     actionButton("toggle_creator_load",
+                                  HTML("<i class='glyphicon glyphicon-chevron-left'></i> Load/Sample"),
+                                  class = "btn-primary btn-sm",
+                                  style = "margin-right: 5px;"),
+                     actionButton("toggle_creator_edit",
+                                  HTML("<i class='glyphicon glyphicon-chevron-left'></i> Edit Gates"),
+                                  class = "btn-primary btn-sm")
+                 ),
+
                  fluidRow(
                    # Left panel: Load/Sample/Save controls
                    column(3,
+                          id = "creator_load_panel",
                           wellPanel(
                             h4("1. Load Base Strategy"),
                             selectInput("creator_base_strategy", "Base Strategy:",
@@ -227,6 +257,7 @@ ui <- fluidPage(
 
                    # Middle panel: All gate editing controls (scrollable)
                    column(4,
+                          id = "creator_edit_panel",
                           wellPanel(
                             style = "overflow-y: auto; max-height: 900px;",
                             h4("Edit Gate Parameters"),
@@ -291,6 +322,7 @@ ui <- fluidPage(
 
                    # Right panel: Plot viewer with toggle
                    column(5,
+                          id = "creator_plot_panel",
                           wellPanel(
                             radioButtons("creator_plot_mode", "View Mode:",
                                         choices = c("All Gates" = "all",
@@ -473,6 +505,72 @@ server <- function(input, output, session) {
       shinyjs::html(id = "toggle_sidebar",
                    html = "<i class='glyphicon glyphicon-chevron-right'></i>")
     }
+  })
+
+  # ==============================================================================
+  # GATING STRATEGY CREATOR PANEL TOGGLES
+  # ==============================================================================
+
+  # Track creator panel states
+  creator_load_visible <- reactiveVal(TRUE)
+  creator_edit_visible <- reactiveVal(TRUE)
+
+  # Function to update plot panel width based on visible panels
+  update_creator_plot_width <- function() {
+    load_vis <- creator_load_visible()
+    edit_vis <- creator_edit_visible()
+
+    # Remove all width classes first
+    shinyjs::removeClass(id = "creator_plot_panel", class = "creator-plot-width-12")
+    shinyjs::removeClass(id = "creator_plot_panel", class = "creator-plot-width-9")
+    shinyjs::removeClass(id = "creator_plot_panel", class = "creator-plot-width-8")
+
+    # Add appropriate width class based on visible panels
+    if(!load_vis && !edit_vis) {
+      # Both hidden - full width (12 cols)
+      shinyjs::addClass(id = "creator_plot_panel", class = "creator-plot-width-12")
+    } else if(load_vis && !edit_vis) {
+      # Only load visible - 9 cols for plot
+      shinyjs::addClass(id = "creator_plot_panel", class = "creator-plot-width-9")
+    } else if(!load_vis && edit_vis) {
+      # Only edit visible - 8 cols for plot
+      shinyjs::addClass(id = "creator_plot_panel", class = "creator-plot-width-8")
+    }
+    # If both visible, default width (5 cols) is used
+  }
+
+  # Toggle Load/Sample panel
+  observeEvent(input$toggle_creator_load, {
+    creator_load_visible(!creator_load_visible())
+    if(creator_load_visible()) {
+      # Show panel
+      shinyjs::removeClass(id = "creator_load_panel", class = "creator-panel-collapsed")
+      shinyjs::html(id = "toggle_creator_load",
+                   html = "<i class='glyphicon glyphicon-chevron-left'></i> Load/Sample")
+    } else {
+      # Hide panel
+      shinyjs::addClass(id = "creator_load_panel", class = "creator-panel-collapsed")
+      shinyjs::html(id = "toggle_creator_load",
+                   html = "<i class='glyphicon glyphicon-chevron-right'></i> Load/Sample")
+    }
+    update_creator_plot_width()
+  })
+
+  # Toggle Edit Gates panel
+  observeEvent(input$toggle_creator_edit, {
+    creator_edit_visible(!creator_edit_visible())
+    if(creator_edit_visible()) {
+      # Show panel
+      shinyjs::removeClass(id = "creator_edit_panel", class = "creator-panel-collapsed")
+      shinyjs::html(id = "toggle_creator_edit",
+                   html = "<i class='glyphicon glyphicon-chevron-left'></i> Edit Gates")
+    } else {
+      # Hide panel
+      shinyjs::addClass(id = "creator_edit_panel", class = "creator-panel-collapsed")
+      shinyjs::html(id = "toggle_creator_edit",
+                   html = "<i class='glyphicon glyphicon-chevron-right'></i> Edit Gates")
+    }
+    update_creator_plot_width()
   })
 
   # ==============================================================================
