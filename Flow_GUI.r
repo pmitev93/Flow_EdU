@@ -158,6 +158,7 @@ ui <- fluidPage(
                  p("Load an existing strategy, modify parameters, and save as a new strategy file."),
 
                  fluidRow(
+                   # Left panel: Load/Sample/Save controls
                    column(3,
                           wellPanel(
                             h4("1. Load Base Strategy"),
@@ -186,43 +187,57 @@ ui <- fluidPage(
                                         class = "btn-success btn-block")
                           )
                    ),
-                   column(9,
-                          tabsetPanel(
-                            id = "creator_tabs",
-                            tabPanel("Preview Plots",
-                                    plotOutput("creator_preview_plot", height = "1200px")
+
+                   # Middle panel: All gate editing controls (scrollable)
+                   column(4,
+                          wellPanel(
+                            style = "overflow-y: auto; max-height: 900px;",
+                            h4("Edit Gate Parameters"),
+
+                            h5("Gate 1: Debris (FSC-A, SSC-A)", style = "color: #337ab7; margin-top: 15px;"),
+                            uiOutput("creator_debris_ui"),
+                            hr(),
+
+                            h5("Gate 2: Singlets (FSC-A, FSC-H)", style = "color: #337ab7;"),
+                            uiOutput("creator_singlet_ui"),
+                            hr(),
+
+                            h5("Gate 3: Live Cells (DCM-A, SSC-A)", style = "color: #337ab7;"),
+                            uiOutput("creator_live_ui"),
+                            hr(),
+
+                            h5("Gate 4: S-phase Outliers (FxCycle-A, EdU-A)", style = "color: #337ab7;"),
+                            uiOutput("creator_sphase_ui"),
+                            hr(),
+
+                            h5("Gate 5: FxCycle Quantile", style = "color: #337ab7;"),
+                            uiOutput("creator_fxcycle_ui"),
+                            hr(),
+
+                            h5("Gate 6: EdU + FxCycle", style = "color: #337ab7;"),
+                            uiOutput("creator_edu_fxcycle_ui"),
+                            hr(),
+
+                            h5("Gate 7: HA Positive", style = "color: #337ab7;"),
+                            uiOutput("creator_ha_ui")
+                          )
+                   ),
+
+                   # Right panel: Plot viewer with toggle
+                   column(5,
+                          wellPanel(
+                            radioButtons("creator_plot_view", "Select View:",
+                                        choices = c("Preview (All Gates)" = "preview",
+                                                   "Final Correlation" = "correlation"),
+                                        selected = "preview",
+                                        inline = TRUE),
+                            conditionalPanel(
+                              condition = "input.creator_plot_view == 'preview'",
+                              plotOutput("creator_preview_plot", height = "900px")
                             ),
-                            tabPanel("Gate 1: Debris",
-                                    h4("Debris Gate Coordinates (FSC-A, SSC-A)"),
-                                    uiOutput("creator_debris_ui")
-                            ),
-                            tabPanel("Gate 2: Singlets",
-                                    h4("Singlet Gate Coordinates (FSC-A, FSC-H)"),
-                                    uiOutput("creator_singlet_ui")
-                            ),
-                            tabPanel("Gate 3: Live Cells",
-                                    h4("Live Cells Gate Coordinates (DCM-A, SSC-A)"),
-                                    uiOutput("creator_live_ui")
-                            ),
-                            tabPanel("Gate 4: S-phase Outliers",
-                                    h4("S-phase Outliers Gate Coordinates (FxCycle-A, EdU-A)"),
-                                    uiOutput("creator_sphase_ui")
-                            ),
-                            tabPanel("Gate 5: FxCycle Quantile",
-                                    h4("FxCycle Quantile Parameters"),
-                                    uiOutput("creator_fxcycle_ui")
-                            ),
-                            tabPanel("Gate 6: EdU + FxCycle",
-                                    h4("EdU + FxCycle Dual Quantile Parameters"),
-                                    uiOutput("creator_edu_fxcycle_ui")
-                            ),
-                            tabPanel("Gate 7: HA Positive",
-                                    h4("HA Positive Threshold Parameters"),
-                                    uiOutput("creator_ha_ui")
-                            ),
-                            tabPanel("Final Correlation",
-                                    h4("EdU vs HA Correlation (with edited gates)"),
-                                    plotOutput("creator_correlation_plot", height = "800px")
+                            conditionalPanel(
+                              condition = "input.creator_plot_view == 'correlation'",
+                              plotOutput("creator_correlation_plot", height = "900px")
                             )
                           )
                    )
