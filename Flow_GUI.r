@@ -42,7 +42,12 @@ ui <- fluidPage(
         transition: all 0.3s;
       }
       .sidebar-collapsed {
-        display: none;
+        display: none !important;
+        width: 0 !important;
+      }
+      .main-expanded {
+        width: 100% !important;
+        max-width: 100% !important;
       }
       #toggle_sidebar {
         position: fixed;
@@ -121,8 +126,9 @@ ui <- fluidPage(
     ),
     
     mainPanel(
+      id = "main_panel",
       width = 8,  # Adjusted from 9 to match sidebar width=4
-      
+
       tabsetPanel(
         id = "main_tabs",
         
@@ -457,11 +463,13 @@ server <- function(input, output, session) {
     if(sidebar_visible()) {
       # Show sidebar
       shinyjs::removeClass(id = "sidebar_panel", class = "sidebar-collapsed")
+      shinyjs::removeClass(id = "main_panel", class = "main-expanded")
       shinyjs::html(id = "toggle_sidebar",
                    html = "<i class='glyphicon glyphicon-chevron-left'></i>")
     } else {
       # Hide sidebar
       shinyjs::addClass(id = "sidebar_panel", class = "sidebar-collapsed")
+      shinyjs::addClass(id = "main_panel", class = "main-expanded")
       shinyjs::html(id = "toggle_sidebar",
                    html = "<i class='glyphicon glyphicon-chevron-right'></i>")
     }
