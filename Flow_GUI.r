@@ -193,33 +193,62 @@ ui <- fluidPage(
                           wellPanel(
                             style = "overflow-y: auto; max-height: 900px;",
                             h4("Edit Gate Parameters"),
+                            p(style = "font-size: 12px; color: #666;", "Click gate names to expand/collapse"),
 
-                            h5("Gate 1: Debris (FSC-A, SSC-A)", style = "color: #337ab7; margin-top: 15px;"),
-                            uiOutput("creator_debris_ui"),
+                            # Gate 1: Debris (collapsible)
+                            tags$a(href = "#collapse_debris", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 1: Debris (FSC-A, SSC-A)"),
+                                      style = "color: #337ab7; margin-top: 15px; cursor: pointer;")),
+                            tags$div(id = "collapse_debris", class = "collapse",
+                                    uiOutput("creator_debris_ui")),
                             hr(),
 
-                            h5("Gate 2: Singlets (FSC-A, FSC-H)", style = "color: #337ab7;"),
-                            uiOutput("creator_singlet_ui"),
+                            # Gate 2: Singlets (collapsible)
+                            tags$a(href = "#collapse_singlet", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 2: Singlets (FSC-A, FSC-H)"),
+                                      style = "color: #337ab7; cursor: pointer;")),
+                            tags$div(id = "collapse_singlet", class = "collapse",
+                                    uiOutput("creator_singlet_ui")),
                             hr(),
 
-                            h5("Gate 3: Live Cells (DCM-A, SSC-A)", style = "color: #337ab7;"),
-                            uiOutput("creator_live_ui"),
+                            # Gate 3: Live Cells (collapsible)
+                            tags$a(href = "#collapse_live", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 3: Live Cells (DCM-A, SSC-A)"),
+                                      style = "color: #337ab7; cursor: pointer;")),
+                            tags$div(id = "collapse_live", class = "collapse",
+                                    uiOutput("creator_live_ui")),
                             hr(),
 
-                            h5("Gate 4: S-phase Outliers (FxCycle-A, EdU-A)", style = "color: #337ab7;"),
-                            uiOutput("creator_sphase_ui"),
+                            # Gate 4: S-phase Outliers (collapsible)
+                            tags$a(href = "#collapse_sphase", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 4: S-phase Outliers (FxCycle-A, EdU-A)"),
+                                      style = "color: #337ab7; cursor: pointer;")),
+                            tags$div(id = "collapse_sphase", class = "collapse",
+                                    uiOutput("creator_sphase_ui")),
                             hr(),
 
-                            h5("Gate 5: FxCycle Quantile", style = "color: #337ab7;"),
-                            uiOutput("creator_fxcycle_ui"),
+                            # Gate 5: FxCycle Quantile (collapsible, default open)
+                            tags$a(href = "#collapse_fxcycle", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 5: FxCycle Quantile"),
+                                      style = "color: #337ab7; cursor: pointer;")),
+                            tags$div(id = "collapse_fxcycle", class = "collapse in",
+                                    uiOutput("creator_fxcycle_ui")),
                             hr(),
 
-                            h5("Gate 6: EdU + FxCycle", style = "color: #337ab7;"),
-                            uiOutput("creator_edu_fxcycle_ui"),
+                            # Gate 6: EdU + FxCycle (collapsible, default open)
+                            tags$a(href = "#collapse_edu_fxcycle", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 6: EdU + FxCycle"),
+                                      style = "color: #337ab7; cursor: pointer;")),
+                            tags$div(id = "collapse_edu_fxcycle", class = "collapse in",
+                                    uiOutput("creator_edu_fxcycle_ui")),
                             hr(),
 
-                            h5("Gate 7: HA Positive", style = "color: #337ab7;"),
-                            uiOutput("creator_ha_ui")
+                            # Gate 7: HA Positive (collapsible, default open)
+                            tags$a(href = "#collapse_ha", `data-toggle` = "collapse",
+                                   h5(HTML("<i class='glyphicon glyphicon-chevron-down'></i> Gate 7: HA Positive"),
+                                      style = "color: #337ab7; cursor: pointer;")),
+                            tags$div(id = "collapse_ha", class = "collapse in",
+                                    uiOutput("creator_ha_ui"))
                           )
                    ),
 
