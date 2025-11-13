@@ -1182,11 +1182,10 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
        col = dens,
        xlab = "log10(HA-A)",
        ylab = "log10(EdU-A)",
-       main = sprintf("EdU vs HA Correlation\n%s\nr = %.3f (n = %s)", 
-                      sample_name, correlation, format(length(ha_log), big.mark = ",")),
+       main = sprintf("EdU vs HA Correlation\n%s", sample_name),
        xlim = c(3.5, 7),
        ylim = c(4, 7),
-       
+
        xaxs = "i",
        yaxs = "i")
   
@@ -1278,7 +1277,7 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
            col = dens,
            xlab = "",
            ylab = "",
-           main = sprintf("%s\nr=%.3f", sample_name, correlation),
+           main = sample_name,
            xlim = c(3.5, 7),
            ylim = c(4, 7),
            cex.main = 0.9,
