@@ -219,6 +219,10 @@ ui <- fluidPage(
                             tabPanel("Gate 7: HA Positive",
                                     h4("HA Positive Threshold Parameters"),
                                     uiOutput("creator_ha_ui")
+                            ),
+                            tabPanel("Final Correlation",
+                                    h4("EdU vs HA Correlation (with edited gates)"),
+                                    plotOutput("creator_correlation_plot", height = "800px")
                             )
                           )
                    )
@@ -1914,6 +1918,41 @@ server <- function(input, output, session) {
       plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+    }
+  })
+
+  # Render correlation plot for Final Correlation tab
+  output$creator_correlation_plot <- renderPlot({
+    req(rv$experiments, input$creator_experiment, input$creator_sample)
+    req(creator_rv$current_gates)
+
+    exp <- rv$experiments[[input$creator_experiment]]
+    idx <- as.numeric(input$creator_sample)
+    sample_name <- exp$metadata$sample_name[idx]
+    fcs <- exp$flowset[[idx]]
+
+    # Get edited gates
+    gates_to_use <- get_edited_gates()
+
+    # Calculate HA threshold
+    control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+    ha_threshold <- NULL
+    if(!is.null(control_idx)) {
+      control_fcs <- exp$flowset[[control_idx]]
+      control_name <- exp$metadata$sample_name[control_idx]
+      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                             gates = gates_to_use,
+                                                             channels = CHANNELS)
+      ha_threshold <- control_result$threshold
+
+      # Plot just the correlation
+      plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                     gates = gates_to_use, channels = CHANNELS)
+    } else {
+      # No control found - show message
+      plot.new()
+      text(0.5, 0.5, "No control sample found\n(needed to calculate HA threshold)",
+           cex = 1.5, col = "red")
     }
   })
 

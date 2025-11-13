@@ -468,13 +468,17 @@ calculate_ha_threshold_from_control <- function(control_fcs, control_name, gates
     fxcycle_values <= fxcycle_bounds[2]
   current_data <- Subset(current_data, edu_fxcycle_filter)
   cat(sprintf("  After EdU top 50%% + FxCycle range: %s cells\n", format(nrow(current_data), big.mark = ",")))
-  
-  # Now calculate 98th percentile of HA from gated control
+
+  # Calculate HA threshold using percentile from gates parameter
+  ha_gate <- gates$ha_positive
+  ha_percentile <- ha_gate$prob
   ha_values <- exprs(current_data)[, channels$HA]
-  threshold <- quantile(ha_values, probs = 0.98, na.rm = TRUE)
-  
-  cat(sprintf("  HA threshold (98th percentile): %s\n", format(round(threshold, 0), big.mark = ",")))
-  
+  threshold <- quantile(ha_values, probs = ha_percentile, na.rm = TRUE)
+
+  cat(sprintf("  HA threshold (%.0fth percentile): %s\n",
+              ha_percentile * 100,
+              format(round(threshold, 0), big.mark = ",")))
+
   return(list(
     threshold = unname(threshold),
     gated_control_data = current_data,
