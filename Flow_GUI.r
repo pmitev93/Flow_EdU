@@ -1157,12 +1157,12 @@ server <- function(input, output, session) {
                     rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
                     rv$all_results$Gate_ID[match_idx] <- gate_id
 
-                    # Update Ratio if it exists in cached results
-                    if("Ratio" %in% names(cache_data$results)) {
-                      if(!"Ratio" %in% names(rv$all_results)) {
-                        rv$all_results$Ratio <- NA_real_
+                    # Update Strength_Ratio if it exists in cached results
+                    if("Strength_Ratio" %in% names(cache_data$results)) {
+                      if(!"Strength_Ratio" %in% names(rv$all_results)) {
+                        rv$all_results$Strength_Ratio <- NA_real_
                       }
-                      rv$all_results$Ratio[match_idx] <- cache_data$results$Ratio[j]
+                      rv$all_results$Strength_Ratio[match_idx] <- cache_data$results$Strength_Ratio[j]
                     }
 
                     n_updated <- n_updated + 1
@@ -1171,9 +1171,9 @@ server <- function(input, output, session) {
                     new_row <- cache_data$results[j, ]
                     new_row$Gate_ID <- gate_id
 
-                    # Ensure Ratio column exists before binding
-                    if("Ratio" %in% names(cache_data$results) && !"Ratio" %in% names(rv$all_results)) {
-                      rv$all_results$Ratio <- NA_real_
+                    # Ensure Strength_Ratio column exists before binding
+                    if("Strength_Ratio" %in% names(cache_data$results) && !"Strength_Ratio" %in% names(rv$all_results)) {
+                      rv$all_results$Strength_Ratio <- NA_real_
                     }
 
                     rv$all_results <- bind_rows(rv$all_results, new_row)
@@ -1572,18 +1572,18 @@ server <- function(input, output, session) {
           rv$all_results$Notes[match_idx] <- new_results$Notes[i]
           rv$all_results$Gate_ID[match_idx] <- new_results$Gate_ID[i]
 
-          # Update Ratio column if it exists in new_results
-          if("Ratio" %in% names(new_results)) {
-            if(!"Ratio" %in% names(rv$all_results)) {
-              rv$all_results$Ratio <- NA_real_
+          # Update Strength_Ratio column if it exists in new_results
+          if("Strength_Ratio" %in% names(new_results)) {
+            if(!"Strength_Ratio" %in% names(rv$all_results)) {
+              rv$all_results$Strength_Ratio <- NA_real_
             }
-            rv$all_results$Ratio[match_idx] <- new_results$Ratio[i]
+            rv$all_results$Strength_Ratio[match_idx] <- new_results$Strength_Ratio[i]
           }
         } else {
           # This is a second/third gate strategy for same well - add new row
-          # Ensure Ratio column exists in rv$all_results before binding
-          if("Ratio" %in% names(new_results) && !"Ratio" %in% names(rv$all_results)) {
-            rv$all_results$Ratio <- NA_real_
+          # Ensure Strength_Ratio column exists in rv$all_results before binding
+          if("Strength_Ratio" %in% names(new_results) && !"Strength_Ratio" %in% names(rv$all_results)) {
+            rv$all_results$Strength_Ratio <- NA_real_
           }
           rv$all_results <- bind_rows(rv$all_results, new_results[i, ])
         }
@@ -1613,11 +1613,11 @@ server <- function(input, output, session) {
     }
 
     # Format ratio to 4 decimal places
-    if("Ratio" %in% names(display_data)) {
-      display_data$Ratio <- ifelse(
-        is.na(display_data$Ratio),
+    if("Strength_Ratio" %in% names(display_data)) {
+      display_data$Strength_Ratio <- ifelse(
+        is.na(display_data$Strength_Ratio),
         "",
-        sprintf("%.4f", as.numeric(display_data$Ratio))
+        sprintf("%.4f", as.numeric(display_data$Strength_Ratio))
       )
     }
 

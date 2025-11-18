@@ -718,7 +718,7 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
 
   cat(sprintf("  Quadrants: Q1=%.2f%%, Q2=%.2f%%, Q3=%.2f%%, Q4=%.2f%%\n",
               q1_pct, q2_pct, q3_pct, q4_pct))
-  cat(sprintf("  Ratio (HA+/EdU-low ratio) = %.3f\n", ratio))
+  cat(sprintf("  Strength_Ratio (HA+/EdU-low ratio) = %.3f\n", ratio))
 
   return(list(
     ha_threshold = ha_threshold,
@@ -746,8 +746,8 @@ extract_correlations_with_quadrants <- function(experiment, ha_threshold = NULL,
   # Load the standard plotting function
   results_df <- extract_correlations(experiment, ha_threshold, gates, channels)
 
-  # Add Ratio column (initialize as NA)
-  results_df$Ratio <- NA_real_
+  # Add Strength_Ratio column (initialize as NA)
+  results_df$Strength_Ratio <- NA_real_
 
   # If not using quadrant strategy, return standard results
   if(!use_quadrant || is.null(gates$quadrant)) {
@@ -786,10 +786,10 @@ extract_correlations_with_quadrants <- function(experiment, ha_threshold = NULL,
         gates, channels
       )
 
-      # Update the ratio in results_df
+      # Update the strength_ratio in results_df
       well_match <- which(results_df$Sample == sample_name)
       if(length(well_match) > 0) {
-        results_df$Ratio[well_match[1]] <- quadrant_result$ratio
+        results_df$Strength_Ratio[well_match[1]] <- quadrant_result$ratio
       }
 
     }, error = function(e) {

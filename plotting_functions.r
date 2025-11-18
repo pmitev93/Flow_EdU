@@ -37,16 +37,16 @@ quick_scan_experiment <- function(experiment_path) {
   metadata$experiment <- experiment_name
   metadata$correlation <- "Not analyzed"
   metadata$n_cells <- "Not analyzed"
-  metadata$ratio <- NA_real_
+  metadata$strength_ratio <- NA_real_
   metadata$notes <- ""
 
   # Reorder columns
   metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line",
-                           "gene", "mutation", "correlation", "n_cells", "ratio", "notes")]
+                           "gene", "mutation", "correlation", "n_cells", "strength_ratio", "notes")]
 
   # Capitalize column names
   colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line",
-                          "Gene", "Mutation", "Correlation", "N_cells", "Ratio", "Notes")
+                          "Gene", "Mutation", "Correlation", "N_cells", "Strength_Ratio", "Notes")
   
   return(metadata)
 }
@@ -1178,7 +1178,7 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
 
 ## Gate 8: Final EdU vs HA Correlation ----
 
-plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
+plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE, edu_threshold = NULL) {
   # Apply Gates 1-6
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -1192,29 +1192,31 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   # Gate 6: EdU + FxCycle - read from gates
   edu_gate <- gates$edu_fxcycle_sphase
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+  edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
 
   fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
   fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
-  
-  edu_fxcycle_filter <- edu_values >= edu_threshold & 
-    fxcycle_values2 >= fxcycle_bounds[1] & 
+
+  edu_fxcycle_filter <- edu_values >= edu_threshold_g6 &
+    fxcycle_values2 >= fxcycle_bounds[1] &
     fxcycle_values2 <= fxcycle_bounds[2]
   fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
-  
-  # Gate 7: HA-positive
-  ha_values <- exprs(fcs_data)[, channels$HA]
-  ha_filter <- ha_values >= ha_threshold
-  fcs_data <- Subset(fcs_data, ha_filter)
-  
+
+  # Gate 7: HA-positive (skip if edu_threshold provided - show quadrants instead)
+  if(is.null(edu_threshold)) {
+    ha_values <- exprs(fcs_data)[, channels$HA]
+    ha_filter <- ha_values >= ha_threshold
+    fcs_data <- Subset(fcs_data, ha_filter)
+  }
+
   # Extract final data
   ha_final <- exprs(fcs_data)[, channels$HA]
   edu_final <- exprs(fcs_data)[, channels$EdU]
-  
+
   # Log10 transform
   ha_log <- log10(ha_final + 1)
   edu_log <- log10(edu_final + 1)
-  
+
   # Calculate correlation
   correlation <- cor(ha_log, edu_log, use = "complete.obs")
 
@@ -1243,8 +1245,19 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
        xaxs = "i",
        yaxs = "i")
 
-  # Add regression line
-  abline(lm_fit, col = "black", lwd = 1.5, lty=2)
+  # Add threshold lines if edu_threshold is provided (quadrant mode)
+  if(!is.null(edu_threshold)) {
+    # Draw HA threshold line (vertical)
+    ha_threshold_log <- log10(ha_threshold + 1)
+    abline(v = ha_threshold_log, col = "red", lwd = 2, lty = 1)
+
+    # Draw EdU threshold line (horizontal)
+    edu_threshold_log <- log10(edu_threshold + 1)
+    abline(h = edu_threshold_log, col = "red", lwd = 2, lty = 1)
+  } else {
+    # Add regression line (only in non-quadrant mode)
+    abline(lm_fit, col = "black", lwd = 1.5, lty=2)
+  }
 
   # Add r and n label at top center (bold)
   text(4.25, 6.85, sprintf("r = %.3f, n = %s", correlation, format(length(ha_log), big.mark = ",")),
@@ -1259,7 +1272,7 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
                     sprintf("n = %s cells", format(length(ha_log), big.mark = ","))),
          bty = "n",
          cex = 1)
-  
+
   # Return correlation data
   invisible(list(
     sample_name = sample_name,

@@ -4,7 +4,7 @@
 
 GATES <- list()
 
-# Gate 1: Debris removal (FSC-A vs SSC-A)
+# Gate 1: Debris removal (FSC-A vs SSC-A) - from gid17
 GATES$debris <- matrix(c(
   1.4e6, 4.1e6,
   4.0e6, 9.4e6,
@@ -22,23 +22,24 @@ GATES$debris <- matrix(c(
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$debris) <- c("FSC-A", "SSC-A")
 
-# Gate 2: Singlets (FSC-A vs FSC-H)
+# Gate 2: Singlets (FSC-A vs FSC-H) - from gid17
 GATES$singlet <- matrix(c(
+  1.9e6, 0.972e6,
+  3.4e6, 1.5e6,
   5.8e6, 2.5e6,
-  9.5e6, 2.5e6,
-  6.4e6, 1.3e6,
-  4.5e6, 0.740e6,
-  3.0e6, 0.461e6,
-  1.7e6, 0.489e6,
-  1.5e6, 0.525e6,
-  1.6e6, 0.658e6,
-  1.9e6, 0.987e6,
-  3.3e6, 1.6e6,
-  5.8e6, 2.5e6
+  6.8e6, 2.3e6,
+  4.9e6, 1.6e6,
+  3.7e6, 1.1e6,
+  2.8e6, 0.748e6,
+  1.9e6, 0.486e6,
+  1.7e6, 0.491e6,
+  1.5e6, 0.508e6,
+  1.6e6, 0.660e6,
+  1.9e6, 0.972e6
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$singlet) <- c("FSC-A", "FSC-H")
 
-# Gate 3: Live cells (DCM-A vs SSC-A)
+# Gate 3: Live cells (DCM-A vs SSC-A) - from gid17
 GATES$live_cells <- matrix(c(
   122, 181000,
   18000, 181000,
@@ -48,7 +49,7 @@ GATES$live_cells <- matrix(c(
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$live_cells) <- c("DCM-A", "SSC-A")
 
-# Gate 4: S-phase outliers (FxCycle-A vs EdU-A)
+# Gate 4: S-phase outliers (FxCycle-A vs EdU-A) - from gid17
 GATES$s_phase_outliers <- matrix(c(
   1.5e6, 100,
   9e6, 100,
@@ -58,22 +59,22 @@ GATES$s_phase_outliers <- matrix(c(
 ), ncol = 2, byrow = TRUE)
 colnames(GATES$s_phase_outliers) <- c("FxCycle-A", "EdU-A")
 
-# Gate 5: FxCycle quantile
+# Gate 5: FxCycle quantile - 5% to 95%
 GATES$fxcycle_quantile <- list(
   type = "quantile_range",
   parameter = "FL6-A",
-  probs = c(0.01, 0.90),
-  description = "Remove FxCycle outliers (keep 1st-90th percentile)"
+  probs = c(0.05, 0.95),
+  description = "Remove FxCycle outliers (keep 5th-95th percentile)"
 )
 
-# Gate 6: Top 50% EdU + FxCycle range
+# Gate 6: Top 45% EdU + FxCycle 50-85%
 GATES$edu_fxcycle_sphase <- list(
   type = "dual_quantile",
   edu_parameter = "FL1-A",
-  edu_prob = 0.50,
+  edu_prob = 0.55,  # Top 45% means threshold at 55th percentile
   fxcycle_parameter = "FL6-A",
-  fxcycle_probs = c(0.01, 0.90),
-  description = "Select top 50% EdU AND FxCycle 1st-90th percentile"
+  fxcycle_probs = c(0.50, 0.85),
+  description = "Select top 45% EdU AND FxCycle 50th-85th percentile"
 )
 
 # Gate 7: Quadrant gating (HA vs EdU)
@@ -92,7 +93,7 @@ GATES$quadrant <- list(
 GATE_STRATEGY <- list(
   id = "quadrant",
   name = "Quadrant Gating Strategy",
-  description = "Quadrant gating with paired Dox- controls, calculates HA+/EdU-low ratio",
+  description = "Quadrant gating with paired Dox- controls, calculates Strength_Ratio",
   created = Sys.time(),
   analysis_type = "quadrant_ratio"  # Flag to indicate this uses ratio instead of correlation
 )
