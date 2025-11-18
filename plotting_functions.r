@@ -1552,22 +1552,29 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
       fxcycle_values2 <= fxcycle_bounds[2]
     fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
 
-    # Gate 7: HA-positive
+    # Gate 7: HA-positive (skip if ha_threshold is NULL for quadrant analysis)
     # Count cells before Gate 7 for HA+ percentage calculation
     n_before_ha_gate <- nrow(exprs(fcs_data))
 
-    ha_values <- exprs(fcs_data)[, channels$HA]
-    ha_filter <- ha_values >= ha_threshold
-    fcs_data <- Subset(fcs_data, ha_filter)
+    if(!is.null(ha_threshold)) {
+      # Apply HA threshold gate (standard analysis)
+      ha_values <- exprs(fcs_data)[, channels$HA]
+      ha_filter <- ha_values >= ha_threshold
+      fcs_data <- Subset(fcs_data, ha_filter)
 
-    # Count cells after Gate 7
-    n_after_ha_gate <- nrow(exprs(fcs_data))
+      # Count cells after Gate 7
+      n_after_ha_gate <- nrow(exprs(fcs_data))
 
-    # Calculate HA+ percentage
-    ha_pos_pct <- if(n_before_ha_gate > 0) {
-      (n_after_ha_gate / n_before_ha_gate) * 100
+      # Calculate HA+ percentage
+      ha_pos_pct <- if(n_before_ha_gate > 0) {
+        (n_after_ha_gate / n_before_ha_gate) * 100
+      } else {
+        NA_real_
+      }
     } else {
-      NA_real_
+      # Skip Gate 7 for quadrant analysis - use all cells after Gate 6
+      n_after_ha_gate <- n_before_ha_gate
+      ha_pos_pct <- NA_real_
     }
 
     # Extract final data

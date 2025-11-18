@@ -1535,7 +1535,9 @@ server <- function(input, output, session) {
                           GATE_STRATEGY_selected$analysis_type == "quadrant_ratio"
 
           # Use appropriate analysis function
-          exp_results <- extract_correlations_with_quadrants(exp, ha_threshold,
+          # For quadrant analysis, pass NULL for ha_threshold to skip Gate 7 filtering
+          exp_results <- extract_correlations_with_quadrants(exp,
+                                                             if(use_quadrant) NULL else ha_threshold,
                                                              gates = GATES_selected,
                                                              channels = CHANNELS,
                                                              use_quadrant = use_quadrant)
