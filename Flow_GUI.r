@@ -1517,8 +1517,12 @@ server <- function(input, output, session) {
           gate_strategy_key <- paste0("GATE_STRATEGY_", gate_id)
           if(!is.null(cache_data$gate_strategy)) {
             rv$gate_strategies[[gate_strategy_key]] <- cache_data$gate_strategy
+            cat(sprintf("  Stored gate_strategy from cache with key: %s\n", gate_strategy_key))
           } else if(!is.null(GATE_STRATEGY_selected)) {
             rv$gate_strategies[[gate_strategy_key]] <- GATE_STRATEGY_selected
+            cat(sprintf("  Stored gate_strategy from file with key: %s\n", gate_strategy_key))
+          } else {
+            cat(sprintf("  WARNING: No gate_strategy to store for key: %s\n", gate_strategy_key))
           }
 
           exp_results$Gate_ID <- gate_id
@@ -1558,6 +1562,11 @@ server <- function(input, output, session) {
           gate_strategy_key <- paste0("GATE_STRATEGY_", gate_id)
           if(!is.null(GATE_STRATEGY_selected)) {
             rv$gate_strategies[[gate_strategy_key]] <- GATE_STRATEGY_selected
+            cat(sprintf("  Stored gate_strategy from newly analyzed data with key: %s (analysis_type: %s)\n",
+                        gate_strategy_key,
+                        if(!is.null(GATE_STRATEGY_selected$analysis_type)) GATE_STRATEGY_selected$analysis_type else "NULL"))
+          } else {
+            cat(sprintf("  WARNING: GATE_STRATEGY_selected is NULL for key: %s\n", gate_strategy_key))
           }
 
           # Add Gate_ID to results
@@ -1853,6 +1862,13 @@ server <- function(input, output, session) {
     } else if(input$overview_gate == "gate7") {
       # Get strategy metadata
       gate_strategy_key <- paste0("GATE_STRATEGY_", input$overview_gate_strategy)
+
+      # Debug: Show what's available in rv$gate_strategies
+      cat(sprintf("\n=== Checking rv$gate_strategies ===\n"))
+      cat(sprintf("Looking for key: %s\n", gate_strategy_key))
+      cat(sprintf("Available keys in rv$gate_strategies: %s\n",
+                  if(length(names(rv$gate_strategies)) > 0) paste(names(rv$gate_strategies), collapse=", ") else "NONE"))
+
       gate_strategy <- if(!is.null(rv$gate_strategies[[gate_strategy_key]])) {
         rv$gate_strategies[[gate_strategy_key]]
       } else {
