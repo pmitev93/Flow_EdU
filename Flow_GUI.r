@@ -1208,6 +1208,13 @@ server <- function(input, output, session) {
                   cat(sprintf("    Stored gates with key: %s\n", composite_key))
                 }
 
+                # Store gate strategy metadata
+                if(!is.null(cache_data$gate_strategy)) {
+                  gate_strategy_key <- paste0("GATE_STRATEGY_", gate_id)
+                  rv$gate_strategies[[gate_strategy_key]] <- cache_data$gate_strategy
+                  cat(sprintf("    Stored gate_strategy with key: %s\n", gate_strategy_key))
+                }
+
                 # Mark this experiment for FCS loading (only once per experiment)
                 if(!exp_name %in% names(experiments_to_load)) {
                   experiments_to_load[[exp_name]] <- exp_folders[i]

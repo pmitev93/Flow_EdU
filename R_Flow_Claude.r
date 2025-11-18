@@ -617,6 +617,12 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   # Gate 5: FxCycle quantile
   fxcycle_values <- exprs(control_gated)[, channels$FxCycle]
   fxcycle_limits <- quantile(fxcycle_values, probs = gates$fxcycle_quantile$probs, na.rm = TRUE)
+
+  # Check for valid limits
+  if(any(is.na(fxcycle_limits)) || length(fxcycle_limits) < 2) {
+    stop("Control sample has insufficient cells after Gate 4 - cannot calculate FxCycle limits")
+  }
+
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   control_gated <- Subset(control_gated, fxcycle_filter)
 
@@ -625,6 +631,12 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
   fxcycle_values_g6 <- exprs(control_gated)[, channels$FxCycle]
   fxcycle_bounds_g6 <- quantile(fxcycle_values_g6, probs = gates$edu_fxcycle_sphase$fxcycle_probs, na.rm = TRUE)
+
+  # Check for valid thresholds
+  if(is.na(edu_threshold_g6) || any(is.na(fxcycle_bounds_g6)) || length(fxcycle_bounds_g6) < 2) {
+    stop("Control sample has insufficient cells after Gate 5 - cannot calculate EdU/FxCycle thresholds")
+  }
+
   edu_fxcycle_filter <- edu_values_g6 >= edu_threshold_g6 &
     fxcycle_values_g6 >= fxcycle_bounds_g6[1] &
     fxcycle_values_g6 <= fxcycle_bounds_g6[2]
@@ -635,6 +647,11 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
                            probs = gates$quadrant$ha_prob, na.rm = TRUE)
   edu_threshold <- quantile(exprs(control_gated)[, channels$EdU],
                             probs = gates$quadrant$edu_prob, na.rm = TRUE)
+
+  # Check for valid final thresholds
+  if(is.na(ha_threshold) || is.na(edu_threshold)) {
+    stop("Control sample has insufficient cells after Gate 6 - cannot calculate quadrant thresholds")
+  }
 
   cat(sprintf("  Control thresholds: HA = %s, EdU = %s\n",
               format(ha_threshold, big.mark = ","),
@@ -678,6 +695,12 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   # Gate 5: FxCycle quantile
   fxcycle_values <- exprs(test_gated)[, channels$FxCycle]
   fxcycle_limits <- quantile(fxcycle_values, probs = gates$fxcycle_quantile$probs, na.rm = TRUE)
+
+  # Check for valid limits
+  if(any(is.na(fxcycle_limits)) || length(fxcycle_limits) < 2) {
+    stop("Test sample has insufficient cells after Gate 4 - cannot calculate FxCycle limits")
+  }
+
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   test_gated <- Subset(test_gated, fxcycle_filter)
 
@@ -686,6 +709,12 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
   fxcycle_values_g6 <- exprs(test_gated)[, channels$FxCycle]
   fxcycle_bounds_g6 <- quantile(fxcycle_values_g6, probs = gates$edu_fxcycle_sphase$fxcycle_probs, na.rm = TRUE)
+
+  # Check for valid thresholds
+  if(is.na(edu_threshold_g6) || any(is.na(fxcycle_bounds_g6)) || length(fxcycle_bounds_g6) < 2) {
+    stop("Test sample has insufficient cells after Gate 5 - cannot calculate EdU/FxCycle thresholds")
+  }
+
   edu_fxcycle_filter <- edu_values_g6 >= edu_threshold_g6 &
     fxcycle_values_g6 >= fxcycle_bounds_g6[1] &
     fxcycle_values_g6 <= fxcycle_bounds_g6[2]
