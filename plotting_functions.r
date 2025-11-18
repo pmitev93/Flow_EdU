@@ -1147,32 +1147,40 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   
   # Calculate correlation
   correlation <- cor(ha_log, edu_log, use = "complete.obs")
-  
+
   # Calculate linear regression for trend line
   lm_fit <- lm(edu_log ~ ha_log)
-  
+  r_squared <- summary(lm_fit)$r.squared
+
   # Plot
   dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
   par(mgp = c(3, 0.7, 0))
-  
+
   plot(ha_log, edu_log,
        pch = 16,
        cex = 0.5,
        col = dens,
        xlab = "log10(HA-A)",
        ylab = "log10(EdU-A)",
-       main = sprintf("EdU vs HA Correlation\n%s\nr = %.3f (n = %s)",
-                      sample_name, correlation, format(length(ha_log), big.mark = ",")),
-       xlim = c(1, 6),
+       main = sprintf("EdU vs HA Correlation\n%s",
+                      sample_name),
+       xlim = c(2, 6.5),
        ylim = c(4, 7),
-       
+
        xaxs = "i",
        yaxs = "i")
-  
+
   # Add regression line
   abline(lm_fit, col = "black", lwd = 1.5, lty=2)
-  
+
+  # Add r and n at top center
+  text(4.25, 6.85, sprintf("r = %.3f, n = %s", correlation, format(length(ha_log), big.mark = ",")),
+       cex = 1, font = 2, col = "black")
+
+  # Add R² in bottom right
+  text(6.3, 4.15, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 2)
+
   # Add correlation info
   legend("bottomright",
          legend = c(sprintf("Pearson r = %.3f", correlation),
@@ -1246,25 +1254,30 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
     if(length(ha_log) > 10) {
       correlation <- cor(ha_log, edu_log, use = "complete.obs")
       lm_fit <- lm(edu_log ~ ha_log)
-      
+      r_squared <- summary(lm_fit)$r.squared
+
       dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-      
+
       plot(ha_log, edu_log,
            pch = ".",
            col = dens,
            xlab = "",
            ylab = "",
-           main = sprintf("%s\nr=%.3f", sample_name, correlation),
-           xlim = c(1, 6),
+           main = sample_name,
+           xlim = c(2, 6.5),
            ylim = c(4, 7),
            cex.main = 0.9,
            xaxs = "i",
            yaxs = "i")
-      
+
       abline(lm_fit, col = "black", lwd = 1.5, lty =2)
-      
-      # Add r value inside plot
-      text(6.5, 4.3, sprintf("r=%.3f", correlation), col = "black", cex = 0.8, font = 2, pos = 2)
+
+      # Add r and n at top center
+      text(4.25, 6.85, sprintf("r=%.3f, n=%s", correlation, format(length(ha_log), big.mark = ",")),
+           col = "black", cex = 0.7, font = 2)
+
+      # Add R² in bottom right
+      text(6.3, 4.15, sprintf("R²=%.3f", r_squared), col = "black", cex = 0.7, font = 2, pos = 2)
       
       # Flag if low cell count or extreme correlation
       is_empty_vector <- grepl("Empty_Vector", sample_name, ignore.case = TRUE)
