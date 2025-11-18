@@ -853,6 +853,7 @@ server <- function(input, output, session) {
     all_results = NULL,
     ha_thresholds = list(),
     experiment_gates = list(),  # Store which gates were used for each experiment (by experiment+gate_id)
+    gate_strategies = list(),  # Store GATE_STRATEGY metadata for each gate_id
     experiment_available_gates = list(),  # Store list of available gate IDs for each experiment
     gate_storage = initialize_gate_storage(),  # Store custom gates
     edit_mode = FALSE,  # Track if in edit mode
@@ -1508,6 +1509,12 @@ server <- function(input, output, session) {
             GATES_selected
           }
 
+          # Store gate strategy metadata
+          gate_strategy_key <- paste0("GATE_STRATEGY_", gate_id)
+          if(!is.null(GATE_STRATEGY_selected)) {
+            rv$gate_strategies[[gate_strategy_key]] <- GATE_STRATEGY_selected
+          }
+
           exp_results$Gate_ID <- gate_id
 
           n_from_cache <- n_from_cache + 1
@@ -1540,6 +1547,12 @@ server <- function(input, output, session) {
           # Store gates used for this experiment+strategy combination
           composite_key <- paste0(exp_name, "::", gate_id)
           rv$experiment_gates[[composite_key]] <- GATES_selected
+
+          # Store gate strategy metadata
+          gate_strategy_key <- paste0("GATE_STRATEGY_", gate_id)
+          if(!is.null(GATE_STRATEGY_selected)) {
+            rv$gate_strategies[[gate_strategy_key]] <- GATE_STRATEGY_selected
+          }
 
           # Add Gate_ID to results
           exp_results$Gate_ID <- gate_id
@@ -3351,7 +3364,20 @@ GATE_STRATEGY <- list(
     
     # Show relevant columns
     cols_to_show <- c("Experiment", "Sample", "Cell_line", "Gene",
-                      "Mutation", "Correlation", "N_cells", "Gate_ID")
+                      "Mutation", "Correlation")
+
+    # Add HA_Pos_Pct if it exists
+    if("HA_Pos_Pct" %in% names(analyzed)) {
+      cols_to_show <- c(cols_to_show, "HA_Pos_Pct")
+    }
+
+    # Add Strength_Ratio if it exists
+    if("Strength_Ratio" %in% names(analyzed)) {
+      cols_to_show <- c(cols_to_show, "Strength_Ratio")
+    }
+
+    cols_to_show <- c(cols_to_show, "N_cells", "Gate_ID")
+
     # Add Notes if it exists
     if("Notes" %in% names(analyzed)) {
       cols_to_show <- c(cols_to_show, "Notes")
@@ -3360,6 +3386,24 @@ GATE_STRATEGY <- list(
 
     # Format correlation to 4 decimal places
     display_data$Correlation <- sprintf("%.4f", as.numeric(display_data$Correlation))
+
+    # Format HA_Pos_Pct to 2 decimal places with % symbol
+    if("HA_Pos_Pct" %in% names(display_data)) {
+      display_data$HA_Pos_Pct <- ifelse(
+        is.na(display_data$HA_Pos_Pct),
+        "",
+        sprintf("%.2f%%", as.numeric(display_data$HA_Pos_Pct))
+      )
+    }
+
+    # Format Strength_Ratio to 4 decimal places
+    if("Strength_Ratio" %in% names(display_data)) {
+      display_data$Strength_Ratio <- ifelse(
+        is.na(display_data$Strength_Ratio),
+        "",
+        sprintf("%.4f", as.numeric(display_data$Strength_Ratio))
+      )
+    }
 
     # Ensure all columns are character/factor for proper filtering
     display_data$Gate_ID <- as.character(display_data$Gate_ID)
@@ -4002,26 +4046,26 @@ GATE_STRATEGY <- list(
         cell_line <- unique_groups$Cell_line[i]
         mutation <- unique_groups$Mutation[i]
         col_name <- col_names[i]
-        
+
         cell_data <- plot_data %>%
           filter(Cell_line == cell_line) %>%
-          select(Experiment, Correlation, N_cells)
-        
+          select(Experiment, Correlation, HA_Pos_Pct, Strength_Ratio, N_cells)
+
         values <- sapply(unique_experiments, function(exp) {
           match_idx <- which(cell_data$Experiment == exp)
           if(length(match_idx) > 0) {
             corr <- as.numeric(cell_data$Correlation[match_idx[1]])
             n_cells <- as.numeric(cell_data$N_cells[match_idx[1]])
-            
+
             is_empty_vector <- grepl("Empty.?Vector", mutation, ignore.case = TRUE)
             if(!is.na(n_cells) && n_cells < 500 && !is_empty_vector) {
               if(is.null(low_cell_warnings[[exp]])) {
                 low_cell_warnings[[exp]] <- character(0)
               }
-              low_cell_warnings[[exp]] <- c(low_cell_warnings[[exp]], 
+              low_cell_warnings[[exp]] <- c(low_cell_warnings[[exp]],
                                             paste0(mutation, " (#", cell_line, ")"))
             }
-            
+
             if(!is.na(corr)) {
               return(round(corr, 4))
             } else {
@@ -4031,8 +4075,49 @@ GATE_STRATEGY <- list(
             return(NA_real_)
           }
         })
-        
+
         output_df[[col_name]] <- values
+      }
+
+      # Create separate dataframes for HA_Pos_Pct and Strength_Ratio
+      ha_pos_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
+      strength_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
+
+      for(i in 1:nrow(unique_groups)) {
+        cell_line <- unique_groups$Cell_line[i]
+        mutation <- unique_groups$Mutation[i]
+        col_name <- col_names[i]
+
+        cell_data <- plot_data %>%
+          filter(Cell_line == cell_line) %>%
+          select(Experiment, HA_Pos_Pct, Strength_Ratio)
+
+        # HA_Pos_Pct values
+        ha_values <- sapply(unique_experiments, function(exp) {
+          match_idx <- which(cell_data$Experiment == exp)
+          if(length(match_idx) > 0) {
+            ha_pct <- as.numeric(cell_data$HA_Pos_Pct[match_idx[1]])
+            if(!is.na(ha_pct)) {
+              return(round(ha_pct, 2))
+            }
+          }
+          return(NA_real_)
+        })
+
+        # Strength_Ratio values
+        strength_values <- sapply(unique_experiments, function(exp) {
+          match_idx <- which(cell_data$Experiment == exp)
+          if(length(match_idx) > 0) {
+            strength <- as.numeric(cell_data$Strength_Ratio[match_idx[1]])
+            if(!is.na(strength)) {
+              return(round(strength, 4))
+            }
+          }
+          return(NA_real_)
+        })
+
+        ha_pos_df[[col_name]] <- ha_values
+        strength_df[[col_name]] <- strength_values
       }
       
       warnings_col <- sapply(unique_experiments, function(exp) {
@@ -4050,17 +4135,25 @@ GATE_STRATEGY <- list(
         library(writexl)
       }
       
+      # Add warnings to other sheets
+      ha_pos_df$Low_Cell_Warning <- warnings_col
+      strength_df$Low_Cell_Warning <- warnings_col
+
       notes_df <- data.frame(
-        Note = c("Correlation values are reported to 4 decimal places",
-                 "Each row represents one experiment",
-                 "Each column represents one cell line",
-                 "Low_Cell_Warning column lists cell lines with N_cells < 500",
+        Note = c("Three sheets: Correlation, HA_Pos_Pct, and Strength_Ratio",
+                 "Correlation values: 4 decimal places",
+                 "HA_Pos_Pct values: percentage (2 decimal places)",
+                 "Strength_Ratio values: 4 decimal places",
+                 "Each row = one experiment, each column = one cell line",
+                 "Low_Cell_Warning lists cell lines with N_cells < 500",
                  paste0("Data exported: ", Sys.time())),
         stringsAsFactors = FALSE
       )
-      
+
       write_xlsx(list(
-        "Correlation_Data" = output_df,
+        "Correlation" = output_df,
+        "HA_Pos_Pct" = ha_pos_df,
+        "Strength_Ratio" = strength_df,
         "Notes" = notes_df
       ), path = file)
       
