@@ -1850,21 +1850,39 @@ server <- function(input, output, session) {
       plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use)
 
     } else if(input$overview_gate == "gate7") {
-      # Calculate HA threshold (for old strategies, this is just used for the plot)
-      control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
-      if(is.null(control_idx)) {
-        plot.new()
-        text(0.5, 0.5, "No control sample found", cex = 2)
-        return()
+      # Get strategy metadata
+      gate_strategy_key <- paste0("GATE_STRATEGY_", input$overview_gate_strategy)
+      gate_strategy <- if(!is.null(rv$gate_strategies[[gate_strategy_key]])) {
+        rv$gate_strategies[[gate_strategy_key]]
+      } else {
+        NULL
       }
-      control_fcs <- exp$flowset[[control_idx]]
-      control_name <- exp$metadata$sample_name[control_idx]
-      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
-                                                             gates = gates_to_use,
-                                                             channels = CHANNELS)
-      ha_threshold <- control_result$threshold
 
-      plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use)
+      # Check if using quadrant strategy
+      use_quadrant <- !is.null(gate_strategy$analysis_type) &&
+                      gate_strategy$analysis_type == "quadrant_ratio" &&
+                      !is.null(gates_to_use$quadrant)
+
+      if(use_quadrant) {
+        # Quadrant strategy: show quadrant plots for all Dox+ samples
+        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = CHANNELS)
+      } else {
+        # Old strategy: Calculate HA threshold
+        control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+        if(is.null(control_idx)) {
+          plot.new()
+          text(0.5, 0.5, "No control sample found", cex = 2)
+          return()
+        }
+        control_fcs <- exp$flowset[[control_idx]]
+        control_name <- exp$metadata$sample_name[control_idx]
+        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                               gates = gates_to_use,
+                                                               channels = CHANNELS)
+        ha_threshold <- control_result$threshold
+
+        plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use)
+      }
 
     } else if(input$overview_gate == "correlation") {
       # Get strategy metadata
@@ -3388,9 +3406,15 @@ GATE_STRATEGY <- list(
   output$comparison_sample_selector <- renderDT({
     req(rv$all_results)
 
+    # Debug: print what we have
+    cat(sprintf("\n=== Multi-Sample Comparison Debug ===\n"))
+    cat(sprintf("Total rows in rv$all_results: %d\n", nrow(rv$all_results)))
+    cat(sprintf("Gate IDs present: %s\n", paste(unique(rv$all_results$Gate_ID), collapse = ", ")))
+    cat(sprintf("Rows with non-NA Correlation: %d\n", sum(!is.na(rv$all_results$Correlation))))
+
     # Filter to only analyzed samples (those with non-NA correlation)
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
-    
+
     if(nrow(analyzed) == 0) {
       return(data.frame(Message = "No analyzed samples available. Please analyze experiments first."))
     }
@@ -3438,27 +3462,11 @@ GATE_STRATEGY <- list(
       )
     }
 
-    # Ensure all columns are character/factor/numeric for proper filtering
+    # Ensure columns are proper types for filtering
     display_data$Gate_ID <- as.character(display_data$Gate_ID)
     display_data$Experiment <- as.character(display_data$Experiment)
     if("Notes" %in% names(display_data)) {
       display_data$Notes <- as.character(display_data$Notes)
-    }
-
-    # Ensure numeric columns are numeric (not character with "%")
-    if("N_cells" %in% names(display_data)) {
-      display_data$N_cells <- as.numeric(display_data$N_cells)
-    }
-
-    # Convert formatted percentage strings back to numeric for filtering
-    if("HA_Pos_Pct" %in% names(display_data)) {
-      # Remove % sign and convert to numeric
-      display_data$HA_Pos_Pct_Numeric <- as.numeric(gsub("%", "", display_data$HA_Pos_Pct))
-    }
-
-    # Strength_Ratio should already be numeric after formatting, convert back
-    if("Strength_Ratio" %in% names(display_data)) {
-      display_data$Strength_Ratio_Numeric <- as.numeric(display_data$Strength_Ratio)
     }
 
     datatable(display_data,
@@ -3466,11 +3474,7 @@ GATE_STRATEGY <- list(
               options = list(
                 pageLength = 10,
                 scrollX = TRUE,
-                search = list(regex = FALSE, caseInsensitive = TRUE),
-                columnDefs = list(
-                  # Hide the numeric versions of formatted columns
-                  list(visible = FALSE, targets = which(names(display_data) %in% c("HA_Pos_Pct_Numeric", "Strength_Ratio_Numeric")) - 1)
-                )
+                search = list(regex = FALSE, caseInsensitive = TRUE)
               ),
               filter = list(position = 'top', clear = FALSE))
   })
