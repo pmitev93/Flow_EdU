@@ -1226,12 +1226,8 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
 
   par(mgp = c(3, 0.7, 0))
 
-  # Create title based on show_sample_name parameter
-  plot_title <- if(show_sample_name) {
-    sprintf("EdU vs HA Correlation\n%s", sample_name)
-  } else {
-    "EdU vs HA Correlation"
-  }
+  # Create title with sample name and subtitle
+  plot_title <- sprintf("%s\nEdU vs HA Correlation", sample_name)
 
   plot(ha_log, edu_log,
        pch = 16,
