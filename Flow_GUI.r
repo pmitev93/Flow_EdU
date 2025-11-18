@@ -1866,11 +1866,18 @@ server <- function(input, output, session) {
             tryCatch({
               cache_data <- readRDS(cache_file)
               if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$overview_gate_strategy) {
-                # Found matching cache file, extract gate strategy
+                # Found matching cache file, extract gate strategy AND gates
                 if(!is.null(cache_data$gate_strategy)) {
                   gate_strategy <- cache_data$gate_strategy
                   rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
-                  cat(sprintf("Loaded gate strategy '%s' from cache\n", input$overview_gate_strategy))
+
+                  # Also load the gates themselves
+                  if(!is.null(cache_data$gates)) {
+                    composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
+                    rv$experiment_gates[[composite_key]] <- cache_data$gates
+                    gates_to_use <- cache_data$gates
+                    cat(sprintf("Loaded gates and strategy '%s' from cache\n", input$overview_gate_strategy))
+                  }
                   break
                 }
               }
@@ -1937,11 +1944,18 @@ server <- function(input, output, session) {
             tryCatch({
               cache_data <- readRDS(cache_file)
               if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$overview_gate_strategy) {
-                # Found matching cache file, extract gate strategy
+                # Found matching cache file, extract gate strategy AND gates
                 if(!is.null(cache_data$gate_strategy)) {
                   gate_strategy <- cache_data$gate_strategy
                   rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
-                  cat(sprintf("Loaded gate strategy '%s' from cache\n", input$overview_gate_strategy))
+
+                  # Also load the gates themselves
+                  if(!is.null(cache_data$gates)) {
+                    composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
+                    rv$experiment_gates[[composite_key]] <- cache_data$gates
+                    gates_to_use <- cache_data$gates
+                    cat(sprintf("Loaded gates and strategy '%s' from cache\n", input$overview_gate_strategy))
+                  }
                   break
                 }
               }
@@ -2016,11 +2030,18 @@ server <- function(input, output, session) {
           tryCatch({
             cache_data <- readRDS(cache_file)
             if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$sample_overview_gate_strategy) {
-              # Found matching cache file, extract gate strategy
+              # Found matching cache file, extract gate strategy AND gates
               if(!is.null(cache_data$gate_strategy)) {
                 gate_strategy <- cache_data$gate_strategy
                 rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
-                cat(sprintf("Loaded gate strategy '%s' from cache\n", input$sample_overview_gate_strategy))
+
+                # Also load the gates themselves
+                if(!is.null(cache_data$gates)) {
+                  composite_key <- paste0(exp_name, "::", input$sample_overview_gate_strategy)
+                  rv$experiment_gates[[composite_key]] <- cache_data$gates
+                  gates_to_use <- cache_data$gates
+                  cat(sprintf("Loaded gates and strategy '%s' from cache\n", input$sample_overview_gate_strategy))
+                }
                 break
               }
             }
@@ -3516,7 +3537,7 @@ GATE_STRATEGY <- list(
     if(nrow(analyzed) == 0) {
       return(data.frame(Message = "No analyzed samples available. Please analyze experiments first."))
     }
-    
+
     # Show relevant columns
     cols_to_show <- c("Experiment", "Sample", "Cell_line", "Gene",
                       "Mutation", "Correlation")
@@ -3524,11 +3545,17 @@ GATE_STRATEGY <- list(
     # Add HA_Pos_Pct if it exists
     if("HA_Pos_Pct" %in% names(analyzed)) {
       cols_to_show <- c(cols_to_show, "HA_Pos_Pct")
+      cat(sprintf("HA_Pos_Pct column exists - non-NA values: %d\n", sum(!is.na(analyzed$HA_Pos_Pct))))
+    } else {
+      cat("HA_Pos_Pct column does NOT exist in analyzed\n")
     }
 
     # Add Strength_Ratio if it exists
     if("Strength_Ratio" %in% names(analyzed)) {
       cols_to_show <- c(cols_to_show, "Strength_Ratio")
+      cat(sprintf("Strength_Ratio column exists - non-NA values: %d\n", sum(!is.na(analyzed$Strength_Ratio))))
+    } else {
+      cat("Strength_Ratio column does NOT exist in analyzed\n")
     }
 
     cols_to_show <- c(cols_to_show, "N_cells", "Gate_ID")
