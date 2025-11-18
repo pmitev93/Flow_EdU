@@ -1857,6 +1857,30 @@ server <- function(input, output, session) {
         NULL
       }
 
+      # If gate strategy not in memory, try to load from cache
+      if(is.null(gate_strategy)) {
+        cache_dir <- file.path("analysis_cache", exp_name)
+        if(dir.exists(cache_dir)) {
+          cache_files <- list.files(cache_dir, pattern = "\\.rds$", full.names = TRUE)
+          for(cache_file in cache_files) {
+            tryCatch({
+              cache_data <- readRDS(cache_file)
+              if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$overview_gate_strategy) {
+                # Found matching cache file, extract gate strategy
+                if(!is.null(cache_data$gate_strategy)) {
+                  gate_strategy <- cache_data$gate_strategy
+                  rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
+                  cat(sprintf("Loaded gate strategy '%s' from cache\n", input$overview_gate_strategy))
+                  break
+                }
+              }
+            }, error = function(e) {
+              # Skip files that can't be read
+            })
+          }
+        }
+      }
+
       # Debug output
       cat(sprintf("\n=== Gate 7 Overview Debug ===\n"))
       cat(sprintf("overview_gate_strategy: %s\n", input$overview_gate_strategy))
@@ -1902,6 +1926,30 @@ server <- function(input, output, session) {
         rv$gate_strategies[[gate_strategy_key]]
       } else {
         NULL
+      }
+
+      # If gate strategy not in memory, try to load from cache
+      if(is.null(gate_strategy)) {
+        cache_dir <- file.path("analysis_cache", exp_name)
+        if(dir.exists(cache_dir)) {
+          cache_files <- list.files(cache_dir, pattern = "\\.rds$", full.names = TRUE)
+          for(cache_file in cache_files) {
+            tryCatch({
+              cache_data <- readRDS(cache_file)
+              if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$overview_gate_strategy) {
+                # Found matching cache file, extract gate strategy
+                if(!is.null(cache_data$gate_strategy)) {
+                  gate_strategy <- cache_data$gate_strategy
+                  rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
+                  cat(sprintf("Loaded gate strategy '%s' from cache\n", input$overview_gate_strategy))
+                  break
+                }
+              }
+            }, error = function(e) {
+              # Skip files that can't be read
+            })
+          }
+        }
       }
 
       # Check if using quadrant strategy
@@ -1957,6 +2005,30 @@ server <- function(input, output, session) {
       rv$gate_strategies[[gate_strategy_key]]
     } else {
       NULL
+    }
+
+    # If gate strategy not in memory, try to load from cache
+    if(is.null(gate_strategy)) {
+      cache_dir <- file.path("analysis_cache", exp_name)
+      if(dir.exists(cache_dir)) {
+        cache_files <- list.files(cache_dir, pattern = "\\.rds$", full.names = TRUE)
+        for(cache_file in cache_files) {
+          tryCatch({
+            cache_data <- readRDS(cache_file)
+            if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$sample_overview_gate_strategy) {
+              # Found matching cache file, extract gate strategy
+              if(!is.null(cache_data$gate_strategy)) {
+                gate_strategy <- cache_data$gate_strategy
+                rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
+                cat(sprintf("Loaded gate strategy '%s' from cache\n", input$sample_overview_gate_strategy))
+                break
+              }
+            }
+          }, error = function(e) {
+            # Skip files that can't be read
+          })
+        }
+      }
     }
 
     # Check if using quadrant strategy
@@ -3478,6 +3550,8 @@ GATE_STRATEGY <- list(
     # Ensure numeric columns are numeric (not character)
     if("HA_Pos_Pct" %in% names(display_data)) {
       display_data$HA_Pos_Pct <- as.numeric(display_data$HA_Pos_Pct)
+      # Convert from 0-100 range to 0-1 range for formatPercentage
+      display_data$HA_Pos_Pct <- display_data$HA_Pos_Pct / 100
     }
     if("Strength_Ratio" %in% names(display_data)) {
       display_data$Strength_Ratio <- as.numeric(display_data$Strength_Ratio)
@@ -3496,7 +3570,7 @@ GATE_STRATEGY <- list(
 
     # Add formatting for optional columns
     if("HA_Pos_Pct" %in% names(display_data)) {
-      dt <- dt %>% formatRound('HA_Pos_Pct', digits = 2, suffix = '%')
+      dt <- dt %>% formatPercentage('HA_Pos_Pct', digits = 2)
     }
     if("Strength_Ratio" %in% names(display_data)) {
       dt <- dt %>% formatRound('Strength_Ratio', digits = 4)
