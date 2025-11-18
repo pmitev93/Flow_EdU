@@ -1156,11 +1156,26 @@ server <- function(input, output, session) {
                     rv$all_results$N_cells[match_idx] <- cache_data$results$N_cells[j]
                     rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
                     rv$all_results$Gate_ID[match_idx] <- gate_id
+
+                    # Update Ratio if it exists in cached results
+                    if("Ratio" %in% names(cache_data$results)) {
+                      if(!"Ratio" %in% names(rv$all_results)) {
+                        rv$all_results$Ratio <- NA_real_
+                      }
+                      rv$all_results$Ratio[match_idx] <- cache_data$results$Ratio[j]
+                    }
+
                     n_updated <- n_updated + 1
                   } else {
                     # This is a second/third gate strategy for same well - add new row
                     new_row <- cache_data$results[j, ]
                     new_row$Gate_ID <- gate_id
+
+                    # Ensure Ratio column exists before binding
+                    if("Ratio" %in% names(cache_data$results) && !"Ratio" %in% names(rv$all_results)) {
+                      rv$all_results$Ratio <- NA_real_
+                    }
+
                     rv$all_results <- bind_rows(rv$all_results, new_row)
                     n_added <- n_added + 1
                   }
@@ -1488,9 +1503,16 @@ server <- function(input, output, session) {
           incProgress(1/(n_exp*2), detail = sprintf("Analyzing %s", exp_name))
 
           rv$ha_thresholds[[exp_name]] <- ha_threshold
-          exp_results <- extract_correlations(exp, ha_threshold,
-                                               gates = GATES_selected,
-                                               channels = CHANNELS)
+
+          # Check if using quadrant strategy
+          use_quadrant <- !is.null(GATE_STRATEGY_selected$analysis_type) &&
+                          GATE_STRATEGY_selected$analysis_type == "quadrant_ratio"
+
+          # Use appropriate analysis function
+          exp_results <- extract_correlations_with_quadrants(exp, ha_threshold,
+                                                             gates = GATES_selected,
+                                                             channels = CHANNELS,
+                                                             use_quadrant = use_quadrant)
 
           # Save to cache with gate strategy ID
           gate_id <- if(!is.null(GATE_STRATEGY_selected$id)) {
@@ -1549,8 +1571,20 @@ server <- function(input, output, session) {
           rv$all_results$N_cells[match_idx] <- new_results$N_cells[i]
           rv$all_results$Notes[match_idx] <- new_results$Notes[i]
           rv$all_results$Gate_ID[match_idx] <- new_results$Gate_ID[i]
+
+          # Update Ratio column if it exists in new_results
+          if("Ratio" %in% names(new_results)) {
+            if(!"Ratio" %in% names(rv$all_results)) {
+              rv$all_results$Ratio <- NA_real_
+            }
+            rv$all_results$Ratio[match_idx] <- new_results$Ratio[i]
+          }
         } else {
           # This is a second/third gate strategy for same well - add new row
+          # Ensure Ratio column exists in rv$all_results before binding
+          if("Ratio" %in% names(new_results) && !"Ratio" %in% names(rv$all_results)) {
+            rv$all_results$Ratio <- NA_real_
+          }
           rv$all_results <- bind_rows(rv$all_results, new_results[i, ])
         }
       }
@@ -1575,6 +1609,15 @@ server <- function(input, output, session) {
         is.na(display_data$Correlation) | display_data$Correlation == "Not analyzed",
         "Not analyzed",
         sprintf("%.4f", as.numeric(display_data$Correlation))
+      )
+    }
+
+    # Format ratio to 4 decimal places
+    if("Ratio" %in% names(display_data)) {
+      display_data$Ratio <- ifelse(
+        is.na(display_data$Ratio),
+        "",
+        sprintf("%.4f", as.numeric(display_data$Ratio))
       )
     }
 

@@ -37,15 +37,16 @@ quick_scan_experiment <- function(experiment_path) {
   metadata$experiment <- experiment_name
   metadata$correlation <- "Not analyzed"
   metadata$n_cells <- "Not analyzed"
+  metadata$ratio <- NA_real_
   metadata$notes <- ""
-  
+
   # Reorder columns
-  metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line", 
-                           "gene", "mutation", "correlation", "n_cells", "notes")]
-  
+  metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line",
+                           "gene", "mutation", "correlation", "n_cells", "ratio", "notes")]
+
   # Capitalize column names
-  colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line", 
-                          "Gene", "Mutation", "Correlation", "N_cells", "Notes")
+  colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line",
+                          "Gene", "Mutation", "Correlation", "N_cells", "Ratio", "Notes")
   
   return(metadata)
 }

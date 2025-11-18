@@ -738,6 +738,68 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   ))
 }
 
+# Wrapper function: Extract correlations with optional quadrant analysis
+extract_correlations_with_quadrants <- function(experiment, ha_threshold = NULL,
+                                                 gates = GATES, channels = CHANNELS,
+                                                 use_quadrant = FALSE) {
+
+  # Load the standard plotting function
+  results_df <- extract_correlations(experiment, ha_threshold, gates, channels)
+
+  # Add Ratio column (initialize as NA)
+  results_df$Ratio <- NA_real_
+
+  # If not using quadrant strategy, return standard results
+  if(!use_quadrant || is.null(gates$quadrant)) {
+    return(results_df)
+  }
+
+  cat("\n=== QUADRANT ANALYSIS MODE ===\n")
+
+  # For quadrant strategy, calculate ratios for Dox+ samples
+  for(i in seq_along(experiment$flowset)) {
+    sample_name <- experiment$metadata$sample_name[i]
+
+    # Skip Dox- samples (they're controls)
+    if(grepl("Dox-", sample_name, ignore.case = TRUE)) {
+      next
+    }
+
+    # Find paired control
+    control_idx <- find_paired_control(sample_name, experiment$metadata)
+
+    if(is.null(control_idx)) {
+      cat(sprintf("WARNING: No paired control for %s - skipping quadrant analysis\n", sample_name))
+      next
+    }
+
+    # Get control and test FCS data
+    control_fcs <- experiment$flowset[[control_idx]]
+    test_fcs <- experiment$flowset[[i]]
+    control_name <- experiment$metadata$sample_name[control_idx]
+
+    # Calculate quadrant metrics
+    tryCatch({
+      quadrant_result <- calculate_quadrant_from_paired_control(
+        control_fcs, test_fcs,
+        control_name, sample_name,
+        gates, channels
+      )
+
+      # Update the ratio in results_df
+      well_match <- which(results_df$Sample == sample_name)
+      if(length(well_match) > 0) {
+        results_df$Ratio[well_match[1]] <- quadrant_result$ratio
+      }
+
+    }, error = function(e) {
+      cat(sprintf("ERROR in quadrant analysis for %s: %s\n", sample_name, e$message))
+    })
+  }
+
+  return(results_df)
+}
+
 # Paths ####
 master_path <- "Experiments/"
 experiment_folders <- list.dirs(master_path, recursive = FALSE, full.names = TRUE)
