@@ -1497,13 +1497,12 @@ server <- function(input, output, session) {
           rv$ha_thresholds[[exp_name]] <- cache_data$ha_threshold
           exp_results <- cache_data$results
 
-          # Use gate strategy ID (prefer from cache, fallback to GATE_STRATEGY from file)
+          # Use gate strategy ID (prefer from cache, fallback to filename-based ID)
           gate_id <- if(!is.null(cache_data$gate_id)) {
             cache_data$gate_id
-          } else if(!is.null(GATE_STRATEGY_selected$id)) {
-            GATE_STRATEGY_selected$id
           } else {
-            "gdef"
+            # For old cache files, use filename-based ID to avoid collisions
+            gate_id_from_file
           }
 
           # Store gates used for this experiment+strategy combination (prefer from cache, fallback to selected)
@@ -1858,10 +1857,22 @@ server <- function(input, output, session) {
         NULL
       }
 
+      # Debug output
+      cat(sprintf("\n=== Gate 7 Overview Debug ===\n"))
+      cat(sprintf("overview_gate_strategy: %s\n", input$overview_gate_strategy))
+      cat(sprintf("gate_strategy_key: %s\n", gate_strategy_key))
+      cat(sprintf("gate_strategy: %s\n", if(!is.null(gate_strategy)) "PRESENT" else "NULL"))
+      if(!is.null(gate_strategy)) {
+        cat(sprintf("  analysis_type: %s\n", gate_strategy$analysis_type))
+      }
+      cat(sprintf("gates$quadrant: %s\n", if(!is.null(gates_to_use$quadrant)) "PRESENT" else "NULL"))
+
       # Check if using quadrant strategy
       use_quadrant <- !is.null(gate_strategy$analysis_type) &&
                       gate_strategy$analysis_type == "quadrant_ratio" &&
                       !is.null(gates_to_use$quadrant)
+
+      cat(sprintf("use_quadrant: %s\n", use_quadrant))
 
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
@@ -3412,8 +3423,23 @@ GATE_STRATEGY <- list(
     cat(sprintf("Gate IDs present: %s\n", paste(unique(rv$all_results$Gate_ID), collapse = ", ")))
     cat(sprintf("Rows with non-NA Correlation: %d\n", sum(!is.na(rv$all_results$Correlation))))
 
+    # Check quadrant specifically
+    quadrant_rows <- rv$all_results[!is.na(rv$all_results$Gate_ID) & rv$all_results$Gate_ID == "quadrant", ]
+    cat(sprintf("Quadrant rows total: %d\n", nrow(quadrant_rows)))
+    cat(sprintf("Quadrant rows with Correlation: %d\n", sum(!is.na(quadrant_rows$Correlation))))
+    if(nrow(quadrant_rows) > 0) {
+      cat(sprintf("Sample quadrant row - Correlation: %s, HA_Pos_Pct: %s, Strength_Ratio: %s\n",
+                  quadrant_rows$Correlation[1],
+                  quadrant_rows$HA_Pos_Pct[1],
+                  quadrant_rows$Strength_Ratio[1]))
+    }
+
     # Filter to only analyzed samples (those with non-NA correlation)
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    cat(sprintf("After filtering, analyzed rows: %d\n", nrow(analyzed)))
+    quadrant_analyzed <- analyzed[!is.na(analyzed$Gate_ID) & analyzed$Gate_ID == "quadrant", ]
+    cat(sprintf("Quadrant in analyzed: %d\n", nrow(quadrant_analyzed)))
 
     if(nrow(analyzed) == 0) {
       return(data.frame(Message = "No analyzed samples available. Please analyze experiments first."))
@@ -3441,42 +3467,42 @@ GATE_STRATEGY <- list(
     }
     display_data <- analyzed[, cols_to_show]
 
-    # Format correlation to 4 decimal places
-    display_data$Correlation <- sprintf("%.4f", as.numeric(display_data$Correlation))
-
-    # Format HA_Pos_Pct to 2 decimal places with % symbol
-    if("HA_Pos_Pct" %in% names(display_data)) {
-      display_data$HA_Pos_Pct <- ifelse(
-        is.na(display_data$HA_Pos_Pct),
-        "",
-        sprintf("%.2f%%", as.numeric(display_data$HA_Pos_Pct))
-      )
-    }
-
-    # Format Strength_Ratio to 4 decimal places
-    if("Strength_Ratio" %in% names(display_data)) {
-      display_data$Strength_Ratio <- ifelse(
-        is.na(display_data$Strength_Ratio),
-        "",
-        sprintf("%.4f", as.numeric(display_data$Strength_Ratio))
-      )
-    }
-
     # Ensure columns are proper types for filtering
+    display_data$Correlation <- as.numeric(display_data$Correlation)
     display_data$Gate_ID <- as.character(display_data$Gate_ID)
     display_data$Experiment <- as.character(display_data$Experiment)
     if("Notes" %in% names(display_data)) {
       display_data$Notes <- as.character(display_data$Notes)
     }
 
-    datatable(display_data,
+    # Ensure numeric columns are numeric (not character)
+    if("HA_Pos_Pct" %in% names(display_data)) {
+      display_data$HA_Pos_Pct <- as.numeric(display_data$HA_Pos_Pct)
+    }
+    if("Strength_Ratio" %in% names(display_data)) {
+      display_data$Strength_Ratio <- as.numeric(display_data$Strength_Ratio)
+    }
+
+    # Create datatable with numeric columns (formatting applied separately)
+    dt <- datatable(display_data,
               selection = 'multiple',
               options = list(
                 pageLength = 10,
                 scrollX = TRUE,
                 search = list(regex = FALSE, caseInsensitive = TRUE)
               ),
-              filter = list(position = 'top', clear = FALSE))
+              filter = list(position = 'top', clear = FALSE)) %>%
+      formatRound('Correlation', digits = 4)
+
+    # Add formatting for optional columns
+    if("HA_Pos_Pct" %in% names(display_data)) {
+      dt <- dt %>% formatRound('HA_Pos_Pct', digits = 2, suffix = '%')
+    }
+    if("Strength_Ratio" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Strength_Ratio', digits = 4)
+    }
+
+    dt
   })
   
   # Store previous selection to detect additions vs removals
