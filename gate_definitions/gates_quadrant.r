@@ -85,7 +85,7 @@ GATES$quadrant <- list(
   control_suffix = "Dox-",
   test_suffix = "Dox+",
   ha_prob = 0.98,
-  edu_prob = 0.98,
+  edu_prob = 0.02,
   description = "Quadrant gating using paired Dox- control for both HA and EdU thresholds"
 )
 

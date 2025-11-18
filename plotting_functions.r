@@ -1018,6 +1018,22 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
   x <- exprs(fcs_data)[, channels$HA]
   y <- exprs(fcs_data)[, channels$EdU]
 
+  # Check if we have enough cells to plot
+  if(length(x) < 10) {
+    # Create empty plot with warning message
+    plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(100, 6e6),
+         xlab = "HA-A", ylab = "EdU-A",
+         main = if(show_sample_name) sprintf("Gate 7: HA-Positive\n%s", sample_name) else "Gate 7: HA-Positive",
+         log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0))
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+         labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
+    axis(2, at = c(100, 1000, 10000, 100000, 1000000),
+         labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
+    text(1000, 50000, sprintf("Insufficient cells for plotting\n(n = %d)", length(x)),
+         cex = 1.2, col = "red", font = 2)
+    return(invisible(NULL))
+  }
+
   dens <- get_density_colors(x, y, log_x = TRUE, log_y = TRUE)
 
   # Create title
@@ -1109,9 +1125,23 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
     
     x <- exprs(fcs_data)[, channels$HA]
     y <- exprs(fcs_data)[, channels$EdU]
-    
+
+    # Check if we have enough cells to plot
+    if(length(x) < 10) {
+      # Create empty plot with warning
+      plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(100, 6e6),
+           xlab = "", ylab = "", main = sample_name, log = "xy",
+           cex.main = 1.2, cex.axis = 0.7, xaxt = "n", yaxt = "n")
+      axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+           labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
+      axis(2, at = c(100, 1000, 10000, 100000, 1000000),
+           labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
+      text(1000, 50000, sprintf("n = %d", length(x)), cex = 0.8, col = "red", font = 2)
+      next
+    }
+
     dens <- get_density_colors(x, y, log_x = TRUE, log_y = TRUE)
-    
+
     plot(x, y,
          pch = ".",
          col = dens,
