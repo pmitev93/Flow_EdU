@@ -1924,6 +1924,13 @@ server <- function(input, output, session) {
         cat(sprintf("Gate strategy already in memory for '%s'\n", input$overview_gate_strategy))
       }
 
+      # Re-evaluate gates_to_use after cache loading to ensure we have the latest gates
+      composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
+      if(!is.null(rv$experiment_gates[[composite_key]])) {
+        gates_to_use <- rv$experiment_gates[[composite_key]]
+        cat(sprintf("Updated gates_to_use from rv$experiment_gates for '%s'\n", input$overview_gate_strategy))
+      }
+
       # Debug output
       cat(sprintf("\n=== Gate 7 Overview Debug ===\n"))
       cat(sprintf("overview_gate_strategy: %s\n", input$overview_gate_strategy))
@@ -2086,6 +2093,12 @@ server <- function(input, output, session) {
           })
         }
       }
+    }
+
+    # Re-evaluate gates_to_use after cache loading to ensure we have the latest gates
+    composite_key <- paste0(exp_name, "::", input$sample_overview_gate_strategy)
+    if(!is.null(rv$experiment_gates[[composite_key]])) {
+      gates_to_use <- rv$experiment_gates[[composite_key]]
     }
 
     # Check if using quadrant strategy

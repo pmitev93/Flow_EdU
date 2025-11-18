@@ -1677,6 +1677,11 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
         gates, channels
       )
 
+      # Validate thresholds
+      if(is.na(quadrant_result$ha_threshold) || is.na(quadrant_result$edu_threshold)) {
+        stop("Invalid threshold values from control")
+      }
+
       # Apply gates 1-6
       fcs_data <- apply_sequential_gates(test_fcs, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -1684,6 +1689,12 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
       fxcycle_gate <- gates$fxcycle_quantile
       fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
       fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
+
+      # Check for valid limits
+      if(any(is.na(fxcycle_limits)) || length(fxcycle_limits) < 2) {
+        stop("Insufficient cells after gating - cannot calculate FxCycle limits")
+      }
+
       fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
       fcs_data <- Subset(fcs_data, fxcycle_filter)
 
@@ -1694,6 +1705,11 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
 
       fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
       fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
+      # Check for valid thresholds
+      if(is.na(edu_threshold_g6) || any(is.na(fxcycle_bounds)) || length(fxcycle_bounds) < 2) {
+        stop("Insufficient cells after gating - cannot calculate EdU/FxCycle thresholds")
+      }
 
       edu_fxcycle_filter <- edu_values >= edu_threshold_g6 &
         fxcycle_values2 >= fxcycle_bounds[1] &
