@@ -630,16 +630,8 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   control_gated <- Subset(control_gated, fxcycle_filter)
 
   # Gate 6: EdU + FxCycle S-phase
-  # For Dox- samples, use relaxed EdU threshold since they have low EdU incorporation
   edu_values_g6 <- exprs(control_gated)[, channels$EdU]
-
-  if(is_dox_minus) {
-    # For Dox- samples: use 10th percentile (keep top 90%) - much more lenient
-    edu_threshold_g6 <- quantile(edu_values_g6, probs = 0.10, na.rm = TRUE)
-  } else {
-    # For Dox+ controls: use standard threshold (55th percentile = top 45%)
-    edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
-  }
+  edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
 
   fxcycle_values_g6 <- exprs(control_gated)[, channels$FxCycle]
   fxcycle_bounds_g6 <- quantile(fxcycle_values_g6, probs = gates$edu_fxcycle_sphase$fxcycle_probs, na.rm = TRUE)
@@ -717,16 +709,8 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   test_gated <- Subset(test_gated, fxcycle_filter)
 
   # Gate 6: EdU + FxCycle S-phase
-  # For Dox- samples, use relaxed EdU threshold since they have low EdU incorporation
   edu_values_g6 <- exprs(test_gated)[, channels$EdU]
-
-  if(is_dox_minus) {
-    # For Dox- samples: use 10th percentile (keep top 90%) - much more lenient
-    edu_threshold_g6 <- quantile(edu_values_g6, probs = 0.10, na.rm = TRUE)
-  } else {
-    # For Dox+ samples: use standard threshold (55th percentile = top 45%)
-    edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
-  }
+  edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
 
   fxcycle_values_g6 <- exprs(test_gated)[, channels$FxCycle]
   fxcycle_bounds_g6 <- quantile(fxcycle_values_g6, probs = gates$edu_fxcycle_sphase$fxcycle_probs, na.rm = TRUE)
