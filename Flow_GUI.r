@@ -711,7 +711,7 @@ server <- function(input, output, session) {
   }
   
   # Save analysis results to cache
-  save_to_cache <- function(experiment_name, results, ha_threshold, gates, ha_percentile = 0.98, gate_strategy_id = NULL) {
+  save_to_cache <- function(experiment_name, results, ha_threshold, gates, ha_percentile = 0.98, gate_strategy_id = NULL, gate_strategy = NULL) {
     fingerprint <- get_gate_fingerprint(gates, ha_percentile)
 
     # Use provided gate_strategy_id or fallback to auto-generated ID
@@ -730,6 +730,7 @@ server <- function(input, output, session) {
       fingerprint = fingerprint,
       gate_id = gate_id,
       gates = gates,
+      gate_strategy = gate_strategy,  # Store GATE_STRATEGY metadata
       timestamp = Sys.time()
     )
 
@@ -1509,9 +1510,11 @@ server <- function(input, output, session) {
             GATES_selected
           }
 
-          # Store gate strategy metadata
+          # Store gate strategy metadata (prefer from cache, fallback to loaded from file)
           gate_strategy_key <- paste0("GATE_STRATEGY_", gate_id)
-          if(!is.null(GATE_STRATEGY_selected)) {
+          if(!is.null(cache_data$gate_strategy)) {
+            rv$gate_strategies[[gate_strategy_key]] <- cache_data$gate_strategy
+          } else if(!is.null(GATE_STRATEGY_selected)) {
             rv$gate_strategies[[gate_strategy_key]] <- GATE_STRATEGY_selected
           }
 
@@ -1542,7 +1545,8 @@ server <- function(input, output, session) {
           }
 
           save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected,
-                        gate_strategy_id = gate_id)
+                        gate_strategy_id = gate_id,
+                        gate_strategy = GATE_STRATEGY_selected)
 
           # Store gates used for this experiment+strategy combination
           composite_key <- paste0(exp_name, "::", gate_id)
@@ -3234,6 +3238,16 @@ GATE_STRATEGY <- list(
                     !is.null(gates_to_use$quadrant)
 
     sample_name <- exp$metadata$sample_name[idx]
+
+    # Debug output
+    cat(sprintf("\n=== Gate 7 Plot Debug ===\n"))
+    cat(sprintf("Sample: %s\n", sample_name))
+    cat(sprintf("use_quadrant: %s\n", use_quadrant))
+    cat(sprintf("gate_strategy: %s\n", if(!is.null(gate_strategy)) "PRESENT" else "NULL"))
+    if(!is.null(gate_strategy)) {
+      cat(sprintf("  analysis_type: %s\n", gate_strategy$analysis_type))
+    }
+    cat(sprintf("gates$quadrant: %s\n", if(!is.null(gates_to_use$quadrant)) "PRESENT" else "NULL"))
 
     if(use_quadrant) {
       # Quadrant strategy: find paired control and show quadrant plot
