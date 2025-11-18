@@ -1623,3 +1623,148 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
   
   return(results_df)
 }
+}
+
+## Quadrant Correlation Overview ----
+plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+  # Count only Dox+ samples
+  n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
+  n_cols <- ceiling(sqrt(n_dox_plus))
+  n_rows <- ceiling(n_dox_plus / n_cols)
+
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
+
+  for(i in seq_along(experiment$flowset)) {
+    sample_name <- experiment$metadata$sample_name[i]
+
+    # Skip Dox- samples entirely
+    is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
+    if(is_dox_minus) {
+      next
+    }
+
+    # Find paired control
+    control_idx <- find_paired_control(sample_name, experiment$metadata)
+    
+    if(is.null(control_idx)) {
+      # No paired control - show error plot
+      plot.new()
+      text(0.5, 0.5, sprintf("No Dox- control\n%s", sample_name), 
+           col = "red", cex = 0.8, font = 2)
+      box(col = "red", lwd = 2)
+      next
+    }
+
+    # Calculate quadrant thresholds
+    control_fcs <- experiment$flowset[[control_idx]]
+    test_fcs <- experiment$flowset[[i]]
+    control_name <- experiment$metadata$sample_name[control_idx]
+
+    tryCatch({
+      quadrant_result <- calculate_quadrant_from_paired_control(
+        control_fcs, test_fcs, control_name, sample_name,
+        gates, channels
+      )
+
+      # Apply gates 1-6
+      fcs_data <- apply_sequential_gates(test_fcs, up_to_gate = 4, gates = gates, channels = channels)
+
+      # Gate 5
+      fxcycle_gate <- gates$fxcycle_quantile
+      fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
+      fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
+      fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
+      fcs_data <- Subset(fcs_data, fxcycle_filter)
+
+      # Gate 6
+      edu_gate <- gates$edu_fxcycle_sphase
+      edu_values <- exprs(fcs_data)[, channels$EdU]
+      edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
+      fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
+      fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
+      edu_fxcycle_filter <- edu_values >= edu_threshold_g6 &
+        fxcycle_values2 >= fxcycle_bounds[1] &
+        fxcycle_values2 <= fxcycle_bounds[2]
+      fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
+
+      # Get final data (no Gate 7 filter for quadrants - show all cells)
+      ha_final <- exprs(fcs_data)[, channels$HA]
+      edu_final <- exprs(fcs_data)[, channels$EdU]
+
+      # Check if enough cells
+      if(length(ha_final) < 10) {
+        plot.new()
+        text(0.5, 0.5, sprintf("n = %d", length(ha_final)), col = "red", cex = 0.8, font = 2)
+        box(col = "red", lwd = 2)
+        next
+      }
+
+      # Log transform
+      ha_log <- log10(ha_final + 1)
+      edu_log <- log10(edu_final + 1)
+
+      ha_threshold_log <- log10(quadrant_result$ha_threshold + 1)
+      edu_threshold_log <- log10(quadrant_result$edu_threshold + 1)
+
+      # Calculate quadrant populations
+      total_cells <- length(ha_log)
+      q1_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)
+      q2_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)
+      q3_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)
+      q4_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)
+
+      q1_pct <- (q1_ha_pos_edu_high / total_cells) * 100
+      q2_pct <- (q2_ha_neg_edu_high / total_cells) * 100
+      q3_pct <- (q3_ha_neg_edu_low / total_cells) * 100
+      q4_pct <- (q4_ha_pos_edu_low / total_cells) * 100
+
+      strength_ratio <- if((q1_pct + q4_pct) > 0) {
+        q4_pct / (q1_pct + q4_pct)
+      } else {
+        NA_real_
+      }
+
+      # Calculate density colors
+      dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
+
+      # Plot
+      plot(ha_log, edu_log,
+           pch = ".",
+           col = dens,
+           xlab = "",
+           ylab = "",
+           main = sprintf("%s\nStrength=%.3f", sample_name, strength_ratio),
+           xlim = c(2, 6.5),
+           ylim = c(4, 7),
+           cex.main = 0.9,
+           xaxs = "i",
+           yaxs = "i")
+
+      # Add colored quadrants
+      rect(ha_threshold_log, edu_threshold_log, 6.5, 7,
+           col = rgb(0, 0, 1, alpha = 0.1), border = NA)
+      rect(ha_threshold_log, 4, 6.5, edu_threshold_log,
+           col = rgb(1, 0, 0, alpha = 0.1), border = NA)
+
+      # Re-plot points
+      points(ha_log, edu_log, pch = ".", col = dens)
+
+      # Threshold lines
+      abline(v = ha_threshold_log, col = "black", lwd = 1, lty = 1)
+      abline(h = edu_threshold_log, col = "black", lwd = 1, lty = 1)
+
+      # Quadrant percentages
+      text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.6, font = 2)
+      text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.6, font = 2)
+      text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.6, font = 2)
+      text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.6, font = 2)
+
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, sprintf("Error\n%s", e$message), col = "red", cex = 0.7)
+      box(col = "red", lwd = 2)
+    })
+  }
+}

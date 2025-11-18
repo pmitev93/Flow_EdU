@@ -1477,8 +1477,12 @@ server <- function(input, output, session) {
         ha_threshold <- control_result$threshold
 
         # Determine gate ID for this analysis
+        # Use filename-based ID to avoid collisions (e.g., quadrant vs quadrant2)
+        gate_id_from_file <- gsub("^gates_(.*)\\.r$", "\\1", gate_file)
+
         gate_id_for_cache <- if(!is.null(GATE_STRATEGY_selected$id)) {
-          GATE_STRATEGY_selected$id
+          # Prefer filename-based ID to avoid collisions
+          gate_id_from_file
         } else {
           "gdef"
         }
@@ -1538,11 +1542,8 @@ server <- function(input, output, session) {
                                                              use_quadrant = use_quadrant)
 
           # Save to cache with gate strategy ID
-          gate_id <- if(!is.null(GATE_STRATEGY_selected$id)) {
-            GATE_STRATEGY_selected$id
-          } else {
-            "gdef"  # Default fallback
-          }
+          # Use same filename-based ID as above to avoid collisions
+          gate_id <- gate_id_from_file
 
           save_to_cache(exp_name, exp_results, ha_threshold, GATES_selected,
                         gate_strategy_id = gate_id,
@@ -1849,7 +1850,7 @@ server <- function(input, output, session) {
       plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use)
 
     } else if(input$overview_gate == "gate7") {
-      # Calculate HA threshold
+      # Calculate HA threshold (for old strategies, this is just used for the plot)
       control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
       if(is.null(control_idx)) {
         plot.new()
@@ -1866,21 +1867,39 @@ server <- function(input, output, session) {
       plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use)
 
     } else if(input$overview_gate == "correlation") {
-      # Calculate HA threshold
-      control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
-      if(is.null(control_idx)) {
-        plot.new()
-        text(0.5, 0.5, "No control sample found", cex = 2)
-        return()
+      # Get strategy metadata
+      gate_strategy_key <- paste0("GATE_STRATEGY_", input$overview_gate_strategy)
+      gate_strategy <- if(!is.null(rv$gate_strategies[[gate_strategy_key]])) {
+        rv$gate_strategies[[gate_strategy_key]]
+      } else {
+        NULL
       }
-      control_fcs <- exp$flowset[[control_idx]]
-      control_name <- exp$metadata$sample_name[control_idx]
-      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
-                                                             gates = gates_to_use,
-                                                             channels = CHANNELS)
-      ha_threshold <- control_result$threshold
 
-      plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use)
+      # Check if using quadrant strategy
+      use_quadrant <- !is.null(gate_strategy$analysis_type) &&
+                      gate_strategy$analysis_type == "quadrant_ratio" &&
+                      !is.null(gates_to_use$quadrant)
+
+      if(use_quadrant) {
+        # Quadrant strategy: show quadrant plots for all Dox+ samples
+        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = CHANNELS)
+      } else {
+        # Old strategy: use global Empty_Vector control
+        control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+        if(is.null(control_idx)) {
+          plot.new()
+          text(0.5, 0.5, "No control sample found", cex = 2)
+          return()
+        }
+        control_fcs <- exp$flowset[[control_idx]]
+        control_name <- exp$metadata$sample_name[control_idx]
+        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                               gates = gates_to_use,
+                                                               channels = CHANNELS)
+        ha_threshold <- control_result$threshold
+
+        plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use)
+      }
     }
   })
 
