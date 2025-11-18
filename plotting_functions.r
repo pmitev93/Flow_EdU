@@ -1247,13 +1247,55 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
 
   # Add threshold lines if edu_threshold is provided (quadrant mode)
   if(!is.null(edu_threshold)) {
-    # Draw HA threshold line (vertical)
+    # Calculate quadrant populations
     ha_threshold_log <- log10(ha_threshold + 1)
-    abline(v = ha_threshold_log, col = "red", lwd = 2, lty = 1)
-
-    # Draw EdU threshold line (horizontal)
     edu_threshold_log <- log10(edu_threshold + 1)
-    abline(h = edu_threshold_log, col = "red", lwd = 2, lty = 1)
+
+    total_cells <- length(ha_log)
+    q1_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)
+    q2_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)
+    q3_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)
+    q4_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)
+
+    q1_pct <- (q1_ha_neg_edu_low / total_cells) * 100
+    q2_pct <- (q2_ha_pos_edu_low / total_cells) * 100
+    q3_pct <- (q3_ha_neg_edu_high / total_cells) * 100
+    q4_pct <- (q4_ha_pos_edu_high / total_cells) * 100
+
+    # Calculate strength ratio
+    strength_ratio <- if((q2_pct + q4_pct) > 0) {
+      q2_pct / (q2_pct + q4_pct)
+    } else {
+      NA_real_
+    }
+
+    # Add colored background for quadrants
+    # Q4 (top right, HA+/EdU-high) = blue with transparency
+    rect(ha_threshold_log, edu_threshold_log, 6.5, 7,
+         col = rgb(0, 0, 1, alpha = 0.1), border = NA)
+
+    # Q2 (bottom right, HA+/EdU-low) = red with transparency
+    rect(ha_threshold_log, 4, 6.5, edu_threshold_log,
+         col = rgb(1, 0, 0, alpha = 0.1), border = NA)
+
+    # Re-plot points on top of colored rectangles
+    points(ha_log, edu_log, pch = 16, cex = 0.5, col = dens)
+
+    # Draw threshold lines (black)
+    abline(v = ha_threshold_log, col = "black", lwd = 2, lty = 1)
+    abline(h = edu_threshold_log, col = "black", lwd = 2, lty = 1)
+
+    # Add quadrant percentages
+    text(2.8, 6.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.8, font = 2)  # Top left (Q3)
+    text(5.5, 6.5, sprintf("%.1f%%", q4_pct), col = "blue", cex = 0.8, font = 2)   # Top right (Q4) - blue
+    text(2.8, 4.5, sprintf("%.1f%%", q1_pct), col = "black", cex = 0.8, font = 2)  # Bottom left (Q1)
+    text(5.5, 4.5, sprintf("%.1f%%", q2_pct), col = "red", cex = 0.8, font = 2)    # Bottom right (Q2) - red
+
+    # Display strength ratio
+    if(!is.na(strength_ratio)) {
+      text(4.25, 4.2, sprintf("Strength Ratio = %.3f", strength_ratio),
+           col = "black", cex = 1, font = 2, pos = 3)
+    }
   } else {
     # Add regression line (only in non-quadrant mode)
     abline(lm_fit, col = "black", lwd = 1.5, lty=2)
