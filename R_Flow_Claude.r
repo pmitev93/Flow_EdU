@@ -547,6 +547,197 @@ get_density_colors <- function(x, y, log_x = FALSE, log_y = FALSE) {
   densCols(x_plot, y_plot, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 }
 
+# ==============================================================================
+# PAIRED CONTROL FUNCTIONS (for quadrant gating)
+# ==============================================================================
+
+# Find paired control for a sample (matches everything before "Dox")
+find_paired_control <- function(sample_name, metadata) {
+  # Extract the base name (everything before "Dox")
+  base_pattern <- gsub("Dox[+-].*", "", sample_name)
+
+  # Find corresponding Dox- control
+  control_pattern <- paste0("^", base_pattern, "Dox-")
+  matches <- grep(control_pattern, metadata$sample_name, ignore.case = FALSE)
+
+  if(length(matches) == 0) {
+    warning(sprintf("No paired Dox- control found for: %s", sample_name))
+    return(NULL)
+  }
+
+  if(length(matches) > 1) {
+    warning(sprintf("Multiple paired controls found for %s. Using first one.", sample_name))
+  }
+
+  return(matches[1])
+}
+
+# Calculate quadrant thresholds and ratio from paired control
+calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
+                                                     control_name, test_name,
+                                                     gates = GATES, channels = CHANNELS) {
+
+  cat(sprintf("\nQuadrant analysis: %s (control) vs %s (test)\n", control_name, test_name))
+
+  # Apply gates 1-6 to control
+  control_gated <- control_fcs
+
+  # Gate 1: Debris
+  debris_filter <- point.in.polygon(
+    exprs(control_gated)[, channels$FSC_A],
+    exprs(control_gated)[, channels$SSC_A],
+    gates$debris[, 1], gates$debris[, 2]
+  ) > 0
+  control_gated <- Subset(control_gated, debris_filter)
+
+  # Gate 2: Singlets
+  singlet_filter <- point.in.polygon(
+    exprs(control_gated)[, channels$FSC_A],
+    exprs(control_gated)[, channels$FSC_H],
+    gates$singlet[, 1], gates$singlet[, 2]
+  ) > 0
+  control_gated <- Subset(control_gated, singlet_filter)
+
+  # Gate 3: Live cells
+  live_filter <- point.in.polygon(
+    exprs(control_gated)[, channels$DCM],
+    exprs(control_gated)[, channels$SSC_A],
+    gates$live_cells[, 1], gates$live_cells[, 2]
+  ) > 0
+  control_gated <- Subset(control_gated, live_filter)
+
+  # Gate 4: S-phase outliers (keep cells inside)
+  outlier_filter <- point.in.polygon(
+    exprs(control_gated)[, channels$FxCycle],
+    exprs(control_gated)[, channels$EdU],
+    gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2]
+  ) > 0
+  control_gated <- Subset(control_gated, outlier_filter)
+
+  # Gate 5: FxCycle quantile
+  fxcycle_values <- exprs(control_gated)[, channels$FxCycle]
+  fxcycle_limits <- quantile(fxcycle_values, probs = gates$fxcycle_quantile$probs, na.rm = TRUE)
+  fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
+  control_gated <- Subset(control_gated, fxcycle_filter)
+
+  # Gate 6: EdU + FxCycle S-phase
+  edu_values_g6 <- exprs(control_gated)[, channels$EdU]
+  edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
+  fxcycle_values_g6 <- exprs(control_gated)[, channels$FxCycle]
+  fxcycle_bounds_g6 <- quantile(fxcycle_values_g6, probs = gates$edu_fxcycle_sphase$fxcycle_probs, na.rm = TRUE)
+  edu_fxcycle_filter <- edu_values_g6 >= edu_threshold_g6 &
+    fxcycle_values_g6 >= fxcycle_bounds_g6[1] &
+    fxcycle_values_g6 <= fxcycle_bounds_g6[2]
+  control_gated <- Subset(control_gated, edu_fxcycle_filter)
+
+  # Calculate thresholds from control
+  ha_threshold <- quantile(exprs(control_gated)[, channels$HA],
+                           probs = gates$quadrant$ha_prob, na.rm = TRUE)
+  edu_threshold <- quantile(exprs(control_gated)[, channels$EdU],
+                            probs = gates$quadrant$edu_prob, na.rm = TRUE)
+
+  cat(sprintf("  Control thresholds: HA = %s, EdU = %s\n",
+              format(ha_threshold, big.mark = ","),
+              format(edu_threshold, big.mark = ",")))
+
+  # Apply gates 1-6 to test sample
+  test_gated <- test_fcs
+
+  # Gate 1: Debris
+  debris_filter <- point.in.polygon(
+    exprs(test_gated)[, channels$FSC_A],
+    exprs(test_gated)[, channels$SSC_A],
+    gates$debris[, 1], gates$debris[, 2]
+  ) > 0
+  test_gated <- Subset(test_gated, debris_filter)
+
+  # Gate 2: Singlets
+  singlet_filter <- point.in.polygon(
+    exprs(test_gated)[, channels$FSC_A],
+    exprs(test_gated)[, channels$FSC_H],
+    gates$singlet[, 1], gates$singlet[, 2]
+  ) > 0
+  test_gated <- Subset(test_gated, singlet_filter)
+
+  # Gate 3: Live cells
+  live_filter <- point.in.polygon(
+    exprs(test_gated)[, channels$DCM],
+    exprs(test_gated)[, channels$SSC_A],
+    gates$live_cells[, 1], gates$live_cells[, 2]
+  ) > 0
+  test_gated <- Subset(test_gated, live_filter)
+
+  # Gate 4: S-phase outliers
+  outlier_filter <- point.in.polygon(
+    exprs(test_gated)[, channels$FxCycle],
+    exprs(test_gated)[, channels$EdU],
+    gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2]
+  ) > 0
+  test_gated <- Subset(test_gated, outlier_filter)
+
+  # Gate 5: FxCycle quantile
+  fxcycle_values <- exprs(test_gated)[, channels$FxCycle]
+  fxcycle_limits <- quantile(fxcycle_values, probs = gates$fxcycle_quantile$probs, na.rm = TRUE)
+  fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
+  test_gated <- Subset(test_gated, fxcycle_filter)
+
+  # Gate 6: EdU + FxCycle S-phase
+  edu_values_g6 <- exprs(test_gated)[, channels$EdU]
+  edu_threshold_g6 <- quantile(edu_values_g6, probs = gates$edu_fxcycle_sphase$edu_prob, na.rm = TRUE)
+  fxcycle_values_g6 <- exprs(test_gated)[, channels$FxCycle]
+  fxcycle_bounds_g6 <- quantile(fxcycle_values_g6, probs = gates$edu_fxcycle_sphase$fxcycle_probs, na.rm = TRUE)
+  edu_fxcycle_filter <- edu_values_g6 >= edu_threshold_g6 &
+    fxcycle_values_g6 >= fxcycle_bounds_g6[1] &
+    fxcycle_values_g6 <= fxcycle_bounds_g6[2]
+  test_gated <- Subset(test_gated, edu_fxcycle_filter)
+
+  # Get final HA and EdU values from test sample
+  ha_values <- exprs(test_gated)[, channels$HA]
+  edu_values <- exprs(test_gated)[, channels$EdU]
+
+  # Calculate quadrant populations
+  total_cells <- length(ha_values)
+
+  q1_ha_neg_edu_low <- sum(ha_values < ha_threshold & edu_values < edu_threshold)
+  q2_ha_pos_edu_low <- sum(ha_values >= ha_threshold & edu_values < edu_threshold)
+  q3_ha_neg_edu_high <- sum(ha_values < ha_threshold & edu_values >= edu_threshold)
+  q4_ha_pos_edu_high <- sum(ha_values >= ha_threshold & edu_values >= edu_threshold)
+
+  # Calculate percentages
+  q1_pct <- (q1_ha_neg_edu_low / total_cells) * 100
+  q2_pct <- (q2_ha_pos_edu_low / total_cells) * 100
+  q3_pct <- (q3_ha_neg_edu_high / total_cells) * 100
+  q4_pct <- (q4_ha_pos_edu_high / total_cells) * 100
+
+  # Calculate ratio: HA+/EdU-low / (HA+/EdU-low + HA+/EdU-high)
+  ratio <- if((q2_pct + q4_pct) > 0) {
+    q2_pct / (q2_pct + q4_pct)
+  } else {
+    NA_real_
+  }
+
+  cat(sprintf("  Quadrants: Q1=%.2f%%, Q2=%.2f%%, Q3=%.2f%%, Q4=%.2f%%\n",
+              q1_pct, q2_pct, q3_pct, q4_pct))
+  cat(sprintf("  Ratio (HA+/EdU-low ratio) = %.3f\n", ratio))
+
+  return(list(
+    ha_threshold = ha_threshold,
+    edu_threshold = edu_threshold,
+    ratio = ratio,
+    total_cells = total_cells,
+    q1_count = q1_ha_neg_edu_low,
+    q2_count = q2_ha_pos_edu_low,
+    q3_count = q3_ha_neg_edu_high,
+    q4_count = q4_ha_pos_edu_high,
+    q1_pct = q1_pct,
+    q2_pct = q2_pct,
+    q3_pct = q3_pct,
+    q4_pct = q4_pct,
+    control_name = control_name,
+    test_name = test_name
+  ))
+}
+
 # Paths ####
 master_path <- "Experiments/"
 experiment_folders <- list.dirs(master_path, recursive = FALSE, full.names = TRUE)
