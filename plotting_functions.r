@@ -36,36 +36,45 @@ quick_scan_experiment <- function(experiment_path) {
   # Add placeholders
   metadata$experiment <- experiment_name
   metadata$correlation <- "Not analyzed"
+  metadata$ha_pos_pct <- NA_real_
   metadata$n_cells <- "Not analyzed"
+  metadata$strength_ratio <- NA_real_
   metadata$notes <- ""
-  
+
   # Reorder columns
-  metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line", 
-                           "gene", "mutation", "correlation", "n_cells", "notes")]
-  
+  metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line",
+                           "gene", "mutation", "correlation", "ha_pos_pct", "n_cells", "strength_ratio", "notes")]
+
   # Capitalize column names
-  colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line", 
-                          "Gene", "Mutation", "Correlation", "N_cells", "Notes")
+  colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line",
+                          "Gene", "Mutation", "Correlation", "HA_Pos_Pct", "N_cells", "Strength_Ratio", "Notes")
   
   return(metadata)
 }
 
 ## Gate 1 ----
 # Single sample visualization 
-plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Plot settings
   x <- exprs(fcs_data)[, channels$FSC_A]
   y <- exprs(fcs_data)[, channels$SSC_A]
-  
+
   # Calculate 2D density
   dens <- densCols(x, y, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 1: Debris Removal\n%s", sample_name)
+  } else {
+    "Gate 1: Debris Removal"
+  }
+
   plot(x, y,
        pch = ".",
        col = dens,
        xlab = "FSC-A",
        ylab = "SSC-A",
-       main = sprintf("Gate 1: Debris Removal\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 20e6),
        ylim = c(0, 20e6),
        mgp = c(3, 0.5, 0),
@@ -188,7 +197,7 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
 
 ## Gate 2: Singlets (FSC-A vs FSC-H) ####
 
-plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gate 1 first (debris removal)
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -197,19 +206,26 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
     gates$debris[, 2]
   ) > 0
   fcs_data <- Subset(fcs_data, debris_filter)
-  
+
   # Plot settings
   x <- exprs(fcs_data)[, channels$FSC_A]
   y <- exprs(fcs_data)[, channels$FSC_H]
   dens <- densCols(x, y, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 2: Singlets\n%s", sample_name)
+  } else {
+    "Gate 2: Singlets"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FSC-A",
        ylab = "FSC-H",
-       main = sprintf("Gate 2: Singlets\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 15e6),
        ylim = c(0, 4e6),
        xaxt = "n",
@@ -335,7 +351,7 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
 
 ## Gate 3: Live Cells (DCM-A vs SSC-A) ####
 
-plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gate 1: Debris removal
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -358,19 +374,26 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
   # Plot settings with log-scaled DCM
   x <- exprs(fcs_data)[, channels$DCM]
   y <- exprs(fcs_data)[, channels$SSC_A]
-  
+
   # Log transform DCM for density calculation and plotting
   x_log <- log10(x + 1)  # +1 to avoid log(0)
-  
+
   dens <- densCols(x_log, y, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 3: Live Cells\n%s", sample_name)
+  } else {
+    "Gate 3: Live Cells"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "DCM-A",
        ylab = "SSC-A",
-       main = sprintf("Gate 3: Live Cells\n%s", sample_name),
+       main = plot_title,
        xlim = c(100, 1000000),
        ylim = c(0, 15e6),
        xaxt = "n",
@@ -496,7 +519,7 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
 
 ## Gate 4: S-phase Outlier Removal (FxCycle-A vs EdU-A) ----
 
-plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-3
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -528,16 +551,23 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
   x <- exprs(fcs_data)[, channels$FxCycle]
   y <- exprs(fcs_data)[, channels$EdU]
   y_log <- log10(y + 1)
-  
+
   dens <- densCols(x, y_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 4: S-phase Outlier Removal\n%s", sample_name)
+  } else {
+    "Gate 4: S-phase Outlier Removal"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 4: S-phase Outlier Removal\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -670,29 +700,37 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
 
 ## Gate 5: FxCycle Quantile (1%-90%) ----
 
-plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-4
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Calculate FxCycle quantile bounds
+
+  # Calculate FxCycle quantile bounds - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  quantile_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  quantile_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   lower_bound <- quantile_limits[1]
   upper_bound <- quantile_limits[2]
   
   # Plot settings
   x <- exprs(fcs_data)[, channels$FxCycle]
   y <- exprs(fcs_data)[, channels$EdU]
-  
+
   dens <- get_density_colors(x, y, log_x = FALSE, log_y = TRUE)
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 5: FxCycle Quantile (1%%-90%%)\n%s", sample_name)
+  } else {
+    "Gate 5: FxCycle Quantile (1%-90%)"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 5: FxCycle Quantile (1%%-90%%)\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -728,19 +766,22 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
   n_samples <- length(experiment$flowset)
   n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Apply Gates 1-4
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Calculate quantile bounds
+
+    # Calculate quantile bounds - read from gates
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    quantile_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    quantile_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     lower_bound <- quantile_limits[1]
     upper_bound <- quantile_limits[2]
     
@@ -784,38 +825,49 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
   par(mfrow = c(1, 1), mar = c(5, 4, 4, 2), oma = c(0, 0, 0, 0))
 }
 
-## Gate 6: Top 50% EdU + FxCycle Range ----
+## Gate 6: EdU + FxCycle Range (reads percentile from gates) ----
 
-plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS) {
+plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-5
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Apply Gate 5 (FxCycle quantile)
+
+  # Apply Gate 5 (FxCycle quantile) - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   fcs_data <- Subset(fcs_data, fxcycle_filter)
-  
-  # Calculate EdU threshold (50th percentile) and FxCycle bounds
+
+  # Calculate EdU threshold and FxCycle bounds - read from gates
+  edu_gate <- gates$edu_fxcycle_sphase
+  edu_prob <- edu_gate$edu_prob
+
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-  
+  edu_threshold <- quantile(edu_values, probs = edu_prob, na.rm = TRUE)
+
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_bounds <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
-  
+  fxcycle_bounds <- quantile(fxcycle_values, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
   # Plot settings
   x <- exprs(fcs_data)[, channels$FxCycle]
   y <- exprs(fcs_data)[, channels$EdU]
-  
+
   dens <- get_density_colors(x, y, log_x = FALSE, log_y = TRUE)
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range\n%s", edu_prob * 100, sample_name)
+  } else {
+    sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range", edu_prob * 100)
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "FxCycle-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 6: Top 50%% EdU + FxCycle Range\n%s", sample_name),
+       main = plot_title,
        xlim = c(0, 12e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -860,28 +912,32 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
   n_samples <- length(experiment$flowset)
   n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+  edu_gate <- gates$edu_fxcycle_sphase
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Apply Gates 1-5
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Apply Gate 5
+
+    # Apply Gate 5 - read from gates
     fxcycle_values_temp <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits_temp <- quantile(fxcycle_values_temp, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits_temp <- quantile(fxcycle_values_temp, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values_temp >= fxcycle_limits_temp[1] & fxcycle_values_temp <= fxcycle_limits_temp[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Calculate thresholds
+
+    # Calculate thresholds - read from gates
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     x <- exprs(fcs_data)[, channels$FxCycle]
     y <- exprs(fcs_data)[, channels$EdU]
@@ -934,22 +990,24 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
 
 ## Gate 7: HA-Positive ----
 
-plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
+plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Apply Gates 1-4
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Apply Gate 5: FxCycle quantile (1-90%)
+
+  # Apply Gate 5: FxCycle quantile - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   fcs_data <- Subset(fcs_data, fxcycle_filter)
-  
-  # Apply Gate 6: EdU top 50% + FxCycle range (1-90%)
+
+  # Apply Gate 6: EdU + FxCycle - read from gates
+  edu_gate <- gates$edu_fxcycle_sphase
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-  
+  edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
   fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
   
   edu_fxcycle_filter <- edu_values >= edu_threshold & 
     fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -959,16 +1017,39 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
   # Plot settings
   x <- exprs(fcs_data)[, channels$HA]
   y <- exprs(fcs_data)[, channels$EdU]
-  
+
+  # Check if we have enough cells to plot
+  if(length(x) < 10) {
+    # Create empty plot with warning message
+    plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(100, 6e6),
+         xlab = "HA-A", ylab = "EdU-A",
+         main = if(show_sample_name) sprintf("Gate 7: HA-Positive\n%s", sample_name) else "Gate 7: HA-Positive",
+         log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0))
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+         labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
+    axis(2, at = c(100, 1000, 10000, 100000, 1000000),
+         labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
+    text(1000, 50000, sprintf("Insufficient cells for plotting\n(n = %d)", length(x)),
+         cex = 1.2, col = "red", font = 2)
+    return(invisible(NULL))
+  }
+
   dens <- get_density_colors(x, y, log_x = TRUE, log_y = TRUE)
-  
+
+  # Create title
+  plot_title <- if(show_sample_name) {
+    sprintf("Gate 7: HA-Positive\n%s", sample_name)
+  } else {
+    "Gate 7: HA-Positive"
+  }
+
   plot(x, y,
        pch = 16,
        cex = 0.3,
        col = dens,
        xlab = "HA-A",
        ylab = "EdU-A",
-       main = sprintf("Gate 7: HA-Positive\n%s", sample_name),
+       main = plot_title,
        xlim = c(100, 1e6),
        ylim = c(100, 6e6),
        xaxt = "n",
@@ -978,30 +1059,41 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        yaxs = "i",
        log = "xy")
   
-  axis(1, at = c(100, 1000, 10000, 100000, 1000000), 
+  axis(1, at = c(100, 1000, 10000, 100000, 1000000),
        labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
-  axis(2, at = c(100, 1000, 10000, 100000, 1000000), 
+  axis(2, at = c(100, 1000, 10000, 100000, 1000000),
        labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
-  
-  # Tint the HA-positive region
-  rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6, 
-       col = rgb(0.5, 0.7, 1, 0.25), border = NA)
-  
-  # Add vertical threshold line
-  abline(v = ha_threshold, col = "black", lwd = 2, lty = 2)
+
+  # Tint the HA-positive region (only if valid threshold)
+  if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+    rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6,
+         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+    # Add vertical threshold line
+    abline(v = ha_threshold, col = "black", lwd = 2, lty = 2)
+  }
   
   # Calculate stats
   ha_values <- exprs(fcs_data)[, channels$HA]
   total_cells <- nrow(fcs_data)
-  inside_gate <- sum(ha_values >= ha_threshold)
-  
+  inside_gate <- if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+    sum(ha_values >= ha_threshold)
+  } else {
+    0
+  }
+
   # Add legend
-  legend("bottomright", 
-         legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
-                    sprintf("HA+: %s (%.1f%%)", 
-                            format(inside_gate, big.mark = ","),
-                            100 * inside_gate / total_cells),
-                    sprintf("Threshold: %.0fK", ha_threshold/1e3)),
+  legend_text <- c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
+                   sprintf("HA+: %s (%.1f%%)",
+                           format(inside_gate, big.mark = ","),
+                           100 * inside_gate / total_cells))
+
+  if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+    legend_text <- c(legend_text, sprintf("Threshold: %.0fK", ha_threshold/1e3))
+  }
+
+  legend("bottomright",
+         legend = legend_text,
          bty = "n",
          cex = 0.9)
 }
@@ -1010,28 +1102,32 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
   n_samples <- length(experiment$flowset)
   n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+  edu_gate <- gates$edu_fxcycle_sphase
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Apply Gates 1-4
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Apply Gate 5: FxCycle quantile
+
+    # Apply Gate 5: FxCycle quantile - read from gates
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Apply Gate 6: EdU top 50% + FxCycle range
+
+    # Apply Gate 6: EdU + FxCycle - read from gates
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     edu_fxcycle_filter <- edu_values >= edu_threshold & 
       fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -1040,9 +1136,23 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
     
     x <- exprs(fcs_data)[, channels$HA]
     y <- exprs(fcs_data)[, channels$EdU]
-    
+
+    # Check if we have enough cells to plot
+    if(length(x) < 10) {
+      # Create empty plot with warning
+      plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(100, 6e6),
+           xlab = "", ylab = "", main = sample_name, log = "xy",
+           cex.main = 1.2, cex.axis = 0.7, xaxt = "n", yaxt = "n")
+      axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+           labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
+      axis(2, at = c(100, 1000, 10000, 100000, 1000000),
+           labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
+      text(1000, 50000, sprintf("n = %d", length(x)), cex = 0.8, col = "red", font = 2)
+      next
+    }
+
     dens <- get_density_colors(x, y, log_x = TRUE, log_y = TRUE)
-    
+
     plot(x, y,
          pch = ".",
          col = dens,
@@ -1057,20 +1167,26 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
          yaxt = "n",
          log = "xy")
     
-    axis(1, at = c(100, 1000, 10000, 100000, 1000000), 
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000),
          labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
-    axis(2, at = c(100, 1000, 10000, 100000, 1000000), 
+    axis(2, at = c(100, 1000, 10000, 100000, 1000000),
          labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
-    
-    # Tint the HA-positive region
-    rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6, 
-         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
-    
-    # Add threshold line
-    abline(v = ha_threshold, col = "black", lwd = 1, lty = 2)
+
+    # Tint the HA-positive region (only if valid threshold)
+    if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+      rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6,
+           col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+      # Add threshold line
+      abline(v = ha_threshold, col = "black", lwd = 1, lty = 2)
+    }
     
     ha_values <- exprs(fcs_data)[, channels$HA]
-    inside_gate <- sum(ha_values >= ha_threshold)
+    inside_gate <- if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+      sum(ha_values >= ha_threshold)
+    } else {
+      0
+    }
     pct <- 100 * inside_gate / nrow(fcs_data)
     
     # Determine sample type
@@ -1110,41 +1226,73 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
 
 ## Gate 8: Final EdU vs HA Correlation ----
 
-plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS) {
+plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE, edu_threshold = NULL) {
   # Apply Gates 1-6
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-  
-  # Gate 5: FxCycle quantile
+
+  # Gate 5: FxCycle quantile - read from gates
+  fxcycle_gate <- gates$fxcycle_quantile
   fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
   fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
   fcs_data <- Subset(fcs_data, fxcycle_filter)
-  
-  # Gate 6: EdU + FxCycle
+
+  # Gate 6: EdU + FxCycle - read from gates
+  edu_gate <- gates$edu_fxcycle_sphase
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-  
+
+  # For Dox- samples, use relaxed EdU threshold (same as in calculate_quadrant_from_paired_control)
+  is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
+  if(is_dox_minus) {
+    # For Dox- samples: use 10th percentile (keep top 90%) - much more lenient
+    edu_threshold_g6 <- quantile(edu_values, probs = 0.10, na.rm = TRUE)
+  } else {
+    # For Dox+ samples: use standard threshold (55th percentile = top 45%)
+    edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+  }
+
   fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-  fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
-  
-  edu_fxcycle_filter <- edu_values >= edu_threshold & 
-    fxcycle_values2 >= fxcycle_bounds[1] & 
+  fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
+  edu_fxcycle_filter <- edu_values >= edu_threshold_g6 &
+    fxcycle_values2 >= fxcycle_bounds[1] &
     fxcycle_values2 <= fxcycle_bounds[2]
   fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
-  
-  # Gate 7: HA-positive
-  ha_values <- exprs(fcs_data)[, channels$HA]
-  ha_filter <- ha_values >= ha_threshold
-  fcs_data <- Subset(fcs_data, ha_filter)
-  
+
+  # Gate 7: HA-positive (skip if edu_threshold provided - show quadrants instead)
+  if(is.null(edu_threshold)) {
+    ha_values <- exprs(fcs_data)[, channels$HA]
+    ha_filter <- ha_values >= ha_threshold
+    fcs_data <- Subset(fcs_data, ha_filter)
+  }
+
   # Extract final data
   ha_final <- exprs(fcs_data)[, channels$HA]
   edu_final <- exprs(fcs_data)[, channels$EdU]
-  
+
+  # Check if we have enough cells to plot
+  if(length(ha_final) < 10) {
+    # Create empty plot with warning message
+    plot(1, 1, type = "n", xlim = c(2, 6.5), ylim = c(4, 7),
+         xlab = "log10(HA-A)", ylab = "log10(EdU-A)",
+         main = sprintf("%s\nEdU vs HA Correlation", sample_name),
+         xaxs = "i", yaxs = "i")
+    text(4.25, 5.5, sprintf("Insufficient cells for plotting\n(n = %d)", length(ha_final)),
+         cex = 1.2, col = "red", font = 2)
+
+    return(invisible(list(
+      sample_name = sample_name,
+      correlation = NA,
+      n_cells = length(ha_final),
+      ha_log = numeric(0),
+      edu_log = numeric(0)
+    )))
+  }
+
   # Log10 transform
   ha_log <- log10(ha_final + 1)
   edu_log <- log10(edu_final + 1)
-  
+
   # Calculate correlation
   correlation <- cor(ha_log, edu_log, use = "complete.obs")
 
@@ -1157,37 +1305,92 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
 
   par(mgp = c(3, 0.7, 0))
 
+  # Create title with sample name and subtitle
+  plot_title <- sprintf("%s\nEdU vs HA Correlation", sample_name)
+
   plot(ha_log, edu_log,
        pch = 16,
        cex = 0.5,
        col = dens,
        xlab = "log10(HA-A)",
        ylab = "log10(EdU-A)",
-       main = sprintf("EdU vs HA Correlation\n%s",
-                      sample_name),
+       main = plot_title,
        xlim = c(2, 6.5),
        ylim = c(4, 7),
 
        xaxs = "i",
        yaxs = "i")
 
-  # Add regression line
-  abline(lm_fit, col = "black", lwd = 1.5, lty=2)
+  # Add threshold lines if edu_threshold is provided (quadrant mode)
+  if(!is.null(edu_threshold)) {
+    # Calculate quadrant populations (correct convention: Q1=top right, counterclockwise)
+    ha_threshold_log <- log10(ha_threshold + 1)
+    edu_threshold_log <- log10(edu_threshold + 1)
 
-  # Add r and n at top center
+    total_cells <- length(ha_log)
+    q1_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)  # Top right
+    q2_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)   # Top left
+    q3_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)     # Bottom left
+    q4_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)    # Bottom right
+
+    q1_pct <- (q1_ha_pos_edu_high / total_cells) * 100
+    q2_pct <- (q2_ha_neg_edu_high / total_cells) * 100
+    q3_pct <- (q3_ha_neg_edu_low / total_cells) * 100
+    q4_pct <- (q4_ha_pos_edu_low / total_cells) * 100
+
+    # Calculate strength ratio: Q4 / (Q1 + Q4)
+    strength_ratio <- if((q1_pct + q4_pct) > 0) {
+      q4_pct / (q1_pct + q4_pct)
+    } else {
+      NA_real_
+    }
+
+    # Add colored background for quadrants
+    # Q1 (top right, HA+/EdU-high) = blue with transparency
+    rect(ha_threshold_log, edu_threshold_log, 6.5, 7,
+         col = rgb(0, 0, 1, alpha = 0.1), border = NA)
+
+    # Q4 (bottom right, HA+/EdU-low) = red with transparency
+    rect(ha_threshold_log, 4, 6.5, edu_threshold_log,
+         col = rgb(1, 0, 0, alpha = 0.1), border = NA)
+
+    # Re-plot points on top of colored rectangles
+    points(ha_log, edu_log, pch = 16, cex = 0.5, col = dens)
+
+    # Draw threshold lines (black)
+    abline(v = ha_threshold_log, col = "black", lwd = 2, lty = 1)
+    abline(h = edu_threshold_log, col = "black", lwd = 2, lty = 1)
+
+    # Add quadrant percentages
+    text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.8, font = 2)  # Top left (Q2)
+    text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.8, font = 2)   # Top right (Q1) - blue
+    text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.8, font = 2)  # Bottom left (Q3)
+    text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.8, font = 2)    # Bottom right (Q4) - red
+
+    # Display strength ratio
+    if(!is.na(strength_ratio)) {
+      text(4.25, 4.2, sprintf("Strength Ratio = %.3f", strength_ratio),
+           col = "black", cex = 1, font = 2, pos = 3)
+    }
+  } else {
+    # Add regression line (only in non-quadrant mode)
+    abline(lm_fit, col = "black", lwd = 1.5, lty=2)
+  }
+
+  # Add r and n label at top center (bold)
   text(4.25, 6.85, sprintf("r = %.3f, n = %s", correlation, format(length(ha_log), big.mark = ",")),
        cex = 1, font = 2, col = "black")
 
-  # Add R² in bottom right
-  text(6.3, 4.15, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 2)
+  # Add R² in top left
+  text(2.15, 6.85, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 4)
 
-  # Add correlation info
+  # Add correlation info at bottom right (keep for single plots)
   legend("bottomright",
          legend = c(sprintf("Pearson r = %.3f", correlation),
                     sprintf("n = %s cells", format(length(ha_log), big.mark = ","))),
          bty = "n",
          cex = 1)
-  
+
   # Return correlation data
   invisible(list(
     sample_name = sample_name,
@@ -1203,34 +1406,38 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
   n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
   n_cols <- ceiling(sqrt(n_dox_plus))
   n_rows <- ceiling(n_dox_plus / n_cols)
-  
+
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
-  
+
+  # Read gate parameters
+  fxcycle_gate <- gates$fxcycle_quantile
+  edu_gate <- gates$edu_fxcycle_sphase
+
   for(i in seq_along(experiment$flowset)) {
     fcs_data <- experiment$flowset[[i]]
     sample_name <- experiment$metadata$sample_name[i]
-    
+
     # Skip Dox- samples entirely
     is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
     if(is_dox_minus) {
       next
     }
-    
+
     # Apply all gates
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Gate 5
+
+    # Gate 5 - read from gates
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Gate 6
+
+    # Gate 6 - read from gates
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
     
     edu_fxcycle_filter <- edu_values >= edu_threshold & 
       fxcycle_values2 >= fxcycle_bounds[1] & 
@@ -1263,21 +1470,21 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
            col = dens,
            xlab = "",
            ylab = "",
-           main = sample_name,
+           main = sprintf("%s\nEdU vs HA Correlation", sample_name),
            xlim = c(2, 6.5),
            ylim = c(4, 7),
-           cex.main = 0.9,
+           cex.main = 1.1,
            xaxs = "i",
            yaxs = "i")
 
       abline(lm_fit, col = "black", lwd = 1.5, lty =2)
 
       # Add r and n at top center
-      text(4.25, 6.85, sprintf("r=%.3f, n=%s", correlation, format(length(ha_log), big.mark = ",")),
+      text(4.25, 6.8, sprintf("r=%.3f, n=%s", correlation, format(length(ha_log), big.mark = ",")),
            col = "black", cex = 0.7, font = 2)
 
-      # Add R² in bottom right
-      text(6.3, 4.15, sprintf("R²=%.3f", r_squared), col = "black", cex = 0.7, font = 2, pos = 2)
+      # Add R² in top left
+      text(2.15, 6.8, sprintf("R²=%.3f", r_squared), col = "black", cex = 0.7, font = 2, pos = 4)
       
       # Flag if low cell count or extreme correlation
       is_empty_vector <- grepl("Empty_Vector", sample_name, ignore.case = TRUE)
@@ -1333,30 +1540,52 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
     
     # Apply all gates
     fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
-    
-    # Gate 5: FxCycle quantile
+
+    # Gate 5: FxCycle quantile - read from gates
+    fxcycle_gate <- gates$fxcycle_quantile
     fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_limits <- quantile(fxcycle_values, probs = c(0.01, 0.90), na.rm = TRUE)
+    fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
     fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
     fcs_data <- Subset(fcs_data, fxcycle_filter)
-    
-    # Gate 6: EdU + FxCycle
+
+    # Gate 6: EdU + FxCycle - read from gates
+    edu_gate <- gates$edu_fxcycle_sphase
     edu_values <- exprs(fcs_data)[, channels$EdU]
-    edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
-    
+    edu_threshold <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
-    fxcycle_bounds <- quantile(fxcycle_values2, probs = c(0.01, 0.90), na.rm = TRUE)
-    
-    edu_fxcycle_filter <- edu_values >= edu_threshold & 
-      fxcycle_values2 >= fxcycle_bounds[1] & 
+    fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
+    edu_fxcycle_filter <- edu_values >= edu_threshold &
+      fxcycle_values2 >= fxcycle_bounds[1] &
       fxcycle_values2 <= fxcycle_bounds[2]
     fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
-    
-    # Gate 7: HA-positive
-    ha_values <- exprs(fcs_data)[, channels$HA]
-    ha_filter <- ha_values >= ha_threshold
-    fcs_data <- Subset(fcs_data, ha_filter)
-    
+
+    # Gate 7: HA-positive (skip if ha_threshold is NULL for quadrant analysis)
+    # Count cells before Gate 7 for HA+ percentage calculation
+    n_before_ha_gate <- nrow(exprs(fcs_data))
+
+    if(!is.null(ha_threshold)) {
+      # Apply HA threshold gate (standard analysis)
+      ha_values <- exprs(fcs_data)[, channels$HA]
+      ha_filter <- ha_values >= ha_threshold
+      fcs_data <- Subset(fcs_data, ha_filter)
+
+      # Count cells after Gate 7
+      n_after_ha_gate <- nrow(exprs(fcs_data))
+
+      # Calculate HA+ percentage
+      ha_pos_pct <- if(n_before_ha_gate > 0) {
+        (n_after_ha_gate / n_before_ha_gate) * 100
+      } else {
+        NA_real_
+      }
+    } else {
+      # Skip Gate 7 for quadrant analysis - use all cells after Gate 6
+      n_after_ha_gate <- n_before_ha_gate
+      ha_pos_pct <- NA_real_
+    }
+
     # Extract final data
     ha_final <- exprs(fcs_data)[, channels$HA]
     edu_final <- exprs(fcs_data)[, channels$EdU]
@@ -1398,14 +1627,187 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
       Gene = gene,
       Mutation = mutation,
       Correlation = correlation,
+      HA_Pos_Pct = ha_pos_pct,
       N_cells = n_cells,
       Notes = notes,
       stringsAsFactors = FALSE
     )
   }
-  
+
   # Combine all results
   results_df <- bind_rows(results_list)
-  
+
   return(results_df)
+}
+
+## Quadrant Correlation Overview ----
+plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+  # Count ALL samples (both Dox+ and Dox-)
+  n_samples <- length(experiment$flowset)
+  n_cols <- ceiling(sqrt(n_samples))
+  n_rows <- ceiling(n_samples / n_cols)
+
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
+
+  for(i in seq_along(experiment$flowset)) {
+    sample_name <- experiment$metadata$sample_name[i]
+
+    # Check if this is a Dox- sample
+    is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
+
+    # Determine control and test samples
+    if(is_dox_minus) {
+      # For Dox- samples, use self as control to show where thresholds are
+      control_idx <- i
+      test_idx <- i
+    } else {
+      # For Dox+ samples, find paired Dox- control
+      control_idx <- find_paired_control(sample_name, experiment$metadata)
+
+      if(is.null(control_idx)) {
+        # No paired control - show error plot
+        plot.new()
+        text(0.5, 0.5, sprintf("No Dox- control\n%s", sample_name),
+             col = "red", cex = 0.8, font = 2)
+        box(col = "red", lwd = 2)
+        next
+      }
+      test_idx <- i
+    }
+
+    # Calculate quadrant thresholds
+    control_fcs <- experiment$flowset[[control_idx]]
+    test_fcs <- experiment$flowset[[test_idx]]
+    control_name <- experiment$metadata$sample_name[control_idx]
+
+    tryCatch({
+      quadrant_result <- calculate_quadrant_from_paired_control(
+        control_fcs, test_fcs, control_name, sample_name,
+        gates, channels
+      )
+
+      # Validate thresholds
+      if(is.na(quadrant_result$ha_threshold) || is.na(quadrant_result$edu_threshold)) {
+        stop("Invalid threshold values from control")
+      }
+
+      # Apply gates 1-6
+      fcs_data <- apply_sequential_gates(test_fcs, up_to_gate = 4, gates = gates, channels = channels)
+
+      # Gate 5
+      fxcycle_gate <- gates$fxcycle_quantile
+      fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
+      fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
+
+      # Check for valid limits
+      if(any(is.na(fxcycle_limits)) || length(fxcycle_limits) < 2) {
+        stop("Insufficient cells after gating - cannot calculate FxCycle limits")
+      }
+
+      fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
+      fcs_data <- Subset(fcs_data, fxcycle_filter)
+
+      # Gate 6
+      edu_gate <- gates$edu_fxcycle_sphase
+      edu_values <- exprs(fcs_data)[, channels$EdU]
+      edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
+      fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
+      fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
+      # Check for valid thresholds
+      if(is.na(edu_threshold_g6) || any(is.na(fxcycle_bounds)) || length(fxcycle_bounds) < 2) {
+        stop("Insufficient cells after gating - cannot calculate EdU/FxCycle thresholds")
+      }
+
+      edu_fxcycle_filter <- edu_values >= edu_threshold_g6 &
+        fxcycle_values2 >= fxcycle_bounds[1] &
+        fxcycle_values2 <= fxcycle_bounds[2]
+      fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
+
+      # Get final data (no Gate 7 filter for quadrants - show all cells)
+      ha_final <- exprs(fcs_data)[, channels$HA]
+      edu_final <- exprs(fcs_data)[, channels$EdU]
+
+      # Check if enough cells
+      if(length(ha_final) < 10) {
+        plot.new()
+        text(0.5, 0.5, sprintf("n = %d", length(ha_final)), col = "red", cex = 0.8, font = 2)
+        box(col = "red", lwd = 2)
+        next
+      }
+
+      # Log transform
+      ha_log <- log10(ha_final + 1)
+      edu_log <- log10(edu_final + 1)
+
+      ha_threshold_log <- log10(quadrant_result$ha_threshold + 1)
+      edu_threshold_log <- log10(quadrant_result$edu_threshold + 1)
+
+      # Calculate quadrant populations
+      total_cells <- length(ha_log)
+      q1_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)
+      q2_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)
+      q3_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)
+      q4_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)
+
+      q1_pct <- (q1_ha_pos_edu_high / total_cells) * 100
+      q2_pct <- (q2_ha_neg_edu_high / total_cells) * 100
+      q3_pct <- (q3_ha_neg_edu_low / total_cells) * 100
+      q4_pct <- (q4_ha_pos_edu_low / total_cells) * 100
+
+      strength_ratio <- if((q1_pct + q4_pct) > 0) {
+        q4_pct / (q1_pct + q4_pct)
+      } else {
+        NA_real_
+      }
+
+      # Calculate density colors
+      dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
+
+      # Create title based on sample type
+      if(is_dox_minus) {
+        plot_title <- sprintf("%s\n[Control - 95th percentile shown]", sample_name)
+      } else {
+        plot_title <- sprintf("%s\nStrength=%.3f", sample_name, strength_ratio)
+      }
+
+      # Plot
+      plot(ha_log, edu_log,
+           pch = ".",
+           col = dens,
+           xlab = "",
+           ylab = "",
+           main = plot_title,
+           xlim = c(2, 6.5),
+           ylim = c(4, 7),
+           cex.main = 0.9,
+           xaxs = "i",
+           yaxs = "i")
+
+      # Add colored quadrants
+      rect(ha_threshold_log, edu_threshold_log, 6.5, 7,
+           col = rgb(0, 0, 1, alpha = 0.1), border = NA)
+      rect(ha_threshold_log, 4, 6.5, edu_threshold_log,
+           col = rgb(1, 0, 0, alpha = 0.1), border = NA)
+
+      # Re-plot points
+      points(ha_log, edu_log, pch = ".", col = dens)
+
+      # Threshold lines
+      abline(v = ha_threshold_log, col = "black", lwd = 1, lty = 1)
+      abline(h = edu_threshold_log, col = "black", lwd = 1, lty = 1)
+
+      # Quadrant percentages
+      text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.6, font = 2)
+      text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.6, font = 2)
+      text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.6, font = 2)
+      text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.6, font = 2)
+
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, sprintf("Error\n%s", e$message), col = "red", cex = 0.7)
+      box(col = "red", lwd = 2)
+    })
+  }
 }
