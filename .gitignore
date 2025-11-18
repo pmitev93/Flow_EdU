@@ -4,6 +4,9 @@
 .RData
 .Rproj.user/
 
+# Ignore log files
+*.log
+
 # Ignore folders
 Backups/
 Experiments/
