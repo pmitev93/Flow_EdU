@@ -1059,30 +1059,41 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        yaxs = "i",
        log = "xy")
   
-  axis(1, at = c(100, 1000, 10000, 100000, 1000000), 
+  axis(1, at = c(100, 1000, 10000, 100000, 1000000),
        labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
-  axis(2, at = c(100, 1000, 10000, 100000, 1000000), 
+  axis(2, at = c(100, 1000, 10000, 100000, 1000000),
        labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
-  
-  # Tint the HA-positive region
-  rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6, 
-       col = rgb(0.5, 0.7, 1, 0.25), border = NA)
-  
-  # Add vertical threshold line
-  abline(v = ha_threshold, col = "black", lwd = 2, lty = 2)
+
+  # Tint the HA-positive region (only if valid threshold)
+  if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+    rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6,
+         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+    # Add vertical threshold line
+    abline(v = ha_threshold, col = "black", lwd = 2, lty = 2)
+  }
   
   # Calculate stats
   ha_values <- exprs(fcs_data)[, channels$HA]
   total_cells <- nrow(fcs_data)
-  inside_gate <- sum(ha_values >= ha_threshold)
-  
+  inside_gate <- if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+    sum(ha_values >= ha_threshold)
+  } else {
+    0
+  }
+
   # Add legend
-  legend("bottomright", 
-         legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
-                    sprintf("HA+: %s (%.1f%%)", 
-                            format(inside_gate, big.mark = ","),
-                            100 * inside_gate / total_cells),
-                    sprintf("Threshold: %.0fK", ha_threshold/1e3)),
+  legend_text <- c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
+                   sprintf("HA+: %s (%.1f%%)",
+                           format(inside_gate, big.mark = ","),
+                           100 * inside_gate / total_cells))
+
+  if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+    legend_text <- c(legend_text, sprintf("Threshold: %.0fK", ha_threshold/1e3))
+  }
+
+  legend("bottomright",
+         legend = legend_text,
          bty = "n",
          cex = 0.9)
 }
@@ -1156,20 +1167,26 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
          yaxt = "n",
          log = "xy")
     
-    axis(1, at = c(100, 1000, 10000, 100000, 1000000), 
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000),
          labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
-    axis(2, at = c(100, 1000, 10000, 100000, 1000000), 
+    axis(2, at = c(100, 1000, 10000, 100000, 1000000),
          labels = c("100", "1K", "10K", "100K", "1M"), cex.axis = 0.5)
-    
-    # Tint the HA-positive region
-    rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6, 
-         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
-    
-    # Add threshold line
-    abline(v = ha_threshold, col = "black", lwd = 1, lty = 2)
+
+    # Tint the HA-positive region (only if valid threshold)
+    if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+      rect(xleft = ha_threshold, ybottom = 100, xright = 1e7, ytop = 6e6,
+           col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+      # Add threshold line
+      abline(v = ha_threshold, col = "black", lwd = 1, lty = 2)
+    }
     
     ha_values <- exprs(fcs_data)[, channels$HA]
-    inside_gate <- sum(ha_values >= ha_threshold)
+    inside_gate <- if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
+      sum(ha_values >= ha_threshold)
+    } else {
+      0
+    }
     pct <- 100 * inside_gate / nrow(fcs_data)
     
     # Determine sample type
