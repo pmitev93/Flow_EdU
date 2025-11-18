@@ -11,6 +11,12 @@ library(DT)
 library(openxlsx)
 library(sortable)
 library(plotly)
+library(future)
+library(future.apply)
+
+# Set up parallel processing plan
+# Use multisession to load experiments in parallel
+plan(multisession, workers = availableCores() - 1)
 
 # Source the master script to load all functions
 # Make sure master script path is correct!
@@ -1090,6 +1096,9 @@ server <- function(input, output, session) {
           cat("Converted N_cells column to numeric\n")
         }
 
+        # First pass: Load cached results and identify experiments that need FCS loading
+        experiments_to_load <- list()
+
         for(i in seq_along(exp_names)) {
           exp_name <- exp_names[i]
           incProgress(1/length(exp_names), detail = exp_name)
@@ -1169,13 +1178,9 @@ server <- function(input, output, session) {
                   cat(sprintf("    Stored gates with key: %s\n", composite_key))
                 }
 
-                # Also load the experiment FCS data for browsing (only once per experiment)
-                if(is.null(rv$experiments)) {
-                  rv$experiments <- list()
-                }
-                if(is.null(rv$experiments[[exp_name]])) {
-                  exp_folder <- exp_folders[i]
-                  rv$experiments[[exp_name]] <- load_experiment(exp_folder)
+                # Mark this experiment for FCS loading (only once per experiment)
+                if(!exp_name %in% names(experiments_to_load)) {
+                  experiments_to_load[[exp_name]] <- exp_folders[i]
                 }
 
                 n_loaded <- n_loaded + 1
@@ -1185,6 +1190,27 @@ server <- function(input, output, session) {
               })
             }
           }
+        }
+
+        # Second pass: Load FCS data in parallel for all experiments
+        if(length(experiments_to_load) > 0) {
+          cat(sprintf("\n=== PARALLEL LOADING %d EXPERIMENTS ===\n", length(experiments_to_load)))
+
+          # Initialize experiments list if needed
+          if(is.null(rv$experiments)) {
+            rv$experiments <- list()
+          }
+
+          # Load experiments in parallel
+          loaded_experiments <- future_lapply(experiments_to_load, function(exp_folder) {
+            load_experiment(exp_folder)
+          }, future.seed = TRUE)
+
+          # Store loaded experiments in reactive values
+          names(loaded_experiments) <- names(experiments_to_load)
+          rv$experiments <- c(rv$experiments, loaded_experiments)
+
+          cat(sprintf("=== PARALLEL LOADING COMPLETE ===\n"))
         }
 
         cat(sprintf("\nFinal rv$all_results has %d rows\n", nrow(rv$all_results)))
