@@ -3438,11 +3438,27 @@ GATE_STRATEGY <- list(
       )
     }
 
-    # Ensure all columns are character/factor for proper filtering
+    # Ensure all columns are character/factor/numeric for proper filtering
     display_data$Gate_ID <- as.character(display_data$Gate_ID)
     display_data$Experiment <- as.character(display_data$Experiment)
     if("Notes" %in% names(display_data)) {
       display_data$Notes <- as.character(display_data$Notes)
+    }
+
+    # Ensure numeric columns are numeric (not character with "%")
+    if("N_cells" %in% names(display_data)) {
+      display_data$N_cells <- as.numeric(display_data$N_cells)
+    }
+
+    # Convert formatted percentage strings back to numeric for filtering
+    if("HA_Pos_Pct" %in% names(display_data)) {
+      # Remove % sign and convert to numeric
+      display_data$HA_Pos_Pct_Numeric <- as.numeric(gsub("%", "", display_data$HA_Pos_Pct))
+    }
+
+    # Strength_Ratio should already be numeric after formatting, convert back
+    if("Strength_Ratio" %in% names(display_data)) {
+      display_data$Strength_Ratio_Numeric <- as.numeric(display_data$Strength_Ratio)
     }
 
     datatable(display_data,
@@ -3450,7 +3466,11 @@ GATE_STRATEGY <- list(
               options = list(
                 pageLength = 10,
                 scrollX = TRUE,
-                search = list(regex = FALSE, caseInsensitive = TRUE)
+                search = list(regex = FALSE, caseInsensitive = TRUE),
+                columnDefs = list(
+                  # Hide the numeric versions of formatted columns
+                  list(visible = FALSE, targets = which(names(display_data) %in% c("HA_Pos_Pct_Numeric", "Strength_Ratio_Numeric")) - 1)
+                )
               ),
               filter = list(position = 'top', clear = FALSE))
   })
