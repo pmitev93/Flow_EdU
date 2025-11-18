@@ -1214,6 +1214,25 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   ha_final <- exprs(fcs_data)[, channels$HA]
   edu_final <- exprs(fcs_data)[, channels$EdU]
 
+  # Check if we have enough cells to plot
+  if(length(ha_final) < 10) {
+    # Create empty plot with warning message
+    plot(1, 1, type = "n", xlim = c(2, 6.5), ylim = c(4, 7),
+         xlab = "log10(HA-A)", ylab = "log10(EdU-A)",
+         main = sprintf("%s\nEdU vs HA Correlation", sample_name),
+         xaxs = "i", yaxs = "i")
+    text(4.25, 5.5, sprintf("Insufficient cells for plotting\n(n = %d)", length(ha_final)),
+         cex = 1.2, col = "red", font = 2)
+
+    return(invisible(list(
+      sample_name = sample_name,
+      correlation = NA,
+      n_cells = length(ha_final),
+      ha_log = numeric(0),
+      edu_log = numeric(0)
+    )))
+  }
+
   # Log10 transform
   ha_log <- log10(ha_final + 1)
   edu_log <- log10(edu_final + 1)
@@ -1248,34 +1267,34 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
 
   # Add threshold lines if edu_threshold is provided (quadrant mode)
   if(!is.null(edu_threshold)) {
-    # Calculate quadrant populations
+    # Calculate quadrant populations (correct convention: Q1=top right, counterclockwise)
     ha_threshold_log <- log10(ha_threshold + 1)
     edu_threshold_log <- log10(edu_threshold + 1)
 
     total_cells <- length(ha_log)
-    q1_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)
-    q2_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)
-    q3_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)
-    q4_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)
+    q1_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)  # Top right
+    q2_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)   # Top left
+    q3_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)     # Bottom left
+    q4_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)    # Bottom right
 
-    q1_pct <- (q1_ha_neg_edu_low / total_cells) * 100
-    q2_pct <- (q2_ha_pos_edu_low / total_cells) * 100
-    q3_pct <- (q3_ha_neg_edu_high / total_cells) * 100
-    q4_pct <- (q4_ha_pos_edu_high / total_cells) * 100
+    q1_pct <- (q1_ha_pos_edu_high / total_cells) * 100
+    q2_pct <- (q2_ha_neg_edu_high / total_cells) * 100
+    q3_pct <- (q3_ha_neg_edu_low / total_cells) * 100
+    q4_pct <- (q4_ha_pos_edu_low / total_cells) * 100
 
-    # Calculate strength ratio
-    strength_ratio <- if((q2_pct + q4_pct) > 0) {
-      q2_pct / (q2_pct + q4_pct)
+    # Calculate strength ratio: Q4 / (Q1 + Q4)
+    strength_ratio <- if((q1_pct + q4_pct) > 0) {
+      q4_pct / (q1_pct + q4_pct)
     } else {
       NA_real_
     }
 
     # Add colored background for quadrants
-    # Q4 (top right, HA+/EdU-high) = blue with transparency
+    # Q1 (top right, HA+/EdU-high) = blue with transparency
     rect(ha_threshold_log, edu_threshold_log, 6.5, 7,
          col = rgb(0, 0, 1, alpha = 0.1), border = NA)
 
-    # Q2 (bottom right, HA+/EdU-low) = red with transparency
+    # Q4 (bottom right, HA+/EdU-low) = red with transparency
     rect(ha_threshold_log, 4, 6.5, edu_threshold_log,
          col = rgb(1, 0, 0, alpha = 0.1), border = NA)
 
@@ -1287,10 +1306,10 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
     abline(h = edu_threshold_log, col = "black", lwd = 2, lty = 1)
 
     # Add quadrant percentages
-    text(2.8, 6.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.8, font = 2)  # Top left (Q3)
-    text(5.5, 6.5, sprintf("%.1f%%", q4_pct), col = "blue", cex = 0.8, font = 2)   # Top right (Q4) - blue
-    text(2.8, 4.5, sprintf("%.1f%%", q1_pct), col = "black", cex = 0.8, font = 2)  # Bottom left (Q1)
-    text(5.5, 4.5, sprintf("%.1f%%", q2_pct), col = "red", cex = 0.8, font = 2)    # Bottom right (Q2) - red
+    text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.8, font = 2)  # Top left (Q2)
+    text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.8, font = 2)   # Top right (Q1) - blue
+    text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.8, font = 2)  # Bottom left (Q3)
+    text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.8, font = 2)    # Bottom right (Q4) - red
 
     # Display strength ratio
     if(!is.na(strength_ratio)) {
