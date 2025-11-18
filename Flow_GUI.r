@@ -2353,9 +2353,17 @@ server <- function(input, output, session) {
     gate <- if(is_quadrant) creator_rv$current_gates$quadrant else creator_rv$current_gates$ha_positive
 
     if(is_quadrant) {
+      # Determine quadrant type
+      quad_type <- if(!is.null(gate$type)) gate$type else "paired_control_quadrant"
+      is_control_based <- (quad_type == "control_based_quadrant")
+
       # Quadrant gate UI (dual thresholds for HA and EdU)
       div(
         h5("Quadrant Gating (HA vs EdU)", style = "margin-top: 0;"),
+        radioButtons("creator_quad_type", "Quadrant Type:",
+                     choices = c("Paired Control (per-sample thresholds)" = "paired_control_quadrant",
+                                 "Control-Based (fixed thresholds)" = "control_based_quadrant"),
+                     selected = quad_type),
         numericInput("creator_quad_ha_prob", "HA Control Percentile:",
                      value = if(is.null(gate$ha_prob)) 0.98 else gate$ha_prob,
                      min = 0, max = 1, step = 0.01),
@@ -2366,12 +2374,22 @@ server <- function(input, output, session) {
                      min = 0, max = 1, step = 0.01),
         textInput("creator_quad_edu_param", "EdU Parameter:",
                   value = if(is.null(gate$edu_parameter)) "FL1-A" else gate$edu_parameter),
-        textInput("creator_quad_control_suffix", "Control Suffix:",
-                  value = if(is.null(gate$control_suffix)) "Dox-" else gate$control_suffix),
-        textInput("creator_quad_test_suffix", "Test Suffix:",
-                  value = if(is.null(gate$test_suffix)) "Dox+" else gate$test_suffix),
+        conditionalPanel(
+          condition = "input.creator_quad_type == 'control_based_quadrant'",
+          textInput("creator_quad_control_pattern", "Control Sample Pattern:",
+                    value = if(is.null(gate$control_pattern)) "121_Empty_Vector_Dox-" else gate$control_pattern)
+        ),
+        conditionalPanel(
+          condition = "input.creator_quad_type == 'paired_control_quadrant'",
+          textInput("creator_quad_control_suffix", "Control Suffix:",
+                    value = if(is.null(gate$control_suffix)) "Dox-" else gate$control_suffix),
+          textInput("creator_quad_test_suffix", "Test Suffix:",
+                    value = if(is.null(gate$test_suffix)) "Dox+" else gate$test_suffix)
+        ),
         textInput("creator_quad_desc", "Description:",
-                  value = if(is.null(gate$description)) "Quadrant gating using paired Dox- control" else gate$description)
+                  value = if(is.null(gate$description)) {
+                    if(is_control_based) "Quadrant gating using control-based thresholds" else "Quadrant gating using paired Dox- control"
+                  } else gate$description)
       )
     } else {
       # Standard HA positive gate UI
@@ -2484,16 +2502,27 @@ server <- function(input, output, session) {
     if(!is.null(creator_rv$current_gates$quadrant)) {
       # Quadrant gate
       quad_gate <- creator_rv$current_gates$quadrant
-      gates$quadrant <- list(
-        type = "paired_control_quadrant",
+      quad_type <- safe_input("creator_quad_type", quad_gate$type)
+
+      # Build quadrant gate based on type
+      quad_list <- list(
+        type = quad_type,
         ha_parameter = safe_input("creator_quad_ha_param", quad_gate$ha_parameter),
         edu_parameter = safe_input("creator_quad_edu_param", quad_gate$edu_parameter),
-        control_suffix = safe_input("creator_quad_control_suffix", quad_gate$control_suffix),
-        test_suffix = safe_input("creator_quad_test_suffix", quad_gate$test_suffix),
         ha_prob = safe_input("creator_quad_ha_prob", quad_gate$ha_prob),
         edu_prob = safe_input("creator_quad_edu_prob", quad_gate$edu_prob),
         description = safe_input("creator_quad_desc", quad_gate$description)
       )
+
+      # Add type-specific fields
+      if(quad_type == "control_based_quadrant") {
+        quad_list$control_pattern <- safe_input("creator_quad_control_pattern", quad_gate$control_pattern)
+      } else {
+        quad_list$control_suffix <- safe_input("creator_quad_control_suffix", quad_gate$control_suffix)
+        quad_list$test_suffix <- safe_input("creator_quad_test_suffix", quad_gate$test_suffix)
+      }
+
+      gates$quadrant <- quad_list
     } else {
       # Standard HA positive gate
       ha_gate <- creator_rv$current_gates$ha_positive
@@ -2726,7 +2755,28 @@ server <- function(input, output, session) {
 
     # Build Gate 7 section based on type
     gate7_section <- if(is_quadrant) {
-      sprintf('# Gate 7: Quadrant gating (HA vs EdU)
+      quad_type <- gates_to_save$quadrant$type
+      if(quad_type == "control_based_quadrant") {
+        # Control-based quadrant
+        sprintf('# Gate 7: Quadrant gating with control-based thresholds
+GATES$quadrant <- list(
+  type = "control_based_quadrant",
+  ha_parameter = "%s",
+  edu_parameter = "%s",
+  control_pattern = "%s",
+  ha_prob = %g,
+  edu_prob = %g,
+  description = "%s"
+)',
+          gates_to_save$quadrant$ha_parameter,
+          gates_to_save$quadrant$edu_parameter,
+          gates_to_save$quadrant$control_pattern,
+          gates_to_save$quadrant$ha_prob,
+          gates_to_save$quadrant$edu_prob,
+          gates_to_save$quadrant$description)
+      } else {
+        # Paired control quadrant
+        sprintf('# Gate 7: Quadrant gating (HA vs EdU)
 GATES$quadrant <- list(
   type = "paired_control_quadrant",
   ha_parameter = "%s",
@@ -2737,13 +2787,14 @@ GATES$quadrant <- list(
   edu_prob = %g,
   description = "%s"
 )',
-        gates_to_save$quadrant$ha_parameter,
-        gates_to_save$quadrant$edu_parameter,
-        gates_to_save$quadrant$control_suffix,
-        gates_to_save$quadrant$test_suffix,
-        gates_to_save$quadrant$ha_prob,
-        gates_to_save$quadrant$edu_prob,
-        gates_to_save$quadrant$description)
+          gates_to_save$quadrant$ha_parameter,
+          gates_to_save$quadrant$edu_parameter,
+          gates_to_save$quadrant$control_suffix,
+          gates_to_save$quadrant$test_suffix,
+          gates_to_save$quadrant$ha_prob,
+          gates_to_save$quadrant$edu_prob,
+          gates_to_save$quadrant$description)
+      }
     } else {
       sprintf('# Gate 7: HA positive
 GATES$ha_positive <- list(
