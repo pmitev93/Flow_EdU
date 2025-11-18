@@ -1633,37 +1633,42 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
 
 ## Quadrant Correlation Overview ----
 plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
-  # Count only Dox+ samples
-  n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
-  n_cols <- ceiling(sqrt(n_dox_plus))
-  n_rows <- ceiling(n_dox_plus / n_cols)
+  # Count ALL samples (both Dox+ and Dox-)
+  n_samples <- length(experiment$flowset)
+  n_cols <- ceiling(sqrt(n_samples))
+  n_rows <- ceiling(n_samples / n_cols)
 
   par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
 
   for(i in seq_along(experiment$flowset)) {
     sample_name <- experiment$metadata$sample_name[i]
 
-    # Skip Dox- samples entirely
+    # Check if this is a Dox- sample
     is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
-    if(is_dox_minus) {
-      next
-    }
 
-    # Find paired control
-    control_idx <- find_paired_control(sample_name, experiment$metadata)
-    
-    if(is.null(control_idx)) {
-      # No paired control - show error plot
-      plot.new()
-      text(0.5, 0.5, sprintf("No Dox- control\n%s", sample_name), 
-           col = "red", cex = 0.8, font = 2)
-      box(col = "red", lwd = 2)
-      next
+    # Determine control and test samples
+    if(is_dox_minus) {
+      # For Dox- samples, use self as control to show where thresholds are
+      control_idx <- i
+      test_idx <- i
+    } else {
+      # For Dox+ samples, find paired Dox- control
+      control_idx <- find_paired_control(sample_name, experiment$metadata)
+
+      if(is.null(control_idx)) {
+        # No paired control - show error plot
+        plot.new()
+        text(0.5, 0.5, sprintf("No Dox- control\n%s", sample_name),
+             col = "red", cex = 0.8, font = 2)
+        box(col = "red", lwd = 2)
+        next
+      }
+      test_idx <- i
     }
 
     # Calculate quadrant thresholds
     control_fcs <- experiment$flowset[[control_idx]]
-    test_fcs <- experiment$flowset[[i]]
+    test_fcs <- experiment$flowset[[test_idx]]
     control_name <- experiment$metadata$sample_name[control_idx]
 
     tryCatch({
@@ -1735,13 +1740,20 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
       # Calculate density colors
       dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 
+      # Create title based on sample type
+      if(is_dox_minus) {
+        plot_title <- sprintf("%s\n[Control - 95th percentile shown]", sample_name)
+      } else {
+        plot_title <- sprintf("%s\nStrength=%.3f", sample_name, strength_ratio)
+      }
+
       # Plot
       plot(ha_log, edu_log,
            pch = ".",
            col = dens,
            xlab = "",
            ylab = "",
-           main = sprintf("%s\nStrength=%.3f", sample_name, strength_ratio),
+           main = plot_title,
            xlim = c(2, 6.5),
            ylim = c(4, 7),
            cex.main = 0.9,
