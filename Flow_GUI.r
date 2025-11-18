@@ -1165,6 +1165,14 @@ server <- function(input, output, session) {
                       rv$all_results$Strength_Ratio[match_idx] <- cache_data$results$Strength_Ratio[j]
                     }
 
+                    # Update HA_Pos_Pct if it exists in cached results
+                    if("HA_Pos_Pct" %in% names(cache_data$results)) {
+                      if(!"HA_Pos_Pct" %in% names(rv$all_results)) {
+                        rv$all_results$HA_Pos_Pct <- NA_real_
+                      }
+                      rv$all_results$HA_Pos_Pct[match_idx] <- cache_data$results$HA_Pos_Pct[j]
+                    }
+
                     n_updated <- n_updated + 1
                   } else {
                     # This is a second/third gate strategy for same well - add new row
@@ -1174,6 +1182,11 @@ server <- function(input, output, session) {
                     # Ensure Strength_Ratio column exists before binding
                     if("Strength_Ratio" %in% names(cache_data$results) && !"Strength_Ratio" %in% names(rv$all_results)) {
                       rv$all_results$Strength_Ratio <- NA_real_
+                    }
+
+                    # Ensure HA_Pos_Pct column exists before binding
+                    if("HA_Pos_Pct" %in% names(cache_data$results) && !"HA_Pos_Pct" %in% names(rv$all_results)) {
+                      rv$all_results$HA_Pos_Pct <- NA_real_
                     }
 
                     rv$all_results <- bind_rows(rv$all_results, new_row)
@@ -1579,11 +1592,24 @@ server <- function(input, output, session) {
             }
             rv$all_results$Strength_Ratio[match_idx] <- new_results$Strength_Ratio[i]
           }
+
+          # Update HA_Pos_Pct column if it exists in new_results
+          if("HA_Pos_Pct" %in% names(new_results)) {
+            if(!"HA_Pos_Pct" %in% names(rv$all_results)) {
+              rv$all_results$HA_Pos_Pct <- NA_real_
+            }
+            rv$all_results$HA_Pos_Pct[match_idx] <- new_results$HA_Pos_Pct[i]
+          }
         } else {
           # This is a second/third gate strategy for same well - add new row
           # Ensure Strength_Ratio column exists in rv$all_results before binding
           if("Strength_Ratio" %in% names(new_results) && !"Strength_Ratio" %in% names(rv$all_results)) {
             rv$all_results$Strength_Ratio <- NA_real_
+          }
+
+          # Ensure HA_Pos_Pct column exists in rv$all_results before binding
+          if("HA_Pos_Pct" %in% names(new_results) && !"HA_Pos_Pct" %in% names(rv$all_results)) {
+            rv$all_results$HA_Pos_Pct <- NA_real_
           }
           rv$all_results <- bind_rows(rv$all_results, new_results[i, ])
         }
@@ -1618,6 +1644,15 @@ server <- function(input, output, session) {
         is.na(display_data$Strength_Ratio),
         "",
         sprintf("%.4f", as.numeric(display_data$Strength_Ratio))
+      )
+    }
+
+    # Format HA_Pos_Pct to 2 decimal places
+    if("HA_Pos_Pct" %in% names(display_data)) {
+      display_data$HA_Pos_Pct <- ifelse(
+        is.na(display_data$HA_Pos_Pct),
+        "",
+        sprintf("%.2f%%", as.numeric(display_data$HA_Pos_Pct))
       )
     }
 

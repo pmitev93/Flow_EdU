@@ -695,40 +695,45 @@ calculate_quadrant_from_paired_control <- function(control_fcs, test_fcs,
   ha_values <- exprs(test_gated)[, channels$HA]
   edu_values <- exprs(test_gated)[, channels$EdU]
 
-  # Calculate quadrant populations
+  # Calculate quadrant populations (correct convention: Q1=top right, counterclockwise)
   total_cells <- length(ha_values)
 
-  q1_ha_neg_edu_low <- sum(ha_values < ha_threshold & edu_values < edu_threshold)
-  q2_ha_pos_edu_low <- sum(ha_values >= ha_threshold & edu_values < edu_threshold)
-  q3_ha_neg_edu_high <- sum(ha_values < ha_threshold & edu_values >= edu_threshold)
-  q4_ha_pos_edu_high <- sum(ha_values >= ha_threshold & edu_values >= edu_threshold)
+  q1_ha_pos_edu_high <- sum(ha_values >= ha_threshold & edu_values >= edu_threshold)  # Top right
+  q2_ha_neg_edu_high <- sum(ha_values < ha_threshold & edu_values >= edu_threshold)   # Top left
+  q3_ha_neg_edu_low <- sum(ha_values < ha_threshold & edu_values < edu_threshold)     # Bottom left
+  q4_ha_pos_edu_low <- sum(ha_values >= ha_threshold & edu_values < edu_threshold)    # Bottom right
 
   # Calculate percentages
-  q1_pct <- (q1_ha_neg_edu_low / total_cells) * 100
-  q2_pct <- (q2_ha_pos_edu_low / total_cells) * 100
-  q3_pct <- (q3_ha_neg_edu_high / total_cells) * 100
-  q4_pct <- (q4_ha_pos_edu_high / total_cells) * 100
+  q1_pct <- (q1_ha_pos_edu_high / total_cells) * 100
+  q2_pct <- (q2_ha_neg_edu_high / total_cells) * 100
+  q3_pct <- (q3_ha_neg_edu_low / total_cells) * 100
+  q4_pct <- (q4_ha_pos_edu_low / total_cells) * 100
 
-  # Calculate ratio: HA+/EdU-low / (HA+/EdU-low + HA+/EdU-high)
-  ratio <- if((q2_pct + q4_pct) > 0) {
-    q2_pct / (q2_pct + q4_pct)
+  # Calculate ratio: HA+/EdU-low / (HA+/EdU-low + HA+/EdU-high) = Q4 / (Q4 + Q1)
+  ratio <- if((q1_pct + q4_pct) > 0) {
+    q4_pct / (q1_pct + q4_pct)
   } else {
     NA_real_
   }
 
+  # Calculate HA positive percentage (right quadrants: Q1 + Q4)
+  ha_pos_pct <- q1_pct + q4_pct
+
   cat(sprintf("  Quadrants: Q1=%.2f%%, Q2=%.2f%%, Q3=%.2f%%, Q4=%.2f%%\n",
               q1_pct, q2_pct, q3_pct, q4_pct))
-  cat(sprintf("  Strength_Ratio (HA+/EdU-low ratio) = %.3f\n", ratio))
+  cat(sprintf("  HA positive: %.2f%% (Q1+Q4)\n", ha_pos_pct))
+  cat(sprintf("  Strength_Ratio (Q4/(Q1+Q4)) = %.3f\n", ratio))
 
   return(list(
     ha_threshold = ha_threshold,
     edu_threshold = edu_threshold,
     ratio = ratio,
+    ha_pos_pct = ha_pos_pct,
     total_cells = total_cells,
-    q1_count = q1_ha_neg_edu_low,
-    q2_count = q2_ha_pos_edu_low,
-    q3_count = q3_ha_neg_edu_high,
-    q4_count = q4_ha_pos_edu_high,
+    q1_count = q1_ha_pos_edu_high,
+    q2_count = q2_ha_neg_edu_high,
+    q3_count = q3_ha_neg_edu_low,
+    q4_count = q4_ha_pos_edu_low,
     q1_pct = q1_pct,
     q2_pct = q2_pct,
     q3_pct = q3_pct,
@@ -746,8 +751,9 @@ extract_correlations_with_quadrants <- function(experiment, ha_threshold = NULL,
   # Load the standard plotting function
   results_df <- extract_correlations(experiment, ha_threshold, gates, channels)
 
-  # Add Strength_Ratio column (initialize as NA)
+  # Add Strength_Ratio and HA_Pos_Pct columns (initialize as NA)
   results_df$Strength_Ratio <- NA_real_
+  results_df$HA_Pos_Pct <- NA_real_
 
   # If not using quadrant strategy, return standard results
   if(!use_quadrant || is.null(gates$quadrant)) {
@@ -786,10 +792,11 @@ extract_correlations_with_quadrants <- function(experiment, ha_threshold = NULL,
         gates, channels
       )
 
-      # Update the strength_ratio in results_df
+      # Update the strength_ratio and ha_pos_pct in results_df
       well_match <- which(results_df$Sample == sample_name)
       if(length(well_match) > 0) {
         results_df$Strength_Ratio[well_match[1]] <- quadrant_result$ratio
+        results_df$HA_Pos_Pct[well_match[1]] <- quadrant_result$ha_pos_pct
       }
 
     }, error = function(e) {

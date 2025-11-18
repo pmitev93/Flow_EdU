@@ -36,17 +36,18 @@ quick_scan_experiment <- function(experiment_path) {
   # Add placeholders
   metadata$experiment <- experiment_name
   metadata$correlation <- "Not analyzed"
+  metadata$ha_pos_pct <- NA_real_
   metadata$n_cells <- "Not analyzed"
   metadata$strength_ratio <- NA_real_
   metadata$notes <- ""
 
   # Reorder columns
   metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line",
-                           "gene", "mutation", "correlation", "n_cells", "strength_ratio", "notes")]
+                           "gene", "mutation", "correlation", "ha_pos_pct", "n_cells", "strength_ratio", "notes")]
 
   # Capitalize column names
   colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line",
-                          "Gene", "Mutation", "Correlation", "N_cells", "Strength_Ratio", "Notes")
+                          "Gene", "Mutation", "Correlation", "HA_Pos_Pct", "N_cells", "Strength_Ratio", "Notes")
   
   return(metadata)
 }
@@ -1479,17 +1480,30 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
 
     fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
     fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
-    
-    edu_fxcycle_filter <- edu_values >= edu_threshold & 
-      fxcycle_values2 >= fxcycle_bounds[1] & 
+
+    edu_fxcycle_filter <- edu_values >= edu_threshold &
+      fxcycle_values2 >= fxcycle_bounds[1] &
       fxcycle_values2 <= fxcycle_bounds[2]
     fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
-    
+
     # Gate 7: HA-positive
+    # Count cells before Gate 7 for HA+ percentage calculation
+    n_before_ha_gate <- nrow(exprs(fcs_data))
+
     ha_values <- exprs(fcs_data)[, channels$HA]
     ha_filter <- ha_values >= ha_threshold
     fcs_data <- Subset(fcs_data, ha_filter)
-    
+
+    # Count cells after Gate 7
+    n_after_ha_gate <- nrow(exprs(fcs_data))
+
+    # Calculate HA+ percentage
+    ha_pos_pct <- if(n_before_ha_gate > 0) {
+      (n_after_ha_gate / n_before_ha_gate) * 100
+    } else {
+      NA_real_
+    }
+
     # Extract final data
     ha_final <- exprs(fcs_data)[, channels$HA]
     edu_final <- exprs(fcs_data)[, channels$EdU]
@@ -1531,6 +1545,7 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
       Gene = gene,
       Mutation = mutation,
       Correlation = correlation,
+      HA_Pos_Pct = ha_pos_pct,
       N_cells = n_cells,
       Notes = notes,
       stringsAsFactors = FALSE
