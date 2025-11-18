@@ -1617,12 +1617,11 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
       stringsAsFactors = FALSE
     )
   }
-  
+
   # Combine all results
   results_df <- bind_rows(results_list)
-  
+
   return(results_df)
-}
 }
 
 ## Quadrant Correlation Overview ----
