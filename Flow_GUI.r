@@ -1861,14 +1861,27 @@ server <- function(input, output, session) {
 
       # If gate strategy not in memory, try to load from cache
       if(is.null(gate_strategy)) {
+        cat(sprintf("Gate strategy NULL - attempting to load from cache for '%s'\n", input$overview_gate_strategy))
         cache_dir <- file.path("analysis_cache", exp_name)
+        cat(sprintf("  Cache dir: %s (exists: %s)\n", cache_dir, dir.exists(cache_dir)))
+
         if(dir.exists(cache_dir)) {
           cache_files <- list.files(cache_dir, pattern = "\\.rds$", full.names = TRUE)
+          cat(sprintf("  Found %d cache files\n", length(cache_files)))
+
           for(cache_file in cache_files) {
             tryCatch({
               cache_data <- readRDS(cache_file)
+              cat(sprintf("    Checking %s: gate_id=%s (looking for '%s')\n",
+                          basename(cache_file),
+                          if(!is.null(cache_data$gate_id)) cache_data$gate_id else "NULL",
+                          input$overview_gate_strategy))
+
               if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$overview_gate_strategy) {
                 # Found matching cache file, extract gate strategy AND gates
+                cat(sprintf("    MATCH FOUND! gate_strategy present: %s, gates present: %s\n",
+                            !is.null(cache_data$gate_strategy), !is.null(cache_data$gates)))
+
                 if(!is.null(cache_data$gate_strategy)) {
                   gate_strategy <- cache_data$gate_strategy
                   rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
@@ -1878,16 +1891,21 @@ server <- function(input, output, session) {
                     composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
                     rv$experiment_gates[[composite_key]] <- cache_data$gates
                     gates_to_use <- cache_data$gates
-                    cat(sprintf("Loaded gates and strategy '%s' from cache\n", input$overview_gate_strategy))
+                    cat(sprintf("    ✓ Loaded gates and strategy '%s' from cache\n", input$overview_gate_strategy))
+                    cat(sprintf("    gates_to_use$quadrant present: %s\n", !is.null(gates_to_use$quadrant)))
+                  } else {
+                    cat(sprintf("    WARNING: gates data missing from cache\n"))
                   }
                   break
                 }
               }
             }, error = function(e) {
-              # Skip files that can't be read
+              cat(sprintf("    ERROR reading %s: %s\n", basename(cache_file), e$message))
             })
           }
         }
+      } else {
+        cat(sprintf("Gate strategy already in memory for '%s'\n", input$overview_gate_strategy))
       }
 
       # Debug output
