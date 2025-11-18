@@ -2478,16 +2478,44 @@ server <- function(input, output, session) {
     # Get edited gates
     gates_to_use <- get_edited_gates()
 
-    # Calculate HA threshold
-    control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+    # Check if using quadrant strategy
+    use_quadrant <- !is.null(creator_rv$current_strategy$analysis_type) &&
+                    creator_rv$current_strategy$analysis_type == "quadrant_ratio" &&
+                    !is.null(gates_to_use$quadrant)
+
+    # Calculate thresholds based on strategy
     ha_threshold <- NULL
-    if(!is.null(control_idx)) {
-      control_fcs <- exp$flowset[[control_idx]]
-      control_name <- exp$metadata$sample_name[control_idx]
-      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
-                                                             gates = gates_to_use,
-                                                             channels = CHANNELS)
-      ha_threshold <- control_result$threshold
+    edu_threshold <- NULL
+
+    if(use_quadrant) {
+      # Quadrant strategy: find paired control
+      control_idx <- find_paired_control(sample_name, exp$metadata)
+      if(!is.null(control_idx)) {
+        control_fcs <- exp$flowset[[control_idx]]
+        control_name <- exp$metadata$sample_name[control_idx]
+
+        tryCatch({
+          quadrant_result <- calculate_quadrant_from_paired_control(
+            control_fcs, fcs, control_name, sample_name,
+            gates_to_use, CHANNELS
+          )
+          ha_threshold <- quadrant_result$ha_threshold
+          edu_threshold <- quadrant_result$edu_threshold
+        }, error = function(e) {
+          cat(sprintf("Error calculating quadrant thresholds: %s\n", e$message))
+        })
+      }
+    } else {
+      # Old strategy: use global Empty_Vector control
+      control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+      if(!is.null(control_idx)) {
+        control_fcs <- exp$flowset[[control_idx]]
+        control_name <- exp$metadata$sample_name[control_idx]
+        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                               gates = gates_to_use,
+                                                               channels = CHANNELS)
+        ha_threshold <- control_result$threshold
+      }
     }
 
     # Set up multi-panel layout
@@ -2500,9 +2528,24 @@ server <- function(input, output, session) {
       plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
-      plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                     gates = gates_to_use, channels = CHANNELS, show_sample_name = FALSE)
+
+      if(use_quadrant) {
+        # Show quadrant plot for Gate 7
+        plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                       gates = gates_to_use, channels = CHANNELS,
+                                       show_sample_name = FALSE,
+                                       edu_threshold = edu_threshold)
+        # Show quadrant plot again (same as Gate 7 for quadrant strategy)
+        plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                       gates = gates_to_use, channels = CHANNELS,
+                                       show_sample_name = FALSE,
+                                       edu_threshold = edu_threshold)
+      } else {
+        # Show traditional Gate 7 and correlation plot
+        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
+        plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                       gates = gates_to_use, channels = CHANNELS, show_sample_name = FALSE)
+      }
     } else {
       par(mfrow = c(3, 2), mar = c(5, 4, 3, 1))
 
@@ -2528,16 +2571,44 @@ server <- function(input, output, session) {
     # Get edited gates
     gates_to_use <- get_edited_gates()
 
-    # Calculate HA threshold if needed
-    control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+    # Check if using quadrant strategy
+    use_quadrant <- !is.null(creator_rv$current_strategy$analysis_type) &&
+                    creator_rv$current_strategy$analysis_type == "quadrant_ratio" &&
+                    !is.null(gates_to_use$quadrant)
+
+    # Calculate thresholds based on strategy
     ha_threshold <- NULL
-    if(!is.null(control_idx)) {
-      control_fcs <- exp$flowset[[control_idx]]
-      control_name <- exp$metadata$sample_name[control_idx]
-      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
-                                                             gates = gates_to_use,
-                                                             channels = CHANNELS)
-      ha_threshold <- control_result$threshold
+    edu_threshold <- NULL
+
+    if(use_quadrant) {
+      # Quadrant strategy: find paired control
+      control_idx <- find_paired_control(sample_name, exp$metadata)
+      if(!is.null(control_idx)) {
+        control_fcs <- exp$flowset[[control_idx]]
+        control_name <- exp$metadata$sample_name[control_idx]
+
+        tryCatch({
+          quadrant_result <- calculate_quadrant_from_paired_control(
+            control_fcs, fcs, control_name, sample_name,
+            gates_to_use, CHANNELS
+          )
+          ha_threshold <- quadrant_result$ha_threshold
+          edu_threshold <- quadrant_result$edu_threshold
+        }, error = function(e) {
+          cat(sprintf("Error calculating quadrant thresholds: %s\n", e$message))
+        })
+      }
+    } else {
+      # Old strategy: use global Empty_Vector control
+      control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+      if(!is.null(control_idx)) {
+        control_fcs <- exp$flowset[[control_idx]]
+        control_name <- exp$metadata$sample_name[control_idx]
+        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                               gates = gates_to_use,
+                                                               channels = CHANNELS)
+        ha_threshold <- control_result$threshold
+      }
     }
 
     # Render the selected plot
@@ -2550,20 +2621,36 @@ server <- function(input, output, session) {
            "gate6" = plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use),
            "gate7" = {
              if(!is.null(ha_threshold)) {
-               plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+               if(use_quadrant) {
+                 # Show quadrant plot for Gate 7
+                 plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                                gates = gates_to_use, channels = CHANNELS,
+                                                edu_threshold = edu_threshold)
+               } else {
+                 # Show traditional HA gate
+                 plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+               }
              } else {
                plot.new()
-               text(0.5, 0.5, "No control sample found\n(needed to calculate HA threshold)",
+               text(0.5, 0.5, "No control sample found\n(needed to calculate thresholds)",
                     cex = 1.5, col = "red")
              }
            },
            "correlation" = {
              if(!is.null(ha_threshold)) {
-               plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                              gates = gates_to_use, channels = CHANNELS)
+               if(use_quadrant) {
+                 # Show quadrant plot with thresholds
+                 plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                                gates = gates_to_use, channels = CHANNELS,
+                                                edu_threshold = edu_threshold)
+               } else {
+                 # Show traditional correlation plot
+                 plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                                gates = gates_to_use, channels = CHANNELS)
+               }
              } else {
                plot.new()
-               text(0.5, 0.5, "No control sample found\n(needed to calculate HA threshold)",
+               text(0.5, 0.5, "No control sample found\n(needed to calculate thresholds)",
                     cex = 1.5, col = "red")
              }
            }
