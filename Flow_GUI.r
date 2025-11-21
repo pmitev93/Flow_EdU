@@ -179,6 +179,10 @@ ui <- fluidPage(
         # Results table
         tabPanel("Results Table",
                  h3("Correlation Results"),
+                 fluidRow(
+                   column(4, checkboxInput("show_dox_minus", "Show Dox- samples", value = FALSE)),
+                   column(4, checkboxInput("show_unanalyzed", "Show unanalyzed samples", value = FALSE))
+                 ),
                  DTOutput("results_table")
         ),
         
@@ -435,7 +439,11 @@ ui <- fluidPage(
         
         tabPanel("Multi-Sample Comparison",
                  h3("Compare Multiple Samples"),
-                 
+
+                 fluidRow(
+                   column(4, checkboxInput("msc_show_dox_minus", "Show Dox- samples", value = FALSE)),
+                   column(4, checkboxInput("msc_show_unanalyzed", "Show unanalyzed samples", value = FALSE))
+                 ),
                  fluidRow(
                    column(12,
                           h4("Select Samples to Compare"),
@@ -1661,8 +1669,27 @@ server <- function(input, output, session) {
   output$results_table <- renderDT({
     req(rv$all_results)
 
-    # Format correlation to 4 decimal places (handle both character and numeric)
+    # React to ui_refresh_trigger to update after analysis
+    rv$ui_refresh_trigger
+
+    # Start with all results
     display_data <- rv$all_results
+
+    # Filter out Dox- samples unless checkbox is checked
+    if(!isTRUE(input$show_dox_minus)) {
+      display_data <- display_data[!grepl("Dox-", display_data$Sample, ignore.case = TRUE), ]
+    }
+
+    # Filter out unanalyzed samples unless checkbox is checked
+    if(!isTRUE(input$show_unanalyzed)) {
+      display_data <- display_data[!is.na(display_data$Correlation) & display_data$Correlation != "Not analyzed", ]
+    }
+
+    if(nrow(display_data) == 0) {
+      return(datatable(data.frame(Message = "No samples match current filters")))
+    }
+
+    # Format correlation to 4 decimal places (handle both character and numeric)
     if("Correlation" %in% names(display_data)) {
       display_data$Correlation <- ifelse(
         is.na(display_data$Correlation) | display_data$Correlation == "Not analyzed",
@@ -3919,6 +3946,9 @@ GATE_STRATEGY <- list(
   output$comparison_sample_selector <- renderDT({
     req(rv$all_results)
 
+    # React to ui_refresh_trigger to update after analysis
+    rv$ui_refresh_trigger
+
     # Debug: print what we have
     cat(sprintf("\n=== Multi-Sample Comparison Debug ===\n"))
     cat(sprintf("Total rows in rv$all_results: %d\n", nrow(rv$all_results)))
@@ -3936,15 +3966,25 @@ GATE_STRATEGY <- list(
                   quadrant_rows$Strength_Ratio[1]))
     }
 
-    # Filter to only analyzed samples (those with non-NA correlation)
-    analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+    # Start with all results
+    analyzed <- rv$all_results
 
-    cat(sprintf("After filtering, analyzed rows: %d\n", nrow(analyzed)))
+    # Filter out Dox- samples unless checkbox is checked
+    if(!isTRUE(input$msc_show_dox_minus)) {
+      analyzed <- analyzed[!grepl("Dox-", analyzed$Sample, ignore.case = TRUE), ]
+    }
+
+    # Filter out unanalyzed samples unless checkbox is checked
+    if(!isTRUE(input$msc_show_unanalyzed)) {
+      analyzed <- analyzed[!is.na(analyzed$Correlation) & analyzed$Correlation != "Not analyzed", ]
+    }
+
+    cat(sprintf("After filtering, rows: %d\n", nrow(analyzed)))
     quadrant_analyzed <- analyzed[!is.na(analyzed$Gate_ID) & analyzed$Gate_ID == "quadrant", ]
-    cat(sprintf("Quadrant in analyzed: %d\n", nrow(quadrant_analyzed)))
+    cat(sprintf("Quadrant in filtered: %d\n", nrow(quadrant_analyzed)))
 
     if(nrow(analyzed) == 0) {
-      return(data.frame(Message = "No analyzed samples available. Please analyze experiments first."))
+      return(datatable(data.frame(Message = "No samples match current filters")))
     }
 
     # Show relevant columns (include Date and Year_Week if available)
