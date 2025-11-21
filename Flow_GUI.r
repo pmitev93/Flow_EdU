@@ -1722,15 +1722,19 @@ server <- function(input, output, session) {
             .groups = 'drop'
           )
 
+        # Add Average and SD columns to display_data
+        display_data$Average <- ""
+        display_data$SD <- ""
+
         # Create summary rows
         for(i in seq_len(nrow(summary_stats))) {
           avg_row <- display_data[1, ]
           avg_row[] <- ""
           avg_row$Cell_line <- summary_stats$Cell_line[i]
-          avg_row$Experiment <- paste0("** Average (n=", summary_stats$n[i], ") **")
-          avg_row$Correlation <- sprintf("%.4f", summary_stats$mean_corr[i])
+          avg_row$Experiment <- paste0("** Summary (n=", summary_stats$n[i], ") **")
+          avg_row$Average <- sprintf("%.4f", summary_stats$mean_corr[i])
           if(!is.na(summary_stats$sd_corr[i])) {
-            avg_row$Notes <- paste0("SD: ", sprintf("%.4f", summary_stats$sd_corr[i]))
+            avg_row$SD <- sprintf("%.4f", summary_stats$sd_corr[i])
           }
           display_data <- bind_rows(display_data, avg_row)
         }
@@ -3812,7 +3816,44 @@ GATE_STRATEGY <- list(
     },
     content = function(file) {
       req(rv$all_results)
-      write.xlsx(rv$all_results, file)
+
+      # Create export data with summary statistics
+      export_data <- rv$all_results
+      export_data$Average <- ""
+      export_data$SD <- ""
+
+      # Calculate summary statistics per Cell_line
+      if("Correlation" %in% names(rv$all_results) && "Cell_line" %in% names(rv$all_results)) {
+        numeric_corr <- as.numeric(rv$all_results$Correlation)
+        valid_data <- rv$all_results[!is.na(numeric_corr), ]
+        valid_data$Correlation_num <- as.numeric(valid_data$Correlation)
+
+        if(nrow(valid_data) > 0) {
+          summary_stats <- valid_data %>%
+            group_by(Cell_line) %>%
+            summarize(
+              mean_corr = mean(Correlation_num, na.rm = TRUE),
+              sd_corr = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
+              n = n(),
+              .groups = 'drop'
+            )
+
+          # Add summary rows
+          for(i in seq_len(nrow(summary_stats))) {
+            avg_row <- export_data[1, ]
+            avg_row[] <- ""
+            avg_row$Cell_line <- summary_stats$Cell_line[i]
+            avg_row$Experiment <- paste0("** Summary (n=", summary_stats$n[i], ") **")
+            avg_row$Average <- sprintf("%.4f", summary_stats$mean_corr[i])
+            if(!is.na(summary_stats$sd_corr[i])) {
+              avg_row$SD <- sprintf("%.4f", summary_stats$sd_corr[i])
+            }
+            export_data <- bind_rows(export_data, avg_row)
+          }
+        }
+      }
+
+      write.xlsx(export_data, file)
     }
   )
   

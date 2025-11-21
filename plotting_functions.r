@@ -1275,7 +1275,16 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   # Gate 6: EdU + FxCycle - read from gates
   edu_gate <- gates$edu_fxcycle_sphase
   edu_values <- exprs(fcs_data)[, channels$EdU]
-  edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+
+  # For Dox- samples, use relaxed EdU threshold (same as in calculate_quadrant_from_paired_control)
+  is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
+  if(is_dox_minus) {
+    # For Dox- samples: use 10th percentile (keep top 90%) - much more lenient
+    edu_threshold_g6 <- quantile(edu_values, probs = 0.10, na.rm = TRUE)
+  } else {
+    # For Dox+ samples: use standard threshold (55th percentile = top 45%)
+    edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+  }
 
   fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
   fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
