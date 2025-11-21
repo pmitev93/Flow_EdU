@@ -2,6 +2,36 @@
 # FLOW CYTOMETRY GUI - PLOTTING FUNCTIONS
 # ==============================================================================
 
+## Helper function to extract date and week from experiment name ----
+extract_experiment_date_info <- function(experiment_name) {
+  # Extract YYYYMMDD from start of experiment name
+  date_str <- str_extract(experiment_name, "^\\d{8}")
+
+  if(is.na(date_str)) {
+    return(list(date = NA_character_, week = NA_integer_, year_week = NA_character_))
+  }
+
+  # Parse date
+  date <- tryCatch({
+    as.Date(date_str, format = "%Y%m%d")
+  }, error = function(e) NA)
+
+  if(is.na(date)) {
+    return(list(date = NA_character_, week = NA_integer_, year_week = NA_character_))
+  }
+
+  # Calculate ISO week number
+  week_num <- as.integer(format(date, "%V"))
+  year <- format(date, "%Y")
+  year_week <- paste0(year, "-W", sprintf("%02d", week_num))
+
+  return(list(
+    date = as.character(date),
+    week = week_num,
+    year_week = year_week
+  ))
+}
+
 ## Quick scan of experiment metadata without loading full FCS data ----
 quick_scan_experiment <- function(experiment_path) {
   experiment_name <- basename(experiment_path)
@@ -41,12 +71,17 @@ quick_scan_experiment <- function(experiment_path) {
   metadata$strength_ratio <- NA_real_
   metadata$notes <- ""
 
+  # Extract date and week info
+  date_info <- extract_experiment_date_info(experiment_name)
+  metadata$date <- date_info$date
+  metadata$year_week <- date_info$year_week
+
   # Reorder columns
-  metadata <- metadata[, c("experiment", "well", "sample_name", "cell_line",
+  metadata <- metadata[, c("experiment", "date", "year_week", "well", "sample_name", "cell_line",
                            "gene", "mutation", "correlation", "ha_pos_pct", "n_cells", "strength_ratio", "notes")]
 
   # Capitalize column names
-  colnames(metadata) <- c("Experiment", "Well", "Sample", "Cell_line",
+  colnames(metadata) <- c("Experiment", "Date", "Year_Week", "Well", "Sample", "Cell_line",
                           "Gene", "Mutation", "Correlation", "HA_Pos_Pct", "N_cells", "Strength_Ratio", "Notes")
   
   return(metadata)
@@ -1609,9 +1644,14 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
     # Combine flags or leave blank
     notes <- if(length(flags) > 0) paste(flags, collapse = "; ") else ""
     
+    # Extract date and week info
+    date_info <- extract_experiment_date_info(experiment$experiment_name)
+
     # Store results
     results_list[[i]] <- data.frame(
       Experiment = experiment$experiment_name,
+      Date = date_info$date,
+      Year_Week = date_info$year_week,
       Well = well,
       Sample = sample_name,
       Cell_line = cell_line,
