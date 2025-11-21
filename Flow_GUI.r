@@ -3820,8 +3820,11 @@ GATE_STRATEGY <- list(
       return(data.frame(Message = "No analyzed samples available. Please analyze experiments first."))
     }
 
-    # Show relevant columns
-    cols_to_show <- c("Experiment", "Sample", "Cell_line", "Gene",
+    # Show relevant columns (include Date and Year_Week if available)
+    cols_to_show <- c("Experiment")
+    if("Date" %in% names(analyzed)) cols_to_show <- c(cols_to_show, "Date")
+    if("Year_Week" %in% names(analyzed)) cols_to_show <- c(cols_to_show, "Year_Week")
+    cols_to_show <- c(cols_to_show, "Sample", "Cell_line", "Gene",
                       "Mutation", "Correlation")
 
     # Add HA_Pos_Pct if it exists
@@ -3847,6 +3850,35 @@ GATE_STRATEGY <- list(
       cols_to_show <- c(cols_to_show, "Notes")
     }
     display_data <- analyzed[, cols_to_show]
+
+    # Calculate cell line statistics (across all experiments and same-week)
+    if("Cell_line" %in% names(display_data) && "Year_Week" %in% names(display_data)) {
+      analyzed_numeric <- analyzed
+      analyzed_numeric$Correlation <- as.numeric(analyzed_numeric$Correlation)
+
+      # Calculate stats across all experiments for each cell line
+      all_stats <- analyzed_numeric %>%
+        group_by(Cell_line) %>%
+        summarise(
+          Avg_Corr_All = mean(Correlation, na.rm = TRUE),
+          Std_Corr_All = sd(Correlation, na.rm = TRUE),
+          .groups = "drop"
+        )
+
+      # Calculate stats for same week for each cell line + week combination
+      week_stats <- analyzed_numeric %>%
+        group_by(Cell_line, Year_Week) %>%
+        summarise(
+          Avg_Corr_Week = mean(Correlation, na.rm = TRUE),
+          Std_Corr_Week = sd(Correlation, na.rm = TRUE),
+          .groups = "drop"
+        )
+
+      # Merge stats back to display_data
+      display_data <- display_data %>%
+        left_join(all_stats, by = "Cell_line") %>%
+        left_join(week_stats, by = c("Cell_line", "Year_Week"))
+    }
 
     # Ensure columns are proper types for filtering
     display_data$Correlation <- as.numeric(display_data$Correlation)
@@ -3883,6 +3915,19 @@ GATE_STRATEGY <- list(
     }
     if("Strength_Ratio" %in% names(display_data)) {
       dt <- dt %>% formatRound('Strength_Ratio', digits = 4)
+    }
+    # Format statistics columns
+    if("Avg_Corr_All" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Avg_Corr_All', digits = 4)
+    }
+    if("Std_Corr_All" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Std_Corr_All', digits = 4)
+    }
+    if("Avg_Corr_Week" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Avg_Corr_Week', digits = 4)
+    }
+    if("Std_Corr_Week" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Std_Corr_Week', digits = 4)
     }
 
     dt
