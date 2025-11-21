@@ -1704,6 +1704,39 @@ server <- function(input, output, session) {
       display_data$Gate_ID <- as.character(display_data$Gate_ID)
     }
 
+    # Calculate summary statistics per Cell_line
+    if("Correlation" %in% names(rv$all_results) && "Cell_line" %in% names(rv$all_results)) {
+      # Get numeric correlations for summary
+      numeric_corr <- as.numeric(rv$all_results$Correlation)
+      valid_data <- rv$all_results[!is.na(numeric_corr), ]
+      valid_data$Correlation_num <- as.numeric(valid_data$Correlation)
+
+      if(nrow(valid_data) > 0) {
+        # Calculate stats per cell line
+        summary_stats <- valid_data %>%
+          group_by(Cell_line) %>%
+          summarize(
+            mean_corr = mean(Correlation_num, na.rm = TRUE),
+            sd_corr = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
+            n = n(),
+            .groups = 'drop'
+          )
+
+        # Create summary rows
+        for(i in seq_len(nrow(summary_stats))) {
+          avg_row <- display_data[1, ]
+          avg_row[] <- ""
+          avg_row$Cell_line <- summary_stats$Cell_line[i]
+          avg_row$Experiment <- paste0("** Average (n=", summary_stats$n[i], ") **")
+          avg_row$Correlation <- sprintf("%.4f", summary_stats$mean_corr[i])
+          if(!is.na(summary_stats$sd_corr[i])) {
+            avg_row$Notes <- paste0("SD: ", sprintf("%.4f", summary_stats$sd_corr[i]))
+          }
+          display_data <- bind_rows(display_data, avg_row)
+        }
+      }
+    }
+
     datatable(display_data,
               selection = 'single',  # Enable single row selection
               options = list(
