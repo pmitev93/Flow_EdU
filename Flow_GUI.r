@@ -1712,31 +1712,57 @@ server <- function(input, output, session) {
       valid_data$Correlation_num <- as.numeric(valid_data$Correlation)
 
       if(nrow(valid_data) > 0) {
-        # Calculate stats per cell line
-        summary_stats <- valid_data %>%
+        # Calculate stats per cell line (all experiments)
+        all_stats <- valid_data %>%
           group_by(Cell_line) %>%
           summarize(
-            mean_corr = mean(Correlation_num, na.rm = TRUE),
-            sd_corr = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
-            n = n(),
+            Avg_All = mean(Correlation_num, na.rm = TRUE),
+            SD_All = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
+            n_all = n(),
             .groups = 'drop'
           )
 
-        # Add Average and SD columns to display_data
-        display_data$Average <- ""
-        display_data$SD <- ""
+        # Calculate stats per cell line and week (same week experiments)
+        week_stats <- NULL
+        if("Year_Week" %in% names(valid_data)) {
+          week_stats <- valid_data %>%
+            group_by(Cell_line, Year_Week) %>%
+            summarize(
+              Avg_Week = mean(Correlation_num, na.rm = TRUE),
+              SD_Week = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
+              n_week = n(),
+              .groups = 'drop'
+            )
+        }
 
-        # Create summary rows
-        for(i in seq_len(nrow(summary_stats))) {
-          avg_row <- display_data[1, ]
-          avg_row[] <- ""
-          avg_row$Cell_line <- summary_stats$Cell_line[i]
-          avg_row$Experiment <- paste0("** Summary (n=", summary_stats$n[i], ") **")
-          avg_row$Average <- sprintf("%.4f", summary_stats$mean_corr[i])
-          if(!is.na(summary_stats$sd_corr[i])) {
-            avg_row$SD <- sprintf("%.4f", summary_stats$sd_corr[i])
+        # Add 4 columns to display_data
+        display_data$Avg_All <- ""
+        display_data$SD_All <- ""
+        display_data$Avg_Week <- ""
+        display_data$SD_Week <- ""
+
+        # Populate per-row stats
+        for(i in seq_len(nrow(display_data))) {
+          cell_line <- display_data$Cell_line[i]
+          # All experiments stats
+          cell_stats <- all_stats[all_stats$Cell_line == cell_line, ]
+          if(nrow(cell_stats) > 0) {
+            display_data$Avg_All[i] <- sprintf("%.4f", cell_stats$Avg_All[1])
+            if(!is.na(cell_stats$SD_All[1])) {
+              display_data$SD_All[i] <- sprintf("%.4f", cell_stats$SD_All[1])
+            }
           }
-          display_data <- bind_rows(display_data, avg_row)
+          # Same week stats
+          if(!is.null(week_stats) && "Year_Week" %in% names(display_data)) {
+            year_week <- display_data$Year_Week[i]
+            wk_stats <- week_stats[week_stats$Cell_line == cell_line & week_stats$Year_Week == year_week, ]
+            if(nrow(wk_stats) > 0) {
+              display_data$Avg_Week[i] <- sprintf("%.4f", wk_stats$Avg_Week[1])
+              if(!is.na(wk_stats$SD_Week[1])) {
+                display_data$SD_Week[i] <- sprintf("%.4f", wk_stats$SD_Week[1])
+              }
+            }
+          }
         }
       }
     }
@@ -3819,8 +3845,10 @@ GATE_STRATEGY <- list(
 
       # Create export data with summary statistics
       export_data <- rv$all_results
-      export_data$Average <- ""
-      export_data$SD <- ""
+      export_data$Avg_All <- ""
+      export_data$SD_All <- ""
+      export_data$Avg_Week <- ""
+      export_data$SD_Week <- ""
 
       # Calculate summary statistics per Cell_line
       if("Correlation" %in% names(rv$all_results) && "Cell_line" %in% names(rv$all_results)) {
@@ -3829,26 +3857,51 @@ GATE_STRATEGY <- list(
         valid_data$Correlation_num <- as.numeric(valid_data$Correlation)
 
         if(nrow(valid_data) > 0) {
-          summary_stats <- valid_data %>%
+          # Calculate stats per cell line (all experiments)
+          all_stats <- valid_data %>%
             group_by(Cell_line) %>%
             summarize(
-              mean_corr = mean(Correlation_num, na.rm = TRUE),
-              sd_corr = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
-              n = n(),
+              Avg_All = mean(Correlation_num, na.rm = TRUE),
+              SD_All = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
+              n_all = n(),
               .groups = 'drop'
             )
 
-          # Add summary rows
-          for(i in seq_len(nrow(summary_stats))) {
-            avg_row <- export_data[1, ]
-            avg_row[] <- ""
-            avg_row$Cell_line <- summary_stats$Cell_line[i]
-            avg_row$Experiment <- paste0("** Summary (n=", summary_stats$n[i], ") **")
-            avg_row$Average <- sprintf("%.4f", summary_stats$mean_corr[i])
-            if(!is.na(summary_stats$sd_corr[i])) {
-              avg_row$SD <- sprintf("%.4f", summary_stats$sd_corr[i])
+          # Calculate stats per cell line and week
+          week_stats <- NULL
+          if("Year_Week" %in% names(valid_data)) {
+            week_stats <- valid_data %>%
+              group_by(Cell_line, Year_Week) %>%
+              summarize(
+                Avg_Week = mean(Correlation_num, na.rm = TRUE),
+                SD_Week = ifelse(n() > 1, sd(Correlation_num, na.rm = TRUE), NA),
+                n_week = n(),
+                .groups = 'drop'
+              )
+          }
+
+          # Populate per-row stats
+          for(i in seq_len(nrow(export_data))) {
+            cell_line <- export_data$Cell_line[i]
+            # All experiments stats
+            cell_stats <- all_stats[all_stats$Cell_line == cell_line, ]
+            if(nrow(cell_stats) > 0) {
+              export_data$Avg_All[i] <- sprintf("%.4f", cell_stats$Avg_All[1])
+              if(!is.na(cell_stats$SD_All[1])) {
+                export_data$SD_All[i] <- sprintf("%.4f", cell_stats$SD_All[1])
+              }
             }
-            export_data <- bind_rows(export_data, avg_row)
+            # Same week stats
+            if(!is.null(week_stats) && "Year_Week" %in% names(export_data)) {
+              year_week <- export_data$Year_Week[i]
+              wk_stats <- week_stats[week_stats$Cell_line == cell_line & week_stats$Year_Week == year_week, ]
+              if(nrow(wk_stats) > 0) {
+                export_data$Avg_Week[i] <- sprintf("%.4f", wk_stats$Avg_Week[1])
+                if(!is.na(wk_stats$SD_Week[1])) {
+                  export_data$SD_Week[i] <- sprintf("%.4f", wk_stats$SD_Week[1])
+                }
+              }
+            }
           }
         }
       }
