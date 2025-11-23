@@ -180,6 +180,12 @@ ui <- fluidPage(
         tabPanel("Results Table",
                  h3("Correlation Results"),
                  fluidRow(
+                   column(12,
+                          h5("Gating Strategies"),
+                          uiOutput("results_gating_strategy_checkboxes")
+                   )
+                 ),
+                 fluidRow(
                    column(4, checkboxInput("show_dox_minus", "Show Dox- samples", value = FALSE)),
                    column(4, checkboxInput("show_unanalyzed", "Show unanalyzed samples", value = FALSE))
                  ),
@@ -440,6 +446,12 @@ ui <- fluidPage(
         tabPanel("Multi-Sample Comparison",
                  h3("Compare Multiple Samples"),
 
+                 fluidRow(
+                   column(12,
+                          h5("Gating Strategies"),
+                          uiOutput("msc_gating_strategy_checkboxes")
+                   )
+                 ),
                  fluidRow(
                    column(4, checkboxInput("msc_show_dox_minus", "Show Dox- samples", value = FALSE)),
                    column(4, checkboxInput("msc_show_unanalyzed", "Show unanalyzed samples", value = FALSE))
@@ -1664,7 +1676,34 @@ server <- function(input, output, session) {
                        type = "message", duration = 5)
     })
   })
-  
+
+  # Render dynamic gating strategy checkboxes for Results Table
+  output$results_gating_strategy_checkboxes <- renderUI({
+    req(rv$all_results)
+
+    # Get unique gating strategies from the data
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) == 0) {
+      return(p("No gating strategies available"))
+    }
+
+    # Create checkboxes for each strategy
+    checkboxes <- lapply(available_strategies, function(strategy) {
+      checkboxInput(
+        inputId = paste0("results_gate_", strategy),
+        label = strategy,
+        value = TRUE  # All selected by default
+      )
+    })
+
+    # Arrange in columns
+    do.call(fluidRow, lapply(1:length(checkboxes), function(i) {
+      column(3, checkboxes[[i]])
+    }))
+  })
+
   # Display results table with row selection
   output$results_table <- renderDT({
     req(rv$all_results)
@@ -1674,6 +1713,29 @@ server <- function(input, output, session) {
 
     # Start with all results
     display_data <- rv$all_results
+
+    # Filter by selected gating strategies
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("results_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
+        }
+      }
+
+      # Only keep rows with selected gating strategies
+      if(length(selected_strategies) > 0) {
+        display_data <- display_data[!is.na(display_data$Gate_ID) &
+                                     display_data$Gate_ID %in% selected_strategies, ]
+      } else {
+        # No strategies selected, show nothing
+        display_data <- display_data[0, ]
+      }
+    }
 
     # Filter out Dox- samples unless checkbox is checked
     if(!isTRUE(input$show_dox_minus)) {
@@ -3938,10 +4000,37 @@ GATE_STRATEGY <- list(
   )
   
   # Multi-sample comparison
-  
+
   # Create reactive value to store selected samples for comparison
   rv$comparison_samples <- reactiveVal(data.frame())
-  
+
+  # Render dynamic gating strategy checkboxes for MSC Table
+  output$msc_gating_strategy_checkboxes <- renderUI({
+    req(rv$all_results)
+
+    # Get unique gating strategies from the data
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) == 0) {
+      return(p("No gating strategies available"))
+    }
+
+    # Create checkboxes for each strategy
+    checkboxes <- lapply(available_strategies, function(strategy) {
+      checkboxInput(
+        inputId = paste0("msc_gate_", strategy),
+        label = strategy,
+        value = TRUE  # All selected by default
+      )
+    })
+
+    # Arrange in columns
+    do.call(fluidRow, lapply(1:length(checkboxes), function(i) {
+      column(3, checkboxes[[i]])
+    }))
+  })
+
   # Display sample selector table (only analyzed samples)
   output$comparison_sample_selector <- renderDT({
     req(rv$all_results)
@@ -3968,6 +4057,29 @@ GATE_STRATEGY <- list(
 
     # Start with all results
     analyzed <- rv$all_results
+
+    # Filter by selected gating strategies
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("msc_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
+        }
+      }
+
+      # Only keep rows with selected gating strategies
+      if(length(selected_strategies) > 0) {
+        analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
+                            analyzed$Gate_ID %in% selected_strategies, ]
+      } else {
+        # No strategies selected, show nothing
+        analyzed <- analyzed[0, ]
+      }
+    }
 
     # Filter out Dox- samples unless checkbox is checked
     if(!isTRUE(input$msc_show_dox_minus)) {
@@ -4103,36 +4215,63 @@ GATE_STRATEGY <- list(
   # Store previous selection to detect additions vs removals
   rv$prev_selected_rows <- reactiveVal(integer(0))
   
-  # Auto-select samples from same cell line (but allow deselection)
+  # Auto-select samples from same cell line AND gating strategy (but allow deselection)
   observeEvent(input$comparison_sample_selector_rows_selected, {
     req(rv$all_results)
 
+    # Apply the same filtering as the table display
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    # Filter by selected gating strategies
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("msc_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
+        }
+      }
+
+      # Only keep rows with selected gating strategies
+      if(length(selected_strategies) > 0) {
+        analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
+                            analyzed$Gate_ID %in% selected_strategies, ]
+      } else {
+        # No strategies selected, show nothing
+        analyzed <- analyzed[0, ]
+      }
+    }
+
     selected_rows <- input$comparison_sample_selector_rows_selected
     prev_rows <- rv$prev_selected_rows()
-    
+
     if(length(selected_rows) == 0) {
       rv$prev_selected_rows(integer(0))
       return()
     }
-    
+
     # Determine if user is adding or removing selections
     newly_added <- setdiff(selected_rows, prev_rows)
-    
+
     # Only auto-select if rows were added (not removed)
     if(length(newly_added) > 0) {
-      # Get cell lines of newly added samples
+      # Get cell lines and gating strategies of newly added samples
       new_cell_lines <- unique(analyzed$Cell_line[newly_added])
-      
-      # Find all rows with matching cell lines
-      matching_rows <- which(analyzed$Cell_line %in% new_cell_lines)
-      
+      new_gate_ids <- unique(analyzed$Gate_ID[newly_added])
+
+      # Find all rows with matching cell lines AND gating strategies
+      matching_rows <- which(analyzed$Cell_line %in% new_cell_lines &
+                            analyzed$Gate_ID %in% new_gate_ids)
+
       # Combine with existing selection
       all_selected <- unique(c(selected_rows, matching_rows))
-      
+
       # Update selection if different
       if(!identical(sort(all_selected), sort(selected_rows))) {
-        dataTableProxy('comparison_sample_selector') %>% 
+        dataTableProxy('comparison_sample_selector') %>%
           selectRows(all_selected)
         rv$prev_selected_rows(all_selected)
       } else {
