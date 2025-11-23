@@ -1318,6 +1318,7 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
     return(invisible(list(
       sample_name = sample_name,
       correlation = NA,
+      slope = NA,
       n_cells = length(ha_final),
       ha_log = numeric(0),
       edu_log = numeric(0)
@@ -1334,6 +1335,7 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   # Calculate linear regression for trend line
   lm_fit <- lm(edu_log ~ ha_log)
   r_squared <- summary(lm_fit)$r.squared
+  slope <- coef(lm_fit)[2]  # Extract slope coefficient
 
   # Plot
   dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
@@ -1419,6 +1421,9 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   # Add R² in top left
   text(2.15, 6.85, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 4)
 
+  # Add slope in top left below R²
+  text(2.15, 6.65, sprintf("Slope = %.3f", slope), col = "black", cex = 0.9, font = 2, pos = 4)
+
   # Add correlation info at bottom right (keep for single plots)
   legend("bottomright",
          legend = c(sprintf("Pearson r = %.3f", correlation),
@@ -1430,6 +1435,7 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   invisible(list(
     sample_name = sample_name,
     correlation = correlation,
+    slope = slope,
     n_cells = length(ha_log),
     ha_log = ha_log,
     edu_log = edu_log
@@ -1625,14 +1631,18 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
     ha_final <- exprs(fcs_data)[, channels$HA]
     edu_final <- exprs(fcs_data)[, channels$EdU]
     
-    # Calculate correlation
+    # Calculate correlation and slope
     if(length(ha_final) > 10) {
       ha_log <- log10(ha_final + 1)
       edu_log <- log10(edu_final + 1)
       correlation <- cor(ha_log, edu_log, use = "complete.obs")
+      # Calculate linear regression slope
+      lm_fit <- lm(edu_log ~ ha_log)
+      slope <- coef(lm_fit)[2]
       n_cells <- length(ha_final)
     } else {
       correlation <- NA
+      slope <- NA
       n_cells <- length(ha_final)
     }
     
@@ -1667,6 +1677,7 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
       Gene = gene,
       Mutation = mutation,
       Correlation = correlation,
+      Slope = slope,
       HA_Pos_Pct = ha_pos_pct,
       N_cells = n_cells,
       Notes = notes,

@@ -281,17 +281,22 @@ calculate_edu_ha_correlation <- function(fcs_data, edu_channel, ha_channel) {
   # Extract values
   edu_values <- exprs(fcs_data)[, edu_channel]
   ha_values <- exprs(fcs_data)[, ha_channel]
-  
+
   # Apply log10 transformation
   edu_log <- log10(edu_values + 1)
   ha_log <- log10(ha_values + 1)
-  
+
   # Calculate Pearson correlation
   correlation <- cor(ha_log, edu_log, use = "complete.obs")
-  
+
+  # Calculate linear regression slope
+  lm_fit <- lm(edu_log ~ ha_log)
+  slope <- coef(lm_fit)[2]  # Extract slope coefficient
+
   # Also return the data for plotting
   return(list(
     correlation = correlation,
+    slope = slope,
     n_cells = length(edu_values),
     ha_log = ha_log,
     edu_log = edu_log
@@ -394,13 +399,15 @@ process_single_sample <- function(fcs_data, sample_name, ha_threshold, gates = G
     cat("  Calculating correlation...")
     corr_result <- calculate_edu_ha_correlation(current_data, channels$EdU, channels$HA)
     results$correlation <- corr_result$correlation
+    results$slope <- corr_result$slope
     results$correlation_n_cells <- corr_result$n_cells
     results$final_data <- current_data
     results$correlation_data <- list(ha_log = corr_result$ha_log, edu_log = corr_result$edu_log)
-    cat(sprintf(" r = %.4f\n", corr_result$correlation))
+    cat(sprintf(" r = %.4f, slope = %.4f\n", corr_result$correlation, corr_result$slope))
   } else {
     warning("Too few cells for correlation")
     results$correlation <- NA
+    results$slope <- NA
     results$correlation_n_cells <- 0
   }
   
