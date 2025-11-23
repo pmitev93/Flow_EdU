@@ -1169,6 +1169,14 @@ server <- function(input, output, session) {
                     rv$all_results$Notes[match_idx] <- cache_data$results$Notes[j]
                     rv$all_results$Gate_ID[match_idx] <- gate_id
 
+                    # Update Slope if it exists in cached results
+                    if("Slope" %in% names(cache_data$results)) {
+                      if(!"Slope" %in% names(rv$all_results)) {
+                        rv$all_results$Slope <- NA_real_
+                      }
+                      rv$all_results$Slope[match_idx] <- cache_data$results$Slope[j]
+                    }
+
                     # Update Strength_Ratio if it exists in cached results
                     if("Strength_Ratio" %in% names(cache_data$results)) {
                       if(!"Strength_Ratio" %in% names(rv$all_results)) {
@@ -1190,6 +1198,11 @@ server <- function(input, output, session) {
                     # This is a second/third gate strategy for same well - add new row
                     new_row <- cache_data$results[j, ]
                     new_row$Gate_ID <- gate_id
+
+                    # Ensure Slope column exists before binding
+                    if("Slope" %in% names(cache_data$results) && !"Slope" %in% names(rv$all_results)) {
+                      rv$all_results$Slope <- NA_real_
+                    }
 
                     # Ensure Strength_Ratio column exists before binding
                     if("Strength_Ratio" %in% names(cache_data$results) && !"Strength_Ratio" %in% names(rv$all_results)) {
@@ -1630,6 +1643,14 @@ server <- function(input, output, session) {
           rv$all_results$Notes[match_idx] <- new_results$Notes[i]
           rv$all_results$Gate_ID[match_idx] <- new_results$Gate_ID[i]
 
+          # Update Slope column if it exists in new_results
+          if("Slope" %in% names(new_results)) {
+            if(!"Slope" %in% names(rv$all_results)) {
+              rv$all_results$Slope <- NA_real_
+            }
+            rv$all_results$Slope[match_idx] <- new_results$Slope[i]
+          }
+
           # Update Strength_Ratio column if it exists in new_results
           if("Strength_Ratio" %in% names(new_results)) {
             if(!"Strength_Ratio" %in% names(rv$all_results)) {
@@ -1647,6 +1668,11 @@ server <- function(input, output, session) {
           }
         } else {
           # This is a second/third gate strategy for same well - add new row
+          # Ensure Slope column exists in rv$all_results before binding
+          if("Slope" %in% names(new_results) && !"Slope" %in% names(rv$all_results)) {
+            rv$all_results$Slope <- NA_real_
+          }
+
           # Ensure Strength_Ratio column exists in rv$all_results before binding
           if("Strength_Ratio" %in% names(new_results) && !"Strength_Ratio" %in% names(rv$all_results)) {
             rv$all_results$Strength_Ratio <- NA_real_
@@ -1736,6 +1762,15 @@ server <- function(input, output, session) {
         is.na(display_data$Correlation) | display_data$Correlation == "Not analyzed",
         "Not analyzed",
         sprintf("%.4f", as.numeric(display_data$Correlation))
+      )
+    }
+
+    # Format slope to 4 decimal places
+    if("Slope" %in% names(display_data)) {
+      display_data$Slope <- ifelse(
+        is.na(display_data$Slope) | display_data$Slope == "Not analyzed",
+        "Not analyzed",
+        sprintf("%.4f", as.numeric(display_data$Slope))
       )
     }
 
@@ -4019,6 +4054,14 @@ GATE_STRATEGY <- list(
     cols_to_show <- c(cols_to_show, "Sample", "Cell_line", "Gene",
                       "Mutation", "Correlation")
 
+    # Add Slope if it exists
+    if("Slope" %in% names(analyzed)) {
+      cols_to_show <- c(cols_to_show, "Slope")
+      cat(sprintf("Slope column exists - non-NA values: %d\n", sum(!is.na(analyzed$Slope))))
+    } else {
+      cat("Slope column does NOT exist in analyzed\n")
+    }
+
     # Add HA_Pos_Pct if it exists
     if("HA_Pos_Pct" %in% names(analyzed)) {
       cols_to_show <- c(cols_to_show, "HA_Pos_Pct")
@@ -4081,6 +4124,9 @@ GATE_STRATEGY <- list(
     }
 
     # Ensure numeric columns are numeric (not character)
+    if("Slope" %in% names(display_data)) {
+      display_data$Slope <- as.numeric(display_data$Slope)
+    }
     if("HA_Pos_Pct" %in% names(display_data)) {
       display_data$HA_Pos_Pct <- as.numeric(display_data$HA_Pos_Pct)
       # Convert from 0-100 range to 0-1 range for formatPercentage
@@ -4102,6 +4148,9 @@ GATE_STRATEGY <- list(
       formatRound('Correlation', digits = 4)
 
     # Add formatting for optional columns
+    if("Slope" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Slope', digits = 4)
+    }
     if("HA_Pos_Pct" %in% names(display_data)) {
       dt <- dt %>% formatPercentage('HA_Pos_Pct', digits = 2)
     }
@@ -4809,7 +4858,8 @@ GATE_STRATEGY <- list(
         output_df[[col_name]] <- values
       }
 
-      # Create separate dataframes for HA_Pos_Pct and Strength_Ratio
+      # Create separate dataframes for Slope, HA_Pos_Pct and Strength_Ratio
+      slope_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
       ha_pos_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
       strength_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
 
@@ -4820,7 +4870,19 @@ GATE_STRATEGY <- list(
 
         cell_data <- plot_data %>%
           filter(Cell_line == cell_line) %>%
-          select(Experiment, HA_Pos_Pct, Strength_Ratio)
+          select(Experiment, Slope, HA_Pos_Pct, Strength_Ratio)
+
+        # Slope values
+        slope_values <- sapply(unique_experiments, function(exp) {
+          match_idx <- which(cell_data$Experiment == exp)
+          if(length(match_idx) > 0) {
+            slope <- as.numeric(cell_data$Slope[match_idx[1]])
+            if(!is.na(slope)) {
+              return(round(slope, 4))
+            }
+          }
+          return(NA_real_)
+        })
 
         # HA_Pos_Pct values
         ha_values <- sapply(unique_experiments, function(exp) {
@@ -4846,6 +4908,7 @@ GATE_STRATEGY <- list(
           return(NA_real_)
         })
 
+        slope_df[[col_name]] <- slope_values
         ha_pos_df[[col_name]] <- ha_values
         strength_df[[col_name]] <- strength_values
       }
@@ -4857,21 +4920,23 @@ GATE_STRATEGY <- list(
           return("")
         }
       })
-      
+
       output_df$Low_Cell_Warning <- warnings_col
-      
+
       if(!require("writexl", quietly = TRUE)) {
         install.packages("writexl", repos = "http://cran.r-project.org")
         library(writexl)
       }
-      
+
       # Add warnings to other sheets
+      slope_df$Low_Cell_Warning <- warnings_col
       ha_pos_df$Low_Cell_Warning <- warnings_col
       strength_df$Low_Cell_Warning <- warnings_col
 
       notes_df <- data.frame(
-        Note = c("Three sheets: Correlation, HA_Pos_Pct, and Strength_Ratio",
+        Note = c("Four sheets: Correlation, Slope, HA_Pos_Pct, and Strength_Ratio",
                  "Correlation values: 4 decimal places",
+                 "Slope values: 4 decimal places",
                  "HA_Pos_Pct values: percentage (2 decimal places)",
                  "Strength_Ratio values: 4 decimal places",
                  "Each row = one experiment, each column = one cell line",
@@ -4882,6 +4947,7 @@ GATE_STRATEGY <- list(
 
       write_xlsx(list(
         "Correlation" = output_df,
+        "Slope" = slope_df,
         "HA_Pos_Pct" = ha_pos_df,
         "Strength_Ratio" = strength_df,
         "Notes" = notes_df
