@@ -66,6 +66,7 @@ quick_scan_experiment <- function(experiment_path) {
   # Add placeholders
   metadata$experiment <- experiment_name
   metadata$correlation <- "Not analyzed"
+  metadata$slope <- NA_real_
   metadata$ha_pos_pct <- NA_real_
   metadata$n_cells <- "Not analyzed"
   metadata$strength_ratio <- NA_real_
@@ -78,11 +79,11 @@ quick_scan_experiment <- function(experiment_path) {
 
   # Reorder columns
   metadata <- metadata[, c("experiment", "date", "year_week", "well", "sample_name", "cell_line",
-                           "gene", "mutation", "correlation", "ha_pos_pct", "n_cells", "strength_ratio", "notes")]
+                           "gene", "mutation", "correlation", "slope", "ha_pos_pct", "n_cells", "strength_ratio", "notes")]
 
   # Capitalize column names
   colnames(metadata) <- c("Experiment", "Date", "Year_Week", "Well", "Sample", "Cell_line",
-                          "Gene", "Mutation", "Correlation", "HA_Pos_Pct", "N_cells", "Strength_Ratio", "Notes")
+                          "Gene", "Mutation", "Correlation", "Slope", "HA_Pos_Pct", "N_cells", "Strength_Ratio", "Notes")
   
   return(metadata)
 }
@@ -1503,6 +1504,7 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
       correlation <- cor(ha_log, edu_log, use = "complete.obs")
       lm_fit <- lm(edu_log ~ ha_log)
       r_squared <- summary(lm_fit)$r.squared
+      slope <- coef(lm_fit)[2]  # Extract slope coefficient
 
       dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 
@@ -1526,6 +1528,9 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
 
       # Add R² in top left
       text(2.15, 6.8, sprintf("R²=%.3f", r_squared), col = "black", cex = 0.7, font = 2, pos = 4)
+
+      # Add Slope below R²
+      text(2.15, 6.6, sprintf("Slope=%.3f", slope), col = "black", cex = 0.7, font = 2, pos = 4)
       
       # Flag if low cell count or extreme correlation
       is_empty_vector <- grepl("Empty_Vector", sample_name, ignore.case = TRUE)
@@ -1813,6 +1818,11 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
         NA_real_
       }
 
+      # Calculate correlation and slope
+      correlation <- cor(ha_log, edu_log, use = "complete.obs")
+      lm_fit <- lm(edu_log ~ ha_log)
+      slope <- coef(lm_fit)[2]
+
       # Calculate density colors
       dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 
@@ -1854,6 +1864,12 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
       text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.6, font = 2)
       text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.6, font = 2)
       text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.6, font = 2)
+
+      # Display correlation and slope (only for Dox+ samples)
+      if(!is_dox_minus) {
+        text(4.25, 6.7, sprintf("r=%.3f", correlation), col = "black", cex = 0.6, font = 2)
+        text(4.25, 6.5, sprintf("Slope=%.3f", slope), col = "black", cex = 0.6, font = 2)
+      }
 
     }, error = function(e) {
       plot.new()
