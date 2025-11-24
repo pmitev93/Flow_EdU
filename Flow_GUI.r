@@ -1891,6 +1891,69 @@ server <- function(input, output, session) {
       }
     }
 
+    # Calculate slope summary statistics per Cell_line
+    if("Slope" %in% names(rv$all_results) && "Cell_line" %in% names(rv$all_results)) {
+      # Get numeric slopes for summary
+      numeric_slope <- as.numeric(rv$all_results$Slope)
+      valid_slope_data <- rv$all_results[!is.na(numeric_slope), ]
+      valid_slope_data$Slope_num <- as.numeric(valid_slope_data$Slope)
+
+      if(nrow(valid_slope_data) > 0) {
+        # Calculate stats per cell line (all experiments)
+        slope_all_stats <- valid_slope_data %>%
+          group_by(Cell_line) %>%
+          summarize(
+            Avg_Slope_All = mean(Slope_num, na.rm = TRUE),
+            SD_Slope_All = ifelse(n() > 1, sd(Slope_num, na.rm = TRUE), NA),
+            n_slope_all = n(),
+            .groups = 'drop'
+          )
+
+        # Calculate stats per cell line and week (same week experiments)
+        slope_week_stats <- NULL
+        if("Year_Week" %in% names(valid_slope_data)) {
+          slope_week_stats <- valid_slope_data %>%
+            group_by(Cell_line, Year_Week) %>%
+            summarize(
+              Avg_Slope_Week = mean(Slope_num, na.rm = TRUE),
+              SD_Slope_Week = ifelse(n() > 1, sd(Slope_num, na.rm = TRUE), NA),
+              n_slope_week = n(),
+              .groups = 'drop'
+            )
+        }
+
+        # Add 4 columns to display_data
+        display_data$Avg_Slope_All <- ""
+        display_data$SD_Slope_All <- ""
+        display_data$Avg_Slope_Week <- ""
+        display_data$SD_Slope_Week <- ""
+
+        # Populate per-row stats
+        for(i in seq_len(nrow(display_data))) {
+          cell_line <- display_data$Cell_line[i]
+          # All experiments stats
+          cell_slope_stats <- slope_all_stats[slope_all_stats$Cell_line == cell_line, ]
+          if(nrow(cell_slope_stats) > 0) {
+            display_data$Avg_Slope_All[i] <- sprintf("%.4f", cell_slope_stats$Avg_Slope_All[1])
+            if(!is.na(cell_slope_stats$SD_Slope_All[1])) {
+              display_data$SD_Slope_All[i] <- sprintf("%.4f", cell_slope_stats$SD_Slope_All[1])
+            }
+          }
+          # Same week stats
+          if(!is.null(slope_week_stats) && "Year_Week" %in% names(display_data)) {
+            year_week <- display_data$Year_Week[i]
+            slope_wk_stats <- slope_week_stats[slope_week_stats$Cell_line == cell_line & slope_week_stats$Year_Week == year_week, ]
+            if(nrow(slope_wk_stats) > 0) {
+              display_data$Avg_Slope_Week[i] <- sprintf("%.4f", slope_wk_stats$Avg_Slope_Week[1])
+              if(!is.na(slope_wk_stats$SD_Slope_Week[1])) {
+                display_data$SD_Slope_Week[i] <- sprintf("%.4f", slope_wk_stats$SD_Slope_Week[1])
+              }
+            }
+          }
+        }
+      }
+    }
+
     datatable(display_data,
               selection = 'single',  # Enable single row selection
               options = list(
@@ -3973,6 +4036,10 @@ GATE_STRATEGY <- list(
       export_data$SD_All <- ""
       export_data$Avg_Week <- ""
       export_data$SD_Week <- ""
+      export_data$Avg_Slope_All <- ""
+      export_data$SD_Slope_All <- ""
+      export_data$Avg_Slope_Week <- ""
+      export_data$SD_Slope_Week <- ""
 
       # Calculate summary statistics per Cell_line
       if("Correlation" %in% names(rv$all_results) && "Cell_line" %in% names(rv$all_results)) {
@@ -4023,6 +4090,62 @@ GATE_STRATEGY <- list(
                 export_data$Avg_Week[i] <- sprintf("%.4f", wk_stats$Avg_Week[1])
                 if(!is.na(wk_stats$SD_Week[1])) {
                   export_data$SD_Week[i] <- sprintf("%.4f", wk_stats$SD_Week[1])
+                }
+              }
+            }
+          }
+        }
+      }
+
+      # Calculate slope summary statistics per Cell_line
+      if("Slope" %in% names(rv$all_results) && "Cell_line" %in% names(rv$all_results)) {
+        numeric_slope <- as.numeric(rv$all_results$Slope)
+        valid_slope_data <- rv$all_results[!is.na(numeric_slope), ]
+        valid_slope_data$Slope_num <- as.numeric(valid_slope_data$Slope)
+
+        if(nrow(valid_slope_data) > 0) {
+          # Calculate stats per cell line (all experiments)
+          slope_all_stats <- valid_slope_data %>%
+            group_by(Cell_line) %>%
+            summarize(
+              Avg_Slope_All = mean(Slope_num, na.rm = TRUE),
+              SD_Slope_All = ifelse(n() > 1, sd(Slope_num, na.rm = TRUE), NA),
+              n_slope_all = n(),
+              .groups = 'drop'
+            )
+
+          # Calculate stats per cell line and week
+          slope_week_stats <- NULL
+          if("Year_Week" %in% names(valid_slope_data)) {
+            slope_week_stats <- valid_slope_data %>%
+              group_by(Cell_line, Year_Week) %>%
+              summarize(
+                Avg_Slope_Week = mean(Slope_num, na.rm = TRUE),
+                SD_Slope_Week = ifelse(n() > 1, sd(Slope_num, na.rm = TRUE), NA),
+                n_slope_week = n(),
+                .groups = 'drop'
+              )
+          }
+
+          # Populate per-row stats
+          for(i in seq_len(nrow(export_data))) {
+            cell_line <- export_data$Cell_line[i]
+            # All experiments stats
+            cell_slope_stats <- slope_all_stats[slope_all_stats$Cell_line == cell_line, ]
+            if(nrow(cell_slope_stats) > 0) {
+              export_data$Avg_Slope_All[i] <- sprintf("%.4f", cell_slope_stats$Avg_Slope_All[1])
+              if(!is.na(cell_slope_stats$SD_Slope_All[1])) {
+                export_data$SD_Slope_All[i] <- sprintf("%.4f", cell_slope_stats$SD_Slope_All[1])
+              }
+            }
+            # Same week stats
+            if(!is.null(slope_week_stats) && "Year_Week" %in% names(export_data)) {
+              year_week <- export_data$Year_Week[i]
+              slope_wk_stats <- slope_week_stats[slope_week_stats$Cell_line == cell_line & slope_week_stats$Year_Week == year_week, ]
+              if(nrow(slope_wk_stats) > 0) {
+                export_data$Avg_Slope_Week[i] <- sprintf("%.4f", slope_wk_stats$Avg_Slope_Week[1])
+                if(!is.na(slope_wk_stats$SD_Slope_Week[1])) {
+                  export_data$SD_Slope_Week[i] <- sprintf("%.4f", slope_wk_stats$SD_Slope_Week[1])
                 }
               }
             }
@@ -4202,6 +4325,40 @@ GATE_STRATEGY <- list(
         left_join(week_stats, by = c("Cell_line", "Year_Week"))
     }
 
+    # Calculate slope statistics (across all experiments and same-week)
+    if("Slope" %in% names(analyzed) && "Cell_line" %in% names(display_data) && "Year_Week" %in% names(display_data)) {
+      analyzed_slope <- analyzed
+      analyzed_slope$Slope <- as.numeric(analyzed_slope$Slope)
+
+      # Remove NA slopes for statistics
+      analyzed_slope_valid <- analyzed_slope[!is.na(analyzed_slope$Slope), ]
+
+      if(nrow(analyzed_slope_valid) > 0) {
+        # Calculate stats across all experiments for each cell line
+        slope_all_stats <- analyzed_slope_valid %>%
+          group_by(Cell_line) %>%
+          summarise(
+            Avg_Slope_All = mean(Slope, na.rm = TRUE),
+            Std_Slope_All = sd(Slope, na.rm = TRUE),
+            .groups = "drop"
+          )
+
+        # Calculate stats for same week for each cell line + week combination
+        slope_week_stats <- analyzed_slope_valid %>%
+          group_by(Cell_line, Year_Week) %>%
+          summarise(
+            Avg_Slope_Week = mean(Slope, na.rm = TRUE),
+            Std_Slope_Week = sd(Slope, na.rm = TRUE),
+            .groups = "drop"
+          )
+
+        # Merge slope stats back to display_data
+        display_data <- display_data %>%
+          left_join(slope_all_stats, by = "Cell_line") %>%
+          left_join(slope_week_stats, by = c("Cell_line", "Year_Week"))
+      }
+    }
+
     # Ensure columns are proper types for filtering
     display_data$Correlation <- as.numeric(display_data$Correlation)
     display_data$Gate_ID <- as.character(display_data$Gate_ID)
@@ -4256,6 +4413,19 @@ GATE_STRATEGY <- list(
     }
     if("Std_Corr_Week" %in% names(display_data)) {
       dt <- dt %>% formatRound('Std_Corr_Week', digits = 4)
+    }
+    # Format slope statistics columns
+    if("Avg_Slope_All" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Avg_Slope_All', digits = 4)
+    }
+    if("Std_Slope_All" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Std_Slope_All', digits = 4)
+    }
+    if("Avg_Slope_Week" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Avg_Slope_Week', digits = 4)
+    }
+    if("Std_Slope_Week" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Std_Slope_Week', digits = 4)
     }
 
     dt
