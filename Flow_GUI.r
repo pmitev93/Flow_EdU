@@ -136,16 +136,9 @@ ui <- fluidPage(
       actionButton("analyze_selected", "Analyze Selected Experiments",
                    class = "btn-success btn-block"),
       hr(),
-      
-      # Sample browser
-      h4("3. Browse Samples"),
-      selectInput("selected_experiment", "Experiment:", choices = NULL),
-      selectInput("browse_gate_strategy", "Gating Strategy:", choices = NULL),
-      selectInput("selected_sample", "Sample:", choices = NULL),
-      hr(),
-      
+
       # Download
-      h4("4. Download Results"),
+      h4("3. Download Results"),
       downloadButton("download_results", "Download Excel")
     ),
     
@@ -369,6 +362,11 @@ ui <- fluidPage(
         # Gate inspection tabs
         tabPanel("Gate 1: Debris",
                  fluidRow(
+                   column(4, selectInput("gate1_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate1_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate1_sample", "Sample:", choices = NULL))
+                 ),
+                 fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
                    column(2, actionButton("gate1_next", "Next", class = "btn-sm", style = "float: right;"))
@@ -377,6 +375,11 @@ ui <- fluidPage(
         ),
         
         tabPanel("Gate 2: Singlets",
+                 fluidRow(
+                   column(4, selectInput("gate2_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate2_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate2_sample", "Sample:", choices = NULL))
+                 ),
                  fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
@@ -387,6 +390,11 @@ ui <- fluidPage(
         
         tabPanel("Gate 3: Live Cells",
                  fluidRow(
+                   column(4, selectInput("gate3_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate3_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate3_sample", "Sample:", choices = NULL))
+                 ),
+                 fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
                    column(2, actionButton("gate1_next", "Next", class = "btn-sm", style = "float: right;"))
@@ -395,6 +403,11 @@ ui <- fluidPage(
         ),
         
         tabPanel("Gate 4: S-phase Outliers",
+                 fluidRow(
+                   column(4, selectInput("gate4_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate4_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate4_sample", "Sample:", choices = NULL))
+                 ),
                  fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
@@ -405,6 +418,11 @@ ui <- fluidPage(
         
         tabPanel("Gate 5: FxCycle Quantile",
                  fluidRow(
+                   column(4, selectInput("gate5_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate5_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate5_sample", "Sample:", choices = NULL))
+                 ),
+                 fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
                    column(2, actionButton("gate1_next", "Next", class = "btn-sm", style = "float: right;"))
@@ -413,6 +431,11 @@ ui <- fluidPage(
         ),
         
         tabPanel("Gate 6: EdU + FxCycle",
+                 fluidRow(
+                   column(4, selectInput("gate6_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate6_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate6_sample", "Sample:", choices = NULL))
+                 ),
                  fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
@@ -423,6 +446,11 @@ ui <- fluidPage(
         
         tabPanel("Gate 7: HA-Positive",
                  fluidRow(
+                   column(4, selectInput("gate7_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("gate7_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("gate7_sample", "Sample:", choices = NULL))
+                 ),
+                 fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
                    column(2, actionButton("gate1_next", "Next", class = "btn-sm", style = "float: right;"))
@@ -431,6 +459,11 @@ ui <- fluidPage(
         ),
         
         tabPanel("Final: Correlation",
+                 fluidRow(
+                   column(4, selectInput("correlation_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("correlation_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("correlation_sample", "Sample:", choices = NULL))
+                 ),
                  fluidRow(
                    column(2, actionButton("gate1_prev", "Previous", class = "btn-sm")),
                    column(8, h4(textOutput("current_sample_name"), align = "center")),
@@ -1282,10 +1315,17 @@ server <- function(input, output, session) {
           showNotification(sprintf("Auto-loaded %d cached analyses", n_loaded),
                            type = "message", duration = 5)
 
-          # Update Browse Samples dropdown with loaded experiments
+          # Update gate tab experiment dropdowns with loaded experiments
           if(!is.null(rv$experiments) && length(rv$experiments) > 0) {
-            updateSelectInput(session, "selected_experiment",
-                              choices = names(rv$experiments))
+            exp_choices <- names(rv$experiments)
+            updateSelectInput(session, "gate1_experiment", choices = exp_choices)
+            updateSelectInput(session, "gate2_experiment", choices = exp_choices)
+            updateSelectInput(session, "gate3_experiment", choices = exp_choices)
+            updateSelectInput(session, "gate4_experiment", choices = exp_choices)
+            updateSelectInput(session, "gate5_experiment", choices = exp_choices)
+            updateSelectInput(session, "gate6_experiment", choices = exp_choices)
+            updateSelectInput(session, "gate7_experiment", choices = exp_choices)
+            updateSelectInput(session, "correlation_experiment", choices = exp_choices)
           }
         }
       })
@@ -1359,69 +1399,82 @@ server <- function(input, output, session) {
     })
   })
 
-  # Update sample selector when experiment changes
-  observeEvent(input$selected_experiment, {
-    req(input$selected_experiment)
-    
-    # Auto-load experiment if not already loaded
-    if(is.null(rv$experiments[[input$selected_experiment]])) {
-      req(rv$experiment_folders)
-      
-      exp_name <- input$selected_experiment
-      exp_folder <- rv$experiment_folders[[exp_name]]
-      
-      if(!is.null(exp_folder)) {
-        withProgress(message = paste('Loading', exp_name), value = 0.5, {
-          if(is.null(rv$experiments)) {
-            rv$experiments <- list()
-          }
-          rv$experiments[[exp_name]] <- load_experiment(exp_folder)
-          
-          showNotification(sprintf("Loaded %s for browsing", exp_name), 
-                           type = "message", duration = 2)
-        })
+  # Update sample selector when experiment changes for each gate tab
+  # Helper function to update gate tab selectors
+  update_gate_selectors <- function(gate_prefix, exp_input, strategy_input, sample_input) {
+    observeEvent(input[[exp_input]], {
+      req(input[[exp_input]])
+
+      # Auto-load experiment if not already loaded
+      if(is.null(rv$experiments[[input[[exp_input]]]])) {
+        req(rv$experiment_folders)
+
+        exp_name <- input[[exp_input]]
+        exp_folder <- rv$experiment_folders[[exp_name]]
+
+        if(!is.null(exp_folder)) {
+          withProgress(message = paste('Loading', exp_name), value = 0.5, {
+            if(is.null(rv$experiments)) {
+              rv$experiments <- list()
+            }
+            rv$experiments[[exp_name]] <- load_experiment(exp_folder)
+
+            showNotification(sprintf("Loaded %s for browsing", exp_name),
+                             type = "message", duration = 2)
+          })
+        }
       }
-    }
-    
-    req(rv$experiments[[input$selected_experiment]])
-    
-    exp <- rv$experiments[[input$selected_experiment]]
-    samples <- exp$metadata$sample_name
 
-    updateSelectInput(session, "selected_sample",
-                      choices = setNames(seq_along(samples), samples))
+      req(rv$experiments[[input[[exp_input]]]])
 
-    # Update gating strategy dropdown with available strategies for this experiment
-    exp_name <- input$selected_experiment
-    available_gates <- rv$experiment_available_gates[[exp_name]]
-    if(is.null(available_gates) || length(available_gates) == 0) {
-      available_gates <- "gdef"  # Default if none available
-    }
+      exp <- rv$experiments[[input[[exp_input]]]]
+      samples <- exp$metadata$sample_name
 
-    # Try to load saved preference for this experiment
-    saved_strategy <- load_gating_preference(exp_name)
-    default_strategy <- available_gates[1]
+      updateSelectInput(session, sample_input,
+                        choices = setNames(seq_along(samples), samples))
 
-    # Use saved strategy if it's still available, otherwise use first available
-    if(!is.null(saved_strategy) && saved_strategy %in% available_gates) {
-      default_strategy <- saved_strategy
-    }
+      # Update gating strategy dropdown with available strategies for this experiment
+      exp_name <- input[[exp_input]]
+      available_gates <- rv$experiment_available_gates[[exp_name]]
+      if(is.null(available_gates) || length(available_gates) == 0) {
+        available_gates <- "gdef"  # Default if none available
+      }
 
-    updateSelectInput(session, "browse_gate_strategy",
-                      choices = available_gates,
-                      selected = default_strategy)
-  })
+      # Try to load saved preference for this experiment
+      saved_strategy <- load_gating_preference(exp_name)
+      default_strategy <- available_gates[1]
 
-  # Save gating strategy preference when user changes it
-  observeEvent(input$browse_gate_strategy, {
-    req(input$selected_experiment, input$browse_gate_strategy)
+      # Use saved strategy if it's still available, otherwise use first available
+      if(!is.null(saved_strategy) && saved_strategy %in% available_gates) {
+        default_strategy <- saved_strategy
+      }
 
-    exp_name <- input$selected_experiment
-    gate_strategy <- input$browse_gate_strategy
+      updateSelectInput(session, strategy_input,
+                        choices = available_gates,
+                        selected = default_strategy)
+    })
 
-    # Save the preference
-    save_gating_preference(exp_name, gate_strategy)
-  }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
+    # Save gating strategy preference when user changes it
+    observeEvent(input[[strategy_input]], {
+      req(input[[exp_input]], input[[strategy_input]])
+
+      exp_name <- input[[exp_input]]
+      gate_strategy <- input[[strategy_input]]
+
+      # Save the preference
+      save_gating_preference(exp_name, gate_strategy)
+    }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
+  }
+
+  # Set up observers for all gate tabs
+  update_gate_selectors("gate1", "gate1_experiment", "gate1_gate_strategy", "gate1_sample")
+  update_gate_selectors("gate2", "gate2_experiment", "gate2_gate_strategy", "gate2_sample")
+  update_gate_selectors("gate3", "gate3_experiment", "gate3_gate_strategy", "gate3_sample")
+  update_gate_selectors("gate4", "gate4_experiment", "gate4_gate_strategy", "gate4_sample")
+  update_gate_selectors("gate5", "gate5_experiment", "gate5_gate_strategy", "gate5_sample")
+  update_gate_selectors("gate6", "gate6_experiment", "gate6_gate_strategy", "gate6_sample")
+  update_gate_selectors("gate7", "gate7_experiment", "gate7_gate_strategy", "gate7_sample")
+  update_gate_selectors("correlation", "correlation_experiment", "correlation_gate_strategy", "correlation_sample")
 
   # Analyze selected experiments (load data now)
   observeEvent(input$analyze_selected, {
@@ -3072,28 +3125,153 @@ GATE_STRATEGY <- list(
 
   # Gate plots
   
-  # Display current sample name
+  # Display current sample name based on active tab
   output$current_sample_name <- renderText({
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
-    exp <- rv$experiments[[input$selected_experiment]]
-    idx <- as.numeric(input$selected_sample)
-    exp$metadata$sample_name[idx]
+    req(input$main_tabs)
+
+    # Determine which gate tab is active and use corresponding inputs
+    tab_name <- input$main_tabs
+
+    if(tab_name == "Gate 1: Debris") {
+      req(rv$experiments, input$gate1_experiment, input$gate1_sample)
+      exp <- rv$experiments[[input$gate1_experiment]]
+      idx <- as.numeric(input$gate1_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Gate 2: Singlets") {
+      req(rv$experiments, input$gate2_experiment, input$gate2_sample)
+      exp <- rv$experiments[[input$gate2_experiment]]
+      idx <- as.numeric(input$gate2_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Gate 3: Live Cells") {
+      req(rv$experiments, input$gate3_experiment, input$gate3_sample)
+      exp <- rv$experiments[[input$gate3_experiment]]
+      idx <- as.numeric(input$gate3_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Gate 4: S-phase Outliers") {
+      req(rv$experiments, input$gate4_experiment, input$gate4_sample)
+      exp <- rv$experiments[[input$gate4_experiment]]
+      idx <- as.numeric(input$gate4_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Gate 5: FxCycle Quantile") {
+      req(rv$experiments, input$gate5_experiment, input$gate5_sample)
+      exp <- rv$experiments[[input$gate5_experiment]]
+      idx <- as.numeric(input$gate5_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Gate 6: EdU + FxCycle") {
+      req(rv$experiments, input$gate6_experiment, input$gate6_sample)
+      exp <- rv$experiments[[input$gate6_experiment]]
+      idx <- as.numeric(input$gate6_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Gate 7: HA-Positive") {
+      req(rv$experiments, input$gate7_experiment, input$gate7_sample)
+      exp <- rv$experiments[[input$gate7_experiment]]
+      idx <- as.numeric(input$gate7_sample)
+      return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Final: Correlation") {
+      req(rv$experiments, input$correlation_experiment, input$correlation_sample)
+      exp <- rv$experiments[[input$correlation_experiment]]
+      idx <- as.numeric(input$correlation_sample)
+      return(exp$metadata$sample_name[idx])
+    }
+
+    return("")
   })
   
   # Navigation functions for all gates
   navigate_sample <- function(direction) {
-    req(rv$experiments, input$selected_experiment, input$selected_sample)
-    exp <- rv$experiments[[input$selected_experiment]]
-    current_idx <- as.numeric(input$selected_sample)
-    n_samples <- length(exp$flowset)
-    
-    if(direction == "next") {
-      new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
-    } else {  # previous
-      new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+    req(input$main_tabs)
+    tab_name <- input$main_tabs
+
+    # Determine which gate tab is active and navigate accordingly
+    if(tab_name == "Gate 1: Debris") {
+      req(rv$experiments, input$gate1_experiment, input$gate1_sample)
+      exp <- rv$experiments[[input$gate1_experiment]]
+      current_idx <- as.numeric(input$gate1_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate1_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Gate 2: Singlets") {
+      req(rv$experiments, input$gate2_experiment, input$gate2_sample)
+      exp <- rv$experiments[[input$gate2_experiment]]
+      current_idx <- as.numeric(input$gate2_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate2_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Gate 3: Live Cells") {
+      req(rv$experiments, input$gate3_experiment, input$gate3_sample)
+      exp <- rv$experiments[[input$gate3_experiment]]
+      current_idx <- as.numeric(input$gate3_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate3_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Gate 4: S-phase Outliers") {
+      req(rv$experiments, input$gate4_experiment, input$gate4_sample)
+      exp <- rv$experiments[[input$gate4_experiment]]
+      current_idx <- as.numeric(input$gate4_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate4_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Gate 5: FxCycle Quantile") {
+      req(rv$experiments, input$gate5_experiment, input$gate5_sample)
+      exp <- rv$experiments[[input$gate5_experiment]]
+      current_idx <- as.numeric(input$gate5_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate5_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Gate 6: EdU + FxCycle") {
+      req(rv$experiments, input$gate6_experiment, input$gate6_sample)
+      exp <- rv$experiments[[input$gate6_experiment]]
+      current_idx <- as.numeric(input$gate6_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate6_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Gate 7: HA-Positive") {
+      req(rv$experiments, input$gate7_experiment, input$gate7_sample)
+      exp <- rv$experiments[[input$gate7_experiment]]
+      current_idx <- as.numeric(input$gate7_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "gate7_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Final: Correlation") {
+      req(rv$experiments, input$correlation_experiment, input$correlation_sample)
+      exp <- rv$experiments[[input$correlation_experiment]]
+      current_idx <- as.numeric(input$correlation_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "correlation_sample", selected = as.character(new_idx))
     }
-    
-    updateSelectInput(session, "selected_sample", selected = as.character(new_idx))
   }
   
   # Gate 1 navigation
@@ -3672,13 +3850,13 @@ GATE_STRATEGY <- list(
   # ==============================================================================
   
   output$gate1_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate1_experiment, input$gate1_sample, input$gate1_gate_strategy)
+    exp <- rv$experiments[[input$gate1_experiment]]
+    exp_name <- input$gate1_experiment
+    idx <- as.numeric(input$gate1_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate1_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3689,13 +3867,13 @@ GATE_STRATEGY <- list(
   })
 
   output$gate2_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate2_experiment, input$gate2_sample, input$gate2_gate_strategy)
+    exp <- rv$experiments[[input$gate2_experiment]]
+    exp_name <- input$gate2_experiment
+    idx <- as.numeric(input$gate2_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate2_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3706,13 +3884,13 @@ GATE_STRATEGY <- list(
   })
 
   output$gate3_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate3_experiment, input$gate3_sample, input$gate3_gate_strategy)
+    exp <- rv$experiments[[input$gate3_experiment]]
+    exp_name <- input$gate3_experiment
+    idx <- as.numeric(input$gate3_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate3_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3723,13 +3901,13 @@ GATE_STRATEGY <- list(
   })
 
   output$gate4_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate4_experiment, input$gate4_sample, input$gate4_gate_strategy)
+    exp <- rv$experiments[[input$gate4_experiment]]
+    exp_name <- input$gate4_experiment
+    idx <- as.numeric(input$gate4_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate4_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3740,13 +3918,13 @@ GATE_STRATEGY <- list(
   })
   
   output$gate5_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate5_experiment, input$gate5_sample, input$gate5_gate_strategy)
+    exp <- rv$experiments[[input$gate5_experiment]]
+    exp_name <- input$gate5_experiment
+    idx <- as.numeric(input$gate5_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate5_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3757,13 +3935,13 @@ GATE_STRATEGY <- list(
   })
 
   output$gate6_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate6_experiment, input$gate6_sample, input$gate6_gate_strategy)
+    exp <- rv$experiments[[input$gate6_experiment]]
+    exp_name <- input$gate6_experiment
+    idx <- as.numeric(input$gate6_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate6_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3774,13 +3952,13 @@ GATE_STRATEGY <- list(
   })
   
   output$gate7_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$gate7_experiment, input$gate7_sample, input$gate7_gate_strategy)
+    exp <- rv$experiments[[input$gate7_experiment]]
+    exp_name <- input$gate7_experiment
+    idx <- as.numeric(input$gate7_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$gate7_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
@@ -3788,7 +3966,7 @@ GATE_STRATEGY <- list(
     }
 
     # Get strategy metadata
-    gate_strategy_key <- paste0("GATE_STRATEGY_", input$browse_gate_strategy)
+    gate_strategy_key <- paste0("GATE_STRATEGY_", input$gate7_gate_strategy)
     gate_strategy <- if(!is.null(rv$gate_strategies[[gate_strategy_key]])) {
       rv$gate_strategies[[gate_strategy_key]]
     } else {
@@ -3868,13 +4046,13 @@ GATE_STRATEGY <- list(
   })
   
   output$correlation_plot <- renderPlot({
-    req(rv$experiments, input$selected_experiment, input$selected_sample, input$browse_gate_strategy)
-    exp <- rv$experiments[[input$selected_experiment]]
-    exp_name <- input$selected_experiment
-    idx <- as.numeric(input$selected_sample)
+    req(rv$experiments, input$correlation_experiment, input$correlation_sample, input$correlation_gate_strategy)
+    exp <- rv$experiments[[input$correlation_experiment]]
+    exp_name <- input$correlation_experiment
+    idx <- as.numeric(input$correlation_sample)
 
     # Use gates for this experiment+strategy combination
-    composite_key <- paste0(exp_name, "::", input$browse_gate_strategy)
+    composite_key <- paste0(exp_name, "::", input$correlation_gate_strategy)
     gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
       rv$experiment_gates[[composite_key]]
     } else {
