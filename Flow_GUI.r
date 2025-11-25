@@ -41,31 +41,9 @@ ui <- fluidPage(
   useShinyjs(),
   titlePanel("The MITEV EdU Analysis Tool"),
 
-  # Add custom CSS for sidebar collapse
+  # Add custom CSS
   tags$head(
     tags$style(HTML("
-      #sidebar_panel {
-        transition: all 0.3s;
-      }
-      .sidebar-collapsed {
-        display: none !important;
-        width: 0 !important;
-      }
-      .main-expanded {
-        width: 100% !important;
-        max-width: 100% !important;
-      }
-      #toggle_sidebar {
-        position: fixed;
-        left: 0;
-        top: 100px;
-        z-index: 1000;
-        border-radius: 0 5px 5px 0;
-      }
-      #toggle_sidebar.collapsed {
-        left: 0;
-      }
-
       /* Gating Strategy Creator panel toggles */
       .creator-panel-collapsed {
         display: none !important;
@@ -86,67 +64,7 @@ ui <- fluidPage(
     "))
   ),
 
-  # Toggle button (always visible)
-  actionButton("toggle_sidebar",
-               HTML("<i class='glyphicon glyphicon-chevron-left'></i>"),
-               class = "btn-primary btn-sm",
-               style = "position: fixed; left: 0; top: 100px; z-index: 1000; border-radius: 0 5px 5px 0;"),
-
-  sidebarLayout(
-    sidebarPanel(
-      id = "sidebar_panel",
-      width = 4,  # Increased from 3 to give more space
-
-      # Folder selection
-      h4("1. Select Data Folder"),
-      textInput("master_folder", "Master Folder Path:",
-                value = "Experiments/"),
-      fluidRow(
-        column(6, actionButton("browse_folder", "Browse...", class = "btn-secondary btn-block")),
-        column(6, actionButton("rescan_experiments", "Rescan Folder", class = "btn-info btn-block"))
-      ),
-      hr(),
-      
-      # Experiment selection with inline gating strategy
-      h4("2. Select Experiments & Gating Strategy"),
-      conditionalPanel(
-        condition = "output.experiments_loaded",
-        wellPanel(
-          style = "background-color: #f8f9fa; padding: 8px;",
-          fluidRow(
-            column(5,
-                   selectInput("default_gate_strategy", "Default Gates:",
-                               choices = NULL, width = "100%")
-            ),
-            column(3,
-                   actionButton("apply_default_gates", "Apply All",
-                                class = "btn-sm btn-info btn-block",
-                                style = "margin-top: 25px; font-size: 11px;")
-            ),
-            column(4,
-                   actionButton("select_all", "Select All Exps",
-                                class = "btn-sm btn-block",
-                                style = "margin-top: 25px; font-size: 11px;")
-            )
-          )
-        )
-      ),
-      uiOutput("experiment_selector_with_gates"),
-      br(),
-      actionButton("analyze_selected", "Analyze Selected Experiments",
-                   class = "btn-success btn-block"),
-      hr(),
-
-      # Download
-      h4("3. Download Results"),
-      downloadButton("download_results", "Download Excel")
-    ),
-    
-    mainPanel(
-      id = "main_panel",
-      width = 8,  # Adjusted from 9 to match sidebar width=4
-
-      tabsetPanel(
+  tabsetPanel(
         id = "main_tabs",
         
         # Welcome tab
@@ -155,8 +73,8 @@ ui <- fluidPage(
                  p("This tool processes flow cytometry data with automated gating and correlation analysis."),
                  h4("How to use:"),
                  tags$ol(
-                   tags$li("Experiments are automatically loaded from the folder path on startup"),
-                   tags$li("Select which experiments to analyze"),
+                   tags$li("Go to the 'Data Selection' tab"),
+                   tags$li("Set the data folder path and select which experiments to analyze"),
                    tags$li("(Optional) Choose different gating strategies for each experiment"),
                    tags$li("Click 'Analyze Selected Experiments' to process data"),
                    tags$li("View results in the 'Results Table' tab"),
@@ -168,17 +86,67 @@ ui <- fluidPage(
                  h4("Status:"),
                  verbatimTextOutput("status_text")
         ),
+
+        # Data Selection tab
+        tabPanel("Data Selection",
+                 h3("Select Data and Experiments"),
+
+                 # Folder selection
+                 h4("1. Select Data Folder"),
+                 textInput("master_folder", "Master Folder Path:",
+                           value = "Experiments/"),
+                 fluidRow(
+                   column(6, actionButton("browse_folder", "Browse...", class = "btn-secondary btn-block")),
+                   column(6, actionButton("rescan_experiments", "Rescan Folder", class = "btn-info btn-block"))
+                 ),
+                 hr(),
+
+                 # Experiment selection with inline gating strategy
+                 h4("2. Select Experiments & Gating Strategy"),
+                 conditionalPanel(
+                   condition = "output.experiments_loaded",
+                   wellPanel(
+                     style = "background-color: #f8f9fa; padding: 8px;",
+                     fluidRow(
+                       column(5,
+                              selectInput("default_gate_strategy", "Default Gates:",
+                                          choices = NULL, width = "100%")
+                       ),
+                       column(3,
+                              actionButton("apply_default_gates", "Apply All",
+                                           class = "btn-sm btn-info btn-block",
+                                           style = "margin-top: 25px; font-size: 11px;")
+                       ),
+                       column(4,
+                              actionButton("select_all", "Select All Exps",
+                                           class = "btn-sm btn-block",
+                                           style = "margin-top: 25px; font-size: 11px;")
+                       )
+                     )
+                   )
+                 ),
+                 uiOutput("experiment_selector_with_gates"),
+                 br(),
+                 actionButton("analyze_selected", "Analyze Selected Experiments",
+                              class = "btn-success btn-block")
+        ),
         
         # Results table
         tabPanel("Results Table",
                  h3("Correlation Results"),
                  fluidRow(
-                   column(12,
+                   column(6,
                           h5("Gating Strategies"),
                           uiOutput("results_gating_strategy_checkboxes")
+                   ),
+                   column(6,
+                          h5("Sample Filters"),
+                          checkboxInput("show_dox_minus", "Show Dox- samples", value = FALSE)
                    )
                  ),
-                 DTOutput("results_table")
+                 DTOutput("results_table"),
+                 br(),
+                 downloadButton("download_results", "Download Excel", class = "btn-primary")
         ),
         
         # ADD THIS NEW TAB:
@@ -522,8 +490,6 @@ ui <- fluidPage(
                    )
                  )
         )
-      )
-    )
   )
 )
 
@@ -532,30 +498,6 @@ ui <- fluidPage(
 # ==============================================================================
 
 server <- function(input, output, session) {
-
-  # ==============================================================================
-  # SIDEBAR TOGGLE
-  # ==============================================================================
-
-  # Track sidebar state
-  sidebar_visible <- reactiveVal(TRUE)
-
-  observeEvent(input$toggle_sidebar, {
-    sidebar_visible(!sidebar_visible())
-    if(sidebar_visible()) {
-      # Show sidebar
-      shinyjs::removeClass(id = "sidebar_panel", class = "sidebar-collapsed")
-      shinyjs::removeClass(id = "main_panel", class = "main-expanded")
-      shinyjs::html(id = "toggle_sidebar",
-                   html = "<i class='glyphicon glyphicon-chevron-left'></i>")
-    } else {
-      # Hide sidebar
-      shinyjs::addClass(id = "sidebar_panel", class = "sidebar-collapsed")
-      shinyjs::addClass(id = "main_panel", class = "main-expanded")
-      shinyjs::html(id = "toggle_sidebar",
-                   html = "<i class='glyphicon glyphicon-chevron-right'></i>")
-    }
-  })
 
   # ==============================================================================
   # GATING STRATEGY CREATOR PANEL TOGGLES
@@ -1781,6 +1723,14 @@ server <- function(input, output, session) {
 
     # Start with all results
     display_data <- rv$all_results
+
+    # Filter by Dox- samples (hide by default unless checkbox is checked)
+    if(!isTRUE(input$show_dox_minus)) {
+      # Filter out rows where Sample contains "Dox-"
+      if("Sample" %in% names(display_data)) {
+        display_data <- display_data[!grepl("Dox-", display_data$Sample, fixed = TRUE), ]
+      }
+    }
 
     # Filter by selected gating strategies
     available_strategies <- unique(rv$all_results$Gate_ID)
