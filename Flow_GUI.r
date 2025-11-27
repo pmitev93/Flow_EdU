@@ -127,8 +127,19 @@ ui <- fluidPage(
                  ),
                  uiOutput("experiment_selector_with_gates"),
                  br(),
-                 actionButton("analyze_selected", "Analyze Selected Experiments",
-                              class = "btn-success btn-block")
+                 fluidRow(
+                   column(6,
+                          actionButton("load_selected", "Load Selected Experiments",
+                                       class = "btn-info btn-block",
+                                       title = "Load FCS data for selected experiments (no analysis)")
+                   ),
+                   column(6,
+                          actionButton("analyze_selected", "Analyze Selected Experiments",
+                                       class = "btn-success btn-block",
+                                       title = "Load and analyze selected experiments")
+                   )
+                 ),
+                 br(), br()
         ),
         
         # Results table
@@ -1352,8 +1363,33 @@ server <- function(input, output, session) {
       # Update gating strategy dropdown with available strategies for this experiment
       exp_name <- input[[exp_input]]
       available_gates <- rv$experiment_available_gates[[exp_name]]
+
+      # If not populated yet, check cache directory directly
       if(is.null(available_gates) || length(available_gates) == 0) {
-        available_gates <- "gdef"  # Default if none available
+        pattern <- paste0("^", exp_name, "_.*\\.rds$")
+        cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
+
+        if(length(cache_files) > 0) {
+          gate_ids <- character(0)
+          for(cache_file in cache_files) {
+            tryCatch({
+              cache_data <- readRDS(cache_file)
+              gate_id <- if(!is.null(cache_data$gate_id)) {
+                cache_data$gate_id
+              } else {
+                get_readable_gate_id(cache_data$fingerprint)
+              }
+              gate_ids <- c(gate_ids, gate_id)
+            }, error = function(e) {
+              # Skip files that can't be read
+            })
+          }
+          available_gates <- unique(sort(gate_ids))
+          # Store for future use
+          rv$experiment_available_gates[[exp_name]] <- available_gates
+        } else {
+          available_gates <- "gdef"  # Default if no cache found
+        }
       }
 
       # Try to load saved preference for this experiment
@@ -1405,6 +1441,57 @@ server <- function(input, output, session) {
   update_gate_selectors("gate6", "gate6_experiment", "gate6_gate_strategy", "gate6_sample")
   update_gate_selectors("gate7", "gate7_experiment", "gate7_gate_strategy", "gate7_sample")
   update_gate_selectors("correlation", "correlation_experiment", "correlation_gate_strategy", "correlation_sample")
+
+  # Load selected experiments (FCS data only, no analysis)
+  observeEvent(input$load_selected, {
+    req(rv$experiment_folders)
+
+    # Get selected experiments from checkboxes
+    exp_names <- names(rv$experiment_folders)
+    selected_exps <- c()
+    for(i in seq_along(exp_names)) {
+      if(isTRUE(input[[paste0("exp_check_", i)]])) {
+        selected_exps <- c(selected_exps, exp_names[i])
+      }
+    }
+
+    if(length(selected_exps) == 0) {
+      showNotification("Please select at least one experiment to load", type = "warning")
+      return()
+    }
+
+    # Initialize experiments list if needed
+    if(is.null(rv$experiments)) {
+      rv$experiments <- list()
+    }
+
+    # Filter to only unloaded experiments
+    experiments_to_load <- list()
+    for(exp_name in selected_exps) {
+      if(is.null(rv$experiments[[exp_name]])) {
+        experiments_to_load[[exp_name]] <- rv$experiment_folders[[exp_name]]
+      }
+    }
+
+    if(length(experiments_to_load) == 0) {
+      showNotification("All selected experiments are already loaded", type = "message")
+      return()
+    }
+
+    withProgress(message = sprintf('Loading %d experiments...', length(experiments_to_load)), value = 0, {
+      # Load experiments in parallel using future
+      loaded_experiments <- future_lapply(experiments_to_load, function(exp_folder) {
+        load_experiment(exp_folder)
+      }, future.seed = TRUE)
+
+      # Store loaded experiments
+      names(loaded_experiments) <- names(experiments_to_load)
+      rv$experiments <- c(rv$experiments, loaded_experiments)
+
+      showNotification(sprintf("Loaded %d experiments successfully", length(loaded_experiments)),
+                       type = "message", duration = 3)
+    })
+  })
 
   # Analyze selected experiments (load data now)
   observeEvent(input$analyze_selected, {
@@ -1891,8 +1978,33 @@ server <- function(input, output, session) {
     req(input$overview_experiment)
     exp_name <- input$overview_experiment
     available_gates <- rv$experiment_available_gates[[exp_name]]
+
+    # If not populated yet, check cache directory directly
     if(is.null(available_gates) || length(available_gates) == 0) {
-      available_gates <- "gdef"  # Default if none available
+      pattern <- paste0("^", exp_name, "_.*\\.rds$")
+      cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
+
+      if(length(cache_files) > 0) {
+        gate_ids <- character(0)
+        for(cache_file in cache_files) {
+          tryCatch({
+            cache_data <- readRDS(cache_file)
+            gate_id <- if(!is.null(cache_data$gate_id)) {
+              cache_data$gate_id
+            } else {
+              get_readable_gate_id(cache_data$fingerprint)
+            }
+            gate_ids <- c(gate_ids, gate_id)
+          }, error = function(e) {
+            # Skip files that can't be read
+          })
+        }
+        available_gates <- unique(sort(gate_ids))
+        # Store for future use
+        rv$experiment_available_gates[[exp_name]] <- available_gates
+      } else {
+        available_gates <- "gdef"  # Default if no cache found
+      }
     }
 
     # Try to load saved preference for this experiment
@@ -1932,8 +2044,33 @@ server <- function(input, output, session) {
     req(input$sample_overview_experiment)
     exp_name <- input$sample_overview_experiment
     available_gates <- rv$experiment_available_gates[[exp_name]]
+
+    # If not populated yet, check cache directory directly
     if(is.null(available_gates) || length(available_gates) == 0) {
-      available_gates <- "gdef"  # Default if none available
+      pattern <- paste0("^", exp_name, "_.*\\.rds$")
+      cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
+
+      if(length(cache_files) > 0) {
+        gate_ids <- character(0)
+        for(cache_file in cache_files) {
+          tryCatch({
+            cache_data <- readRDS(cache_file)
+            gate_id <- if(!is.null(cache_data$gate_id)) {
+              cache_data$gate_id
+            } else {
+              get_readable_gate_id(cache_data$fingerprint)
+            }
+            gate_ids <- c(gate_ids, gate_id)
+          }, error = function(e) {
+            # Skip files that can't be read
+          })
+        }
+        available_gates <- unique(sort(gate_ids))
+        # Store for future use
+        rv$experiment_available_gates[[exp_name]] <- available_gates
+      } else {
+        available_gates <- "gdef"  # Default if no cache found
+      }
     }
 
     # Try to load saved preference for this experiment
