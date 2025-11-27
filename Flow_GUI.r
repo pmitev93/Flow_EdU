@@ -1052,19 +1052,7 @@ server <- function(input, output, session) {
         # Mark experiments as loaded
         rv$experiments_loaded <- TRUE
 
-        showNotification(sprintf("Found %d experiments with %d samples!",
-                                 length(exp_names), nrow(rv$all_results)),
-                         type = "message")
-      })
-      
-      # AUTO-LOAD CACHED ANALYSES
-      withProgress(message = 'Loading cached analyses...', value = 0, {
-        n_loaded <- 0
-
-        cat("\n=== AUTO-LOAD DEBUG ===\n")
-        cat(sprintf("Initial rv$all_results has %d rows\n", nrow(rv$all_results)))
-
-        # Convert Correlation and N_cells to proper types to avoid bind_rows errors
+        # Convert Correlation and N_cells to proper types to avoid bind_rows errors later
         # (quick_scan creates them as character, but cache has numeric)
         if("Correlation" %in% names(rv$all_results)) {
           rv$all_results$Correlation <- ifelse(
@@ -1072,7 +1060,6 @@ server <- function(input, output, session) {
             NA_real_,
             as.numeric(rv$all_results$Correlation)
           )
-          cat("Converted Correlation column to numeric\n")
         }
         if("N_cells" %in% names(rv$all_results)) {
           rv$all_results$N_cells <- ifelse(
@@ -1080,12 +1067,38 @@ server <- function(input, output, session) {
             NA_integer_,
             as.integer(rv$all_results$N_cells)
           )
-          cat("Converted N_cells column to numeric\n")
         }
 
-        # First pass: Load cached results and identify experiments that need FCS loading
-        experiments_to_load <- list()
+        # Flag to track if caches have been loaded
+        rv$caches_loaded <- FALSE
 
+        showNotification(sprintf("Found %d experiments with %d samples!",
+                                 length(exp_names), nrow(rv$all_results)),
+                         type = "message")
+      })
+
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error")
+    })
+  })
+
+  # LAZY LOAD: Load cached analyses when Results Table tab is viewed
+  observeEvent(input$main_tabs, {
+    # Only load if Results Table is selected and caches haven't been loaded yet
+    if(input$main_tabs == "Results Table" && !isTRUE(rv$caches_loaded)) {
+      req(rv$all_results)
+      req(rv$experiment_folders)
+
+      exp_names <- names(rv$experiment_folders)
+      exp_folders <- rv$experiment_folders
+
+      withProgress(message = 'Loading cached analyses...', value = 0, {
+        n_loaded <- 0
+
+        cat("\n=== LAZY LOAD CACHED ANALYSES ===\n")
+        cat(sprintf("Initial rv$all_results has %d rows\n", nrow(rv$all_results)))
+
+        # First pass: Load cached results (metadata only, no FCS data yet)
         for(i in seq_along(exp_names)) {
           exp_name <- exp_names[i]
           incProgress(1/length(exp_names), detail = exp_name)
@@ -1213,11 +1226,6 @@ server <- function(input, output, session) {
                   cat(sprintf("    Stored gate_strategy with key: %s\n", gate_strategy_key))
                 }
 
-                # Mark this experiment for FCS loading (only once per experiment)
-                if(!exp_name %in% names(experiments_to_load)) {
-                  experiments_to_load[[exp_name]] <- exp_folders[i]
-                }
-
                 n_loaded <- n_loaded + 1
 
               }, error = function(e) {
@@ -1227,56 +1235,22 @@ server <- function(input, output, session) {
           }
         }
 
-        # Second pass: Load FCS data in parallel for all experiments
-        if(length(experiments_to_load) > 0) {
-          cat(sprintf("\n=== PARALLEL LOADING %d EXPERIMENTS ===\n", length(experiments_to_load)))
-
-          # Initialize experiments list if needed
-          if(is.null(rv$experiments)) {
-            rv$experiments <- list()
-          }
-
-          # Load experiments in parallel
-          loaded_experiments <- future_lapply(experiments_to_load, function(exp_folder) {
-            load_experiment(exp_folder)
-          }, future.seed = TRUE)
-
-          # Store loaded experiments in reactive values
-          names(loaded_experiments) <- names(experiments_to_load)
-          rv$experiments <- c(rv$experiments, loaded_experiments)
-
-          cat(sprintf("=== PARALLEL LOADING COMPLETE ===\n"))
-        }
-
         cat(sprintf("\nFinal rv$all_results has %d rows\n", nrow(rv$all_results)))
         cat(sprintf("Gate_ID distribution:\n"))
         print(table(rv$all_results$Gate_ID, useNA = "ifany"))
-        cat("=== END AUTO-LOAD DEBUG ===\n\n")
-        
-        if(n_loaded > 0) {
-          showNotification(sprintf("Auto-loaded %d cached analyses", n_loaded),
-                           type = "message", duration = 5)
+        cat("=== END LAZY LOAD ===\n\n")
 
-          # Update gate tab experiment dropdowns with loaded experiments
-          if(!is.null(rv$experiments) && length(rv$experiments) > 0) {
-            exp_choices <- names(rv$experiments)
-            updateSelectInput(session, "gate1_experiment", choices = exp_choices)
-            updateSelectInput(session, "gate2_experiment", choices = exp_choices)
-            updateSelectInput(session, "gate3_experiment", choices = exp_choices)
-            updateSelectInput(session, "gate4_experiment", choices = exp_choices)
-            updateSelectInput(session, "gate5_experiment", choices = exp_choices)
-            updateSelectInput(session, "gate6_experiment", choices = exp_choices)
-            updateSelectInput(session, "gate7_experiment", choices = exp_choices)
-            updateSelectInput(session, "correlation_experiment", choices = exp_choices)
-          }
+        # Mark caches as loaded
+        rv$caches_loaded <- TRUE
+
+        if(n_loaded > 0) {
+          showNotification(sprintf("Loaded %d cached analyses", n_loaded),
+                           type = "message", duration = 3)
         }
       })
-      
-    }, error = function(e) {
-      showNotification(paste("Error:", e$message), type = "error")
-    })
-  })
-  
+    }
+  }, ignoreInit = TRUE)
+
   # Rescan when button clicked
   observeEvent(input$rescan_experiments, {
     req(input$master_folder)
@@ -1407,6 +1381,20 @@ server <- function(input, output, session) {
       save_gating_preference(exp_name, gate_strategy)
     }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
   }
+
+  # Populate gate experiment dropdowns with ALL available experiments (lazy load on selection)
+  observe({
+    req(rv$experiment_folders)
+    exp_choices <- names(rv$experiment_folders)
+    updateSelectInput(session, "gate1_experiment", choices = exp_choices)
+    updateSelectInput(session, "gate2_experiment", choices = exp_choices)
+    updateSelectInput(session, "gate3_experiment", choices = exp_choices)
+    updateSelectInput(session, "gate4_experiment", choices = exp_choices)
+    updateSelectInput(session, "gate5_experiment", choices = exp_choices)
+    updateSelectInput(session, "gate6_experiment", choices = exp_choices)
+    updateSelectInput(session, "gate7_experiment", choices = exp_choices)
+    updateSelectInput(session, "correlation_experiment", choices = exp_choices)
+  })
 
   # Set up observers for all gate tabs
   update_gate_selectors("gate1", "gate1_experiment", "gate1_gate_strategy", "gate1_sample")
