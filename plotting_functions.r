@@ -444,21 +444,34 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
   
-  axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+  axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
   axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
-  
-  # Add gate polygon
-  polygon(gates$live_cells[, 1], gates$live_cells[, 2], 
-          border = "black", lwd = 1.5)
-  
+
+  # Add gate (polygon or vertical line)
+  if(is.matrix(gates$live_cells)) {
+    # Old polygon-based gate
+    polygon(gates$live_cells[, 1], gates$live_cells[, 2],
+            border = "black", lwd = 1.5)
+  } else {
+    # New threshold-based gate (vertical line)
+    abline(v = gates$live_cells$threshold, col = "black", lwd = 2, lty = 2)
+    # Add shading for kept region (left of line)
+    rect(xleft = 100, ybottom = 0, xright = gates$live_cells$threshold, ytop = 15e6,
+         col = rgb(0.5, 0.7, 1, 0.15), border = NA)
+  }
+
   # Calculate stats
   total_cells <- nrow(fcs_data)
-  inside_gate <- sum(point.in.polygon(
-    exprs(fcs_data)[, channels$DCM],
-    exprs(fcs_data)[, channels$SSC_A],
-    gates$live_cells[, 1],
-    gates$live_cells[, 2]
-  ) > 0)
+  if(is.matrix(gates$live_cells)) {
+    inside_gate <- sum(point.in.polygon(
+      exprs(fcs_data)[, channels$DCM],
+      exprs(fcs_data)[, channels$SSC_A],
+      gates$live_cells[, 1],
+      gates$live_cells[, 2]
+    ) > 0)
+  } else {
+    inside_gate <- sum(exprs(fcs_data)[, channels$DCM] < gates$live_cells$threshold)
+  }
   
   # Add legend
   legend("topright", 
@@ -526,18 +539,27 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
          yaxt = "n",
          log = "x")
     
-    axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
     axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), cex.axis = 0.5)
-    
-    polygon(gates$live_cells[, 1], gates$live_cells[, 2], 
-            border = "black", lwd = 1)
-    
-    inside_gate <- sum(point.in.polygon(
-      exprs(fcs_data)[, channels$DCM],
-      exprs(fcs_data)[, channels$SSC_A],
-      gates$live_cells[, 1],
-      gates$live_cells[, 2]
-    ) > 0)
+
+    # Add gate (polygon or vertical line)
+    if(is.matrix(gates$live_cells)) {
+      polygon(gates$live_cells[, 1], gates$live_cells[, 2],
+              border = "black", lwd = 1)
+    } else {
+      abline(v = gates$live_cells$threshold, col = "black", lwd = 1.5, lty = 2)
+    }
+
+    if(is.matrix(gates$live_cells)) {
+      inside_gate <- sum(point.in.polygon(
+        exprs(fcs_data)[, channels$DCM],
+        exprs(fcs_data)[, channels$SSC_A],
+        gates$live_cells[, 1],
+        gates$live_cells[, 2]
+      ) > 0)
+    } else {
+      inside_gate <- sum(exprs(fcs_data)[, channels$DCM] < gates$live_cells$threshold)
+    }
     
     pct <- 100 * inside_gate / nrow(fcs_data)
     text_col <- ifelse(pct < 50, "red", "black")
@@ -572,12 +594,16 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
   ) > 0
   fcs_data <- Subset(fcs_data, singlet_filter)
   
-  live_filter <- point.in.polygon(
-    exprs(fcs_data)[, channels$DCM],
-    exprs(fcs_data)[, channels$SSC_A],
-    gates$live_cells[, 1],
-    gates$live_cells[, 2]
-  ) > 0
+  if(is.matrix(gates$live_cells)) {
+    live_filter <- point.in.polygon(
+      exprs(fcs_data)[, channels$DCM],
+      exprs(fcs_data)[, channels$SSC_A],
+      gates$live_cells[, 1],
+      gates$live_cells[, 2]
+    ) > 0
+  } else {
+    live_filter <- exprs(fcs_data)[, channels$DCM] < gates$live_cells$threshold
+  }
   fcs_data <- Subset(fcs_data, live_filter)
   
   # Plot settings
@@ -604,7 +630,7 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
        ylab = "EdU-A",
        main = plot_title,
        xlim = c(0, 12e6),
-       ylim = c(1e3, 1e7),
+       ylim = c(1e3, 1e8),
        xaxt = "n",
        yaxt = "n",
        mgp = c(3, 0.5, 0),
@@ -619,20 +645,37 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
   }
   
   axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), mgp = c(3, 0.5, 0))
-  axis(2, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
-  
-  # Add gate polygon
-  polygon(gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2], 
-          border = "black", lwd = 1.5)
-  
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
+
+  # Add gate (polygon or vertical lines)
+  if(is.matrix(gates$s_phase_outliers)) {
+    # Old polygon-based gate
+    polygon(gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2],
+            border = "black", lwd = 1.5)
+  } else {
+    # New range-based gate (two vertical lines)
+    abline(v = gates$s_phase_outliers$lower_threshold, col = "black", lwd = 2, lty = 2)
+    abline(v = gates$s_phase_outliers$upper_threshold, col = "black", lwd = 2, lty = 2)
+    # Add shading for kept region (between lines)
+    rect(xleft = gates$s_phase_outliers$lower_threshold, ybottom = 1e3,
+         xright = gates$s_phase_outliers$upper_threshold, ytop = 1e8,
+         col = rgb(0.5, 0.7, 1, 0.15), border = NA)
+  }
+
   # Calculate stats
   total_cells <- nrow(fcs_data)
-  inside_gate <- sum(point.in.polygon(
-    exprs(fcs_data)[, channels$FxCycle],
-    exprs(fcs_data)[, channels$EdU],
-    gates$s_phase_outliers[, 1],
-    gates$s_phase_outliers[, 2]
-  ) > 0)
+  if(is.matrix(gates$s_phase_outliers)) {
+    inside_gate <- sum(point.in.polygon(
+      exprs(fcs_data)[, channels$FxCycle],
+      exprs(fcs_data)[, channels$EdU],
+      gates$s_phase_outliers[, 1],
+      gates$s_phase_outliers[, 2]
+    ) > 0)
+  } else {
+    fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
+    inside_gate <- sum(fxcycle_values >= gates$s_phase_outliers$lower_threshold &
+                       fxcycle_values <= gates$s_phase_outliers$upper_threshold)
+  }
   
   # Add legend
   legend("bottomright", 
@@ -677,20 +720,24 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
     ) > 0
     fcs_data <- Subset(fcs_data, singlet_filter)
     
-    live_filter <- point.in.polygon(
-      exprs(fcs_data)[, channels$DCM],
-      exprs(fcs_data)[, channels$SSC_A],
-      gates$live_cells[, 1],
-      gates$live_cells[, 2]
-    ) > 0
+    if(is.matrix(gates$live_cells)) {
+      live_filter <- point.in.polygon(
+        exprs(fcs_data)[, channels$DCM],
+        exprs(fcs_data)[, channels$SSC_A],
+        gates$live_cells[, 1],
+        gates$live_cells[, 2]
+      ) > 0
+    } else {
+      live_filter <- exprs(fcs_data)[, channels$DCM] < gates$live_cells$threshold
+    }
     fcs_data <- Subset(fcs_data, live_filter)
-    
+
     x <- exprs(fcs_data)[, channels$FxCycle]
     y <- exprs(fcs_data)[, channels$EdU]
     y_log <- log10(y + 1)
-    
+
     dens <- densCols(x, y_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
-    
+
     plot(x, y,
          pch = ".",
          col = dens,
@@ -698,7 +745,7 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
          ylab = "",
          main = sample_name,
          xlim = c(0, 12e6),
-         ylim = c(1e3, 1e7),
+         ylim = c(1e3, 1e8),
          cex.main = 1.2,
          cex.axis = 0.7,
          xaxt = "n",
@@ -706,19 +753,31 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
          xaxs = "i",
          yaxs = "i",
          log= "y")
-    
+
     axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), cex.axis = 0.5)
-    axis(2, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
-    
-    polygon(gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2], 
-            border = "black", lwd = 1)
-    
-    inside_gate <- sum(point.in.polygon(
-      exprs(fcs_data)[, channels$FxCycle],
-      exprs(fcs_data)[, channels$EdU],
-      gates$s_phase_outliers[, 1],
-      gates$s_phase_outliers[, 2]
-    ) > 0)
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
+
+    # Add gate (polygon or vertical lines)
+    if(is.matrix(gates$s_phase_outliers)) {
+      polygon(gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2],
+              border = "black", lwd = 1)
+    } else {
+      abline(v = gates$s_phase_outliers$lower_threshold, col = "black", lwd = 1.5, lty = 2)
+      abline(v = gates$s_phase_outliers$upper_threshold, col = "black", lwd = 1.5, lty = 2)
+    }
+
+    if(is.matrix(gates$s_phase_outliers)) {
+      inside_gate <- sum(point.in.polygon(
+        exprs(fcs_data)[, channels$FxCycle],
+        exprs(fcs_data)[, channels$EdU],
+        gates$s_phase_outliers[, 1],
+        gates$s_phase_outliers[, 2]
+      ) > 0)
+    } else {
+      fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
+      inside_gate <- sum(fxcycle_values >= gates$s_phase_outliers$lower_threshold &
+                         fxcycle_values <= gates$s_phase_outliers$upper_threshold)
+    }
     
     pct <- 100 * inside_gate / nrow(fcs_data)
     text_col <- ifelse(pct < 50, "red", "black")
@@ -767,7 +826,7 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
        ylab = "EdU-A",
        main = plot_title,
        xlim = c(0, 12e6),
-       ylim = c(1e3, 1e7),
+       ylim = c(1e3, 1e8),
        xaxt = "n",
        yaxt = "n",
        mgp = c(3, 0.5, 0),
@@ -776,7 +835,7 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
        log = "y")
   
   axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 0.5, 0))
-  axis(2, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
   
   # Add vertical lines for quantile bounds
   abline(v = lower_bound, col = "black", lwd = 2, lty = 2)
@@ -832,7 +891,7 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
          ylab = "",
          main = sample_name,
          xlim = c(0, 12e6),
-         ylim = c(1e3, 1e7),
+         ylim = c(1e3, 1e8),
          cex.main = 1.2,
          cex.axis = 0.7,
          xaxt = "n",
@@ -840,7 +899,7 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
          log = "y")
     
     axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5)
-    axis(2, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), cex.axis = 0.5)
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
     
     # Add vertical lines
     abline(v = lower_bound, col = "black", lwd = 1, lty = 2)
@@ -904,7 +963,7 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
        ylab = "EdU-A",
        main = plot_title,
        xlim = c(0, 12e6),
-       ylim = c(1e3, 1e7),
+       ylim = c(1e3, 1e8),
        xaxt = "n",
        yaxt = "n",
        mgp = c(3, 0.5, 0),
@@ -913,7 +972,7 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
        log = "y")
   
   axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 0.5, 0))
-  axis(2, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
   
   # Add gate lines (only in gated region)
   segments(x0 = fxcycle_bounds[1], y0 = edu_threshold, 
@@ -986,7 +1045,7 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
          ylab = "",
          main = sample_name,
          xlim = c(0, 12e6),
-         ylim = c(1e3, 1e7),
+         ylim = c(1e3, 1e8),
          cex.main = 1.2,
          cex.axis = 0.7,
          xaxt = "n",
@@ -994,7 +1053,7 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
          log = "y")
     
     axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5)
-    axis(2, at = c(100, 1000, 10000, 100000, 1000000), labels = c("1K", "10K", "100K", "1M", "10M"), cex.axis = 0.5)
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
     
     # Add gate lines (only in gated region)
     segments(x0 = fxcycle_bounds[1], y0 = edu_threshold, 
@@ -1056,14 +1115,14 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
   # Check if we have enough cells to plot
   if(length(x) < 10) {
     # Create empty plot with warning message
-    plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e7),
+    plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e8),
          xlab = "HA-A", ylab = "EdU-A",
          main = if(show_sample_name) sprintf("Gate 7: HA-Positive\n%s", sample_name) else "Gate 7: HA-Positive",
          log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0))
     axis(1, at = c(100, 1000, 10000, 100000, 1000000),
-         labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
-         labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
     text(1000, 50000, sprintf("Insufficient cells for plotting\n(n = %d)", length(x)),
          cex = 1.2, col = "red", font = 2)
     return(invisible(NULL))
@@ -1086,7 +1145,7 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        ylab = "EdU-A",
        main = plot_title,
        xlim = c(100, 1e6),
-       ylim = c(1e3, 1e7),
+       ylim = c(1e3, 1e8),
        xaxt = "n",
        yaxt = "n",
        mgp = c(3, 0.5, 0),
@@ -1095,13 +1154,13 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        log = "xy")
   
   axis(1, at = c(100, 1000, 10000, 100000, 1000000),
-       labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
-       labels = c("1K", "10K", "100K", "1M", "10M"), mgp = c(3, 0.5, 0))
+       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
 
   # Tint the HA-positive region (only if valid threshold)
   if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
-    rect(xleft = ha_threshold, ybottom = 1e3, xright = 1e7, ytop = 1e7,
+    rect(xleft = ha_threshold, ybottom = 1e3, xright = 1e7, ytop = 1e8,
          col = rgb(0.5, 0.7, 1, 0.25), border = NA)
 
     # Add vertical threshold line
@@ -1175,13 +1234,13 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
     # Check if we have enough cells to plot
     if(length(x) < 10) {
       # Create empty plot with warning
-      plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e7),
+      plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e8),
            xlab = "", ylab = "", main = sample_name, log = "xy",
            cex.main = 1.2, cex.axis = 0.7, xaxt = "n", yaxt = "n")
       axis(1, at = c(100, 1000, 10000, 100000, 1000000),
-           labels = c("1K", "10K", "100K", "1M", "10M"), cex.axis = 0.5)
+           labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
       axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
-           labels = c("1K", "10K", "100K", "1M", "10M"), cex.axis = 0.5)
+           labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
       text(1000, 50000, sprintf("n = %d", length(x)), cex = 0.8, col = "red", font = 2)
       next
     }
@@ -1195,7 +1254,7 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
          ylab = "",
          main = sample_name,
          xlim = c(100, 1e6),
-         ylim = c(1e3, 1e7),
+         ylim = c(1e3, 1e8),
          cex.main = 1.2,
          cex.axis = 0.7,
          xaxt = "n",
@@ -1203,13 +1262,13 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
          log = "xy")
     
     axis(1, at = c(100, 1000, 10000, 100000, 1000000),
-         labels = c("1K", "10K", "100K", "1M", "10M"), cex.axis = 0.5)
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
-         labels = c("1K", "10K", "100K", "1M", "10M"), cex.axis = 0.5)
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
 
     # Tint the HA-positive region (only if valid threshold)
     if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
-      rect(xleft = ha_threshold, ybottom = 1e3, xright = 1e7, ytop = 1e7,
+      rect(xleft = ha_threshold, ybottom = 1e3, xright = 1e7, ytop = 1e8,
            col = rgb(0.5, 0.7, 1, 0.25), border = NA)
 
       # Add threshold line

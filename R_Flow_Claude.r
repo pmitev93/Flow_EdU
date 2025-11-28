@@ -519,21 +519,36 @@ apply_sequential_gates <- function(fcs_data, up_to_gate, gates = GATES, channels
   
   # Gate 3: Live cells
   if(up_to_gate >= 3) {
-    live_filter <- point.in.polygon(
-      exprs(fcs_data)[, channels$DCM],
-      exprs(fcs_data)[, channels$SSC_A],
-      gates$live_cells[, 1], gates$live_cells[, 2]
-    ) > 0
+    if(is.matrix(gates$live_cells)) {
+      # Old polygon-based gate
+      live_filter <- point.in.polygon(
+        exprs(fcs_data)[, channels$DCM],
+        exprs(fcs_data)[, channels$SSC_A],
+        gates$live_cells[, 1], gates$live_cells[, 2]
+      ) > 0
+    } else {
+      # New threshold-based gate
+      dcm_values <- exprs(fcs_data)[, channels$DCM]
+      live_filter <- dcm_values < gates$live_cells$threshold
+    }
     fcs_data <- Subset(fcs_data, live_filter)
   }
-  
+
   # Gate 4: S-phase outliers
   if(up_to_gate >= 4) {
-    sphase_filter <- point.in.polygon(
-      exprs(fcs_data)[, channels$FxCycle],
-      exprs(fcs_data)[, channels$EdU],
-      gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2]
-    ) > 0
+    if(is.matrix(gates$s_phase_outliers)) {
+      # Old polygon-based gate
+      sphase_filter <- point.in.polygon(
+        exprs(fcs_data)[, channels$FxCycle],
+        exprs(fcs_data)[, channels$EdU],
+        gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2]
+      ) > 0
+    } else {
+      # New range-based gate
+      fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
+      sphase_filter <- (fxcycle_values >= gates$s_phase_outliers$lower_threshold) &
+                       (fxcycle_values <= gates$s_phase_outliers$upper_threshold)
+    }
     fcs_data <- Subset(fcs_data, sphase_filter)
   }
   
