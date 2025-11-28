@@ -2476,14 +2476,36 @@ server <- function(input, output, session) {
 
   # Populate experiment dropdown
   observe({
-    req(rv$experiments)
+    req(rv$experiment_folders)
     updateSelectInput(session, "creator_experiment",
-                      choices = names(rv$experiments))
+                      choices = names(rv$experiment_folders))
   })
 
   # Update sample selector when experiment changes
   observeEvent(input$creator_experiment, {
-    req(input$creator_experiment, rv$experiments)
+    req(input$creator_experiment)
+
+    # Auto-load experiment if not already loaded
+    if(is.null(rv$experiments[[input$creator_experiment]])) {
+      req(rv$experiment_folders)
+
+      exp_name <- input$creator_experiment
+      exp_folder <- rv$experiment_folders[[exp_name]]
+
+      if(!is.null(exp_folder)) {
+        withProgress(message = paste('Loading', exp_name), value = 0.5, {
+          if(is.null(rv$experiments)) {
+            rv$experiments <- list()
+          }
+          rv$experiments[[exp_name]] <- load_experiment(exp_folder)
+
+          showNotification(sprintf("Loaded %s for browsing", exp_name),
+                           type = "message", duration = 2)
+        })
+      }
+    }
+
+    req(rv$experiments[[input$creator_experiment]])
     exp <- rv$experiments[[input$creator_experiment]]
     if(!is.null(exp)) {
       sample_choices <- setNames(seq_along(exp$metadata$sample_name),
@@ -2559,12 +2581,47 @@ server <- function(input, output, session) {
 
   output$creator_live_ui <- renderUI({
     req(creator_rv$current_gates)
-    generate_matrix_ui(creator_rv$current_gates$live_cells, "live")
+    gate <- creator_rv$current_gates$live_cells
+
+    if(is.matrix(gate)) {
+      # Polygon-based gate
+      generate_matrix_ui(gate, "live")
+    } else {
+      # Threshold-based gate
+      div(
+        numericInput("creator_live_threshold", "DCM-A Threshold:",
+                     value = gate$threshold, min = 0, step = 1000),
+        selectInput("creator_live_direction", "Direction:",
+                    choices = c("Less than" = "less_than", "Greater than" = "greater_than"),
+                    selected = gate$direction),
+        textInput("creator_live_param", "Parameter:",
+                  value = gate$parameter),
+        textInput("creator_live_desc", "Description:",
+                  value = gate$description)
+      )
+    }
   })
 
   output$creator_sphase_ui <- renderUI({
     req(creator_rv$current_gates)
-    generate_matrix_ui(creator_rv$current_gates$s_phase_outliers, "sphase")
+    gate <- creator_rv$current_gates$s_phase_outliers
+
+    if(is.matrix(gate)) {
+      # Polygon-based gate
+      generate_matrix_ui(gate, "sphase")
+    } else {
+      # Range-based gate
+      div(
+        numericInput("creator_sphase_lower", "Lower FxCycle-A Threshold:",
+                     value = gate$lower_threshold, min = 0, step = 100000),
+        numericInput("creator_sphase_upper", "Upper FxCycle-A Threshold:",
+                     value = gate$upper_threshold, min = 0, step = 100000),
+        textInput("creator_sphase_param", "Parameter:",
+                  value = gate$parameter),
+        textInput("creator_sphase_desc", "Description:",
+                  value = gate$description)
+      )
+    }
   })
 
   output$creator_fxcycle_ui <- renderUI({
@@ -2718,30 +2775,56 @@ server <- function(input, output, session) {
 
     # Live cells gate
     if(!is.null(creator_rv$current_gates$live_cells)) {
-      n <- nrow(creator_rv$current_gates$live_cells)
-      coords <- matrix(nrow = n, ncol = 2)
-      for(i in 1:n) {
-        coords[i, 1] <- safe_input(paste0("creator_live_x", i),
-                                   creator_rv$current_gates$live_cells[i, 1])
-        coords[i, 2] <- safe_input(paste0("creator_live_y", i),
-                                   creator_rv$current_gates$live_cells[i, 2])
+      if(is.matrix(creator_rv$current_gates$live_cells)) {
+        # Polygon-based gate
+        n <- nrow(creator_rv$current_gates$live_cells)
+        coords <- matrix(nrow = n, ncol = 2)
+        for(i in 1:n) {
+          coords[i, 1] <- safe_input(paste0("creator_live_x", i),
+                                     creator_rv$current_gates$live_cells[i, 1])
+          coords[i, 2] <- safe_input(paste0("creator_live_y", i),
+                                     creator_rv$current_gates$live_cells[i, 2])
+        }
+        colnames(coords) <- colnames(creator_rv$current_gates$live_cells)
+        gates$live_cells <- coords
+      } else {
+        # Threshold-based gate
+        live_gate <- creator_rv$current_gates$live_cells
+        gates$live_cells <- list(
+          type = "vertical_threshold",
+          parameter = safe_input("creator_live_param", live_gate$parameter),
+          threshold = safe_input("creator_live_threshold", live_gate$threshold),
+          direction = safe_input("creator_live_direction", live_gate$direction),
+          description = safe_input("creator_live_desc", live_gate$description)
+        )
       }
-      colnames(coords) <- colnames(creator_rv$current_gates$live_cells)
-      gates$live_cells <- coords
     }
 
     # S-phase outliers gate
     if(!is.null(creator_rv$current_gates$s_phase_outliers)) {
-      n <- nrow(creator_rv$current_gates$s_phase_outliers)
-      coords <- matrix(nrow = n, ncol = 2)
-      for(i in 1:n) {
-        coords[i, 1] <- safe_input(paste0("creator_sphase_x", i),
-                                   creator_rv$current_gates$s_phase_outliers[i, 1])
-        coords[i, 2] <- safe_input(paste0("creator_sphase_y", i),
-                                   creator_rv$current_gates$s_phase_outliers[i, 2])
+      if(is.matrix(creator_rv$current_gates$s_phase_outliers)) {
+        # Polygon-based gate
+        n <- nrow(creator_rv$current_gates$s_phase_outliers)
+        coords <- matrix(nrow = n, ncol = 2)
+        for(i in 1:n) {
+          coords[i, 1] <- safe_input(paste0("creator_sphase_x", i),
+                                     creator_rv$current_gates$s_phase_outliers[i, 1])
+          coords[i, 2] <- safe_input(paste0("creator_sphase_y", i),
+                                     creator_rv$current_gates$s_phase_outliers[i, 2])
+        }
+        colnames(coords) <- colnames(creator_rv$current_gates$s_phase_outliers)
+        gates$s_phase_outliers <- coords
+      } else {
+        # Range-based gate
+        sphase_gate <- creator_rv$current_gates$s_phase_outliers
+        gates$s_phase_outliers <- list(
+          type = "vertical_range",
+          parameter = safe_input("creator_sphase_param", sphase_gate$parameter),
+          lower_threshold = safe_input("creator_sphase_lower", sphase_gate$lower_threshold),
+          upper_threshold = safe_input("creator_sphase_upper", sphase_gate$upper_threshold),
+          description = safe_input("creator_sphase_desc", sphase_gate$description)
+        )
       }
-      colnames(coords) <- colnames(creator_rv$current_gates$s_phase_outliers)
-      gates$s_phase_outliers <- coords
     }
 
     # FxCycle quantile gate

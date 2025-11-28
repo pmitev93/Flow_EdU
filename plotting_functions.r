@@ -1119,9 +1119,9 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
          xlab = "HA-A", ylab = "EdU-A",
          main = if(show_sample_name) sprintf("Gate 7: HA-Positive\n%s", sample_name) else "Gate 7: HA-Positive",
          log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0))
-    axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
          labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
-    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
          labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
     text(1000, 50000, sprintf("Insufficient cells for plotting\n(n = %d)", length(x)),
          cex = 1.2, col = "red", font = 2)
@@ -1153,9 +1153,9 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        yaxs = "i",
        log = "xy")
   
-  axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+  axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
        labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
-  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
        labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
 
   # Tint the HA-positive region (only if valid threshold)
@@ -1237,9 +1237,9 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
       plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e8),
            xlab = "", ylab = "", main = sample_name, log = "xy",
            cex.main = 1.2, cex.axis = 0.7, xaxt = "n", yaxt = "n")
-      axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+      axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
            labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
-      axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
+      axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
            labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
       text(1000, 50000, sprintf("n = %d", length(x)), cex = 0.8, col = "red", font = 2)
       next
@@ -1261,9 +1261,9 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
          yaxt = "n",
          log = "xy")
     
-    axis(1, at = c(100, 1000, 10000, 100000, 1000000),
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
          labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
-    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000),
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
          labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
 
     # Tint the HA-positive region (only if valid threshold)
