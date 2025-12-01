@@ -869,7 +869,8 @@ server <- function(input, output, session) {
     experiment_gate_strategies = list(),  # Per-experiment gate strategy selection
     experiments_loaded = FALSE,  # Track if experiments have been loaded
     scan_trigger = 0,  # Trigger for rescanning experiments
-    ui_refresh_trigger = 0  # Trigger for refreshing experiment UI
+    ui_refresh_trigger = 0,  # Trigger for refreshing experiment UI
+    loaded_experiment_names = c()  # Track which experiments have been explicitly loaded
   )
   
   # Scan for available gate strategy files
@@ -1522,6 +1523,9 @@ server <- function(input, output, session) {
       names(loaded_experiments) <- names(experiments_to_load)
       rv$experiments <- c(rv$experiments, loaded_experiments)
 
+      # Track which experiments were explicitly loaded
+      rv$loaded_experiment_names <- unique(c(rv$loaded_experiment_names, names(experiments_to_load)))
+
       showNotification(sprintf("Loaded %d experiments successfully", length(loaded_experiments)),
                        type = "message", duration = 3)
     })
@@ -1551,6 +1555,9 @@ server <- function(input, output, session) {
       if(is.null(rv$experiments)) {
         rv$experiments <- list()
       }
+
+      # Track which experiments are being loaded/analyzed
+      rv$loaded_experiment_names <- unique(c(rv$loaded_experiment_names, selected_exps))
 
       all_results <- list()
       n_exp <- length(selected_exps)
@@ -4386,6 +4393,13 @@ GATE_STRATEGY <- list(
     # Filter to only analyzed samples (those with non-NA correlation)
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
 
+    # Filter to only explicitly loaded experiments
+    if(length(rv$loaded_experiment_names) > 0) {
+      analyzed <- analyzed[analyzed$Experiment %in% rv$loaded_experiment_names, ]
+      cat(sprintf("After filtering by loaded experiments (%s): %d rows\n",
+                  paste(rv$loaded_experiment_names, collapse = ", "), nrow(analyzed)))
+    }
+
     # Filter by selected gating strategies
     available_strategies <- unique(rv$all_results$Gate_ID)
     available_strategies <- available_strategies[!is.na(available_strategies)]
@@ -4648,6 +4662,11 @@ GATE_STRATEGY <- list(
     # Filter to only analyzed samples (those with non-NA correlation)
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
 
+    # Filter to only explicitly loaded experiments (MUST match table rendering)
+    if(length(rv$loaded_experiment_names) > 0) {
+      analyzed <- analyzed[analyzed$Experiment %in% rv$loaded_experiment_names, ]
+    }
+
     # Filter by selected gating strategies (same logic as the table rendering)
     available_strategies <- unique(rv$all_results$Gate_ID)
     available_strategies <- available_strategies[!is.na(available_strategies)]
@@ -4688,6 +4707,11 @@ GATE_STRATEGY <- list(
 
     # Use the SAME filtering logic as the table rendering
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    # Filter to only explicitly loaded experiments (MUST match table rendering)
+    if(length(rv$loaded_experiment_names) > 0) {
+      analyzed <- analyzed[analyzed$Experiment %in% rv$loaded_experiment_names, ]
+    }
 
     # Filter by selected gating strategies (MUST match table rendering logic)
     available_strategies <- unique(rv$all_results$Gate_ID)
