@@ -945,6 +945,11 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
     axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5)
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
     
+    # Add blue tint to gated region
+    rect(xleft = lower_bound, ybottom = 1e3,
+         xright = upper_bound, ytop = 1e8,
+         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
     # Add vertical lines
     abline(v = lower_bound, col = "black", lwd = 1, lty = 2)
     abline(v = upper_bound, col = "black", lwd = 1, lty = 2)
@@ -1103,17 +1108,22 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
     
     axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5)
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
-    
-    # Add gate lines (only in gated region)
-    segments(x0 = fxcycle_bounds[1], y0 = edu_threshold, 
-             x1 = fxcycle_bounds[2], y1 = edu_threshold, 
+
+    # Add blue tint to gated region
+    rect(xleft = fxcycle_bounds[1], ybottom = edu_threshold,
+         xright = fxcycle_bounds[2], ytop = 1e8,
+         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+    # Add gate lines (extended to top of plot)
+    segments(x0 = fxcycle_bounds[1], y0 = edu_threshold,
+             x1 = fxcycle_bounds[2], y1 = edu_threshold,
              col = "black", lwd = 2, lty = 2)  # Horizontal line between FxCycle bounds
-    segments(x0 = fxcycle_bounds[1], y0 = edu_threshold, 
-             x1 = fxcycle_bounds[1], y1 = 6e6, 
-             col = "black", lwd = 2, lty = 2)  # Left vertical line
-    segments(x0 = fxcycle_bounds[2], y0 = edu_threshold, 
-             x1 = fxcycle_bounds[2], y1 = 6e6, 
-             col = "black", lwd = 2, lty = 2)  # Right vertical line
+    segments(x0 = fxcycle_bounds[1], y0 = edu_threshold,
+             x1 = fxcycle_bounds[1], y1 = 1e8,
+             col = "black", lwd = 2, lty = 2)  # Left vertical line (extended to top)
+    segments(x0 = fxcycle_bounds[2], y0 = edu_threshold,
+             x1 = fxcycle_bounds[2], y1 = 1e8,
+             col = "black", lwd = 2, lty = 2)  # Right vertical line (extended to top)
     
     inside_gate <- sum(edu_values >= edu_threshold & 
                          fxcycle_values >= fxcycle_bounds[1] & 
