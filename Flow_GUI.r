@@ -489,7 +489,13 @@ ui <- fluidPage(
                                                    choices = c("Correlation" = "correlation",
                                                                "Slope" = "slope"),
                                                    selected = "correlation",
-                                                   inline = TRUE))
+                                                   inline = TRUE)),
+                            column(4, selectInput("stat_test_type", "Statistical Test:",
+                                                  choices = c("Paired t-test" = "paired_t",
+                                                            "Unpaired t-test" = "unpaired_t",
+                                                            "Wilcoxon signed-rank (paired)" = "wilcoxon_paired",
+                                                            "Mann-Whitney U (unpaired)" = "mann_whitney"),
+                                                  selected = "paired_t"))
                           )
                    )
                  ),
@@ -4780,9 +4786,26 @@ GATE_STRATEGY <- list(
       paste0(mut, " (#", cl, ")")
     })
     choices <- setNames(unique_lines, choices_labels)
-    updateSelectInput(session, "reference_group", 
+
+    # Smart default selection: preserve current if valid, otherwise prefer WT (#203) > WT (#213) > first
+    current_ref <- input$reference_group
+    default_ref <- if(!is.null(current_ref) && current_ref %in% unique_lines) {
+      # Keep current selection if still valid
+      current_ref
+    } else if("203" %in% unique_lines) {
+      # Prefer WT (#203)
+      "203"
+    } else if("213" %in% unique_lines) {
+      # Prefer WT (#213)
+      "213"
+    } else {
+      # Default to first
+      unique_lines[1]
+    }
+
+    updateSelectInput(session, "reference_group",
                       choices = choices,
-                      selected = unique_lines[1])
+                      selected = default_ref)
   })
 
 
@@ -4946,6 +4969,10 @@ GATE_STRATEGY <- list(
 
     # Add statistical significance using Holm-Sidak correction (all at same height)
     if(nrow(plot_summary) > 1) {
+      # Get selected statistical test type
+      test_type <- input$stat_test_type
+      if(is.null(test_type)) test_type <- "paired_t"
+
       # Prepare data for matched analysis
       # If there are multiple replicates per experiment/cell_line, take the mean
       wide_data <- plot_data %>%
@@ -4955,7 +4982,7 @@ GATE_STRATEGY <- list(
       long_data <- wide_data %>%
         pivot_longer(cols = -Experiment, names_to = "Cell_line", values_to = "metric_value") %>%
         filter(!is.na(metric_value))
-      
+
       # Reference group - use selected reference or default to first
       ref_group <- if(!is.null(input$reference_group) && input$reference_group != "") {
         input$reference_group
@@ -4963,11 +4990,11 @@ GATE_STRATEGY <- list(
         plot_summary$Cell_line[1]
       }
       ref_data <- long_data %>% filter(Cell_line == ref_group)
-      
-      # Perform pairwise t-tests
+
+      # Perform pairwise statistical tests
       p_values <- c()
       test_groups <- c()
-      
+
       for(i in 1:nrow(plot_summary)) {
         test_group <- plot_summary$Cell_line[i]
 
@@ -4982,53 +5009,79 @@ GATE_STRATEGY <- list(
         # Remove any rows with NA values
         merged <- merged %>% filter(!is.na(metric_value_ref) & !is.na(metric_value_test))
 
-        if(nrow(merged) >= 2) {
-          # Paired t-test (only for experiments with both samples)
-          tryCatch({
-            t_result <- t.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
-            p_values <- c(p_values, t_result$p.value)
+        # Perform test based on selected type
+        if(test_type %in% c("paired_t", "wilcoxon_paired")) {
+          # Paired tests require matched data
+          if(nrow(merged) >= 2) {
+            tryCatch({
+              if(test_type == "paired_t") {
+                test_result <- t.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
+              } else {  # wilcoxon_paired
+                test_result <- wilcox.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
+              }
+              p_values <- c(p_values, test_result$p.value)
+              test_groups <- c(test_groups, test_group)
+            }, error = function(e) {
+              # If test fails, mark as NA
+              p_values <<- c(p_values, NA)
+              test_groups <<- c(test_groups, test_group)
+            })
+          } else {
+            # Not enough matched pairs for comparison
+            p_values <- c(p_values, NA)
             test_groups <- c(test_groups, test_group)
-          }, error = function(e) {
-            # If t-test fails, mark as NA
-            p_values <<- c(p_values, NA)
-            test_groups <<- c(test_groups, test_group)
-          })
+          }
         } else {
-          # Not enough matched pairs for comparison
-          p_values <- c(p_values, NA)
-          test_groups <- c(test_groups, test_group)
+          # Unpaired tests - use all available data
+          if(nrow(ref_data) >= 2 && nrow(test_data) >= 2) {
+            tryCatch({
+              if(test_type == "unpaired_t") {
+                test_result <- t.test(ref_data$metric_value, test_data$metric_value, paired = FALSE)
+              } else {  # mann_whitney
+                test_result <- wilcox.test(ref_data$metric_value, test_data$metric_value, paired = FALSE)
+              }
+              p_values <- c(p_values, test_result$p.value)
+              test_groups <- c(test_groups, test_group)
+            }, error = function(e) {
+              # If test fails, mark as NA
+              p_values <<- c(p_values, NA)
+              test_groups <<- c(test_groups, test_group)
+            })
+          } else {
+            # Not enough data for comparison
+            p_values <- c(p_values, NA)
+            test_groups <- c(test_groups, test_group)
+          }
         }
       }
 
       # Apply Holm-Sidak correction
       p_adjusted <- p.adjust(p_values, method = "holm")
 
-      # Find the maximum y position for all bars
-      max_y <- max(c(plot_summary$mean_value + plot_summary$sd_value,
-                     plot_data[[metric_col]]), na.rm = TRUE)
-      sig_y_pos <- max_y + 0.12
-      
+      # Use y_max from ylim calculation (already includes error bars + padding)
+      sig_y_pos <- y_max - 0.18  # Position near top of plot
+
       # Display results
       for(i in seq_along(test_groups)) {
         plot_idx <- which(plot_summary$Cell_line == test_groups[i])
-        
+
         # Only display if we have a valid p-value (skip n/a cases)
         if(!is.na(p_adjusted[i])) {
           stars <- if(p_adjusted[i] < 0.001) "***"
           else if(p_adjusted[i] < 0.01) "**"
           else if(p_adjusted[i] < 0.05) "*"
           else "ns"
-          
+
           # Format p-value
           if(p_adjusted[i] < 0.001) {
             p_text <- sprintf("(p<0.001)")
           } else {
             p_text <- sprintf("(p=%.3f)", p_adjusted[i])
           }
-          
+
           # Show stars/ns at consistent height
           text(bp[plot_idx], sig_y_pos, stars, cex = 1.2, font = 2, col = "black")
-          
+
           # Show p-value below stars
           text(bp[plot_idx], sig_y_pos - 0.06, p_text, cex = 0.7, col = "black")
         }
