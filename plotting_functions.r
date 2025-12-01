@@ -214,12 +214,14 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
     ) > 0)
     
     pct <- 100 * inside_gate / nrow(fcs_data)
-    # Color code based on threshold
-    text_col <- ifelse(pct < 75, "red", "black")
+    # Color code based on threshold (use QC threshold from gate strategy)
+    threshold <- if(!is.null(gates$qc_thresholds$gate2_singlet)) gates$qc_thresholds$gate2_singlet else 75
+    text_col <- ifelse(pct < threshold, "red", "black")
     text(17e6, 1e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
     
-    # Add BIG warning if below threshold
-    if(pct < 75) {
+    # Add BIG warning if below threshold (use QC threshold from gate strategy)
+    threshold <- if(!is.null(gates$qc_thresholds$gate2_singlet)) gates$qc_thresholds$gate2_singlet else 75
+    if(pct < threshold) {
       # Red border around plot
       box(col = "red", lwd = 4)
       # Big warning text in center
@@ -371,10 +373,12 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
     ) > 0)
     
     pct <- 100 * inside_gate / nrow(fcs_data)
-    text_col <- ifelse(pct < 50, "red", "black")
+    # Use QC threshold from gate strategy
+    threshold <- if(!is.null(gates$qc_thresholds$gate2_singlet)) gates$qc_thresholds$gate2_singlet else 75
+    text_col <- ifelse(pct < threshold, "red", "black")
     text(13e6, 0.5e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
-    
-    if(pct < 70) {
+
+    if(pct < threshold) {
       box(col = "red", lwd = 4)
       text(10e6, 2e6, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
     }
@@ -562,10 +566,12 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
     }
     
     pct <- 100 * inside_gate / nrow(fcs_data)
-    text_col <- ifelse(pct < 50, "red", "black")
+    # Use QC threshold from gate strategy
+    threshold <- if(!is.null(gates$qc_thresholds$gate3_live)) gates$qc_thresholds$gate3_live else 50
+    text_col <- ifelse(pct < threshold, "red", "black")
     text(850000, 14e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
-    
-    if(pct < 50) {
+
+    if(pct < threshold) {
       box(col = "red", lwd = 4)
       text(1000, 7.5e6, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
     }

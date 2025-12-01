@@ -90,6 +90,17 @@ GATES$quadrant <- list(
   description = "Quadrant gating using 121_Empty_Vector_Dox- control for both HA and EdU thresholds"
 )
 
+# Quality control thresholds (percentage thresholds for flagging low cell counts)
+QC_THRESHOLDS <- list(
+  gate1_debris = NULL,        # No QC threshold for debris gate
+  gate2_singlet = 75,         # Flag if < 75% of cells pass singlet gate
+  gate3_live = 50,            # Flag if < 50% of cells pass live gate
+  gate4_sphase = NULL,        # No QC threshold for s-phase outlier gate
+  gate5_fxcycle = NULL,       # No QC threshold for fxcycle quantile gate
+  gate6_edu_fxcycle = NULL,   # No QC threshold for edu_fxcycle gate
+  gate7_ha_positive = NULL    # No QC threshold for ha_positive gate
+)
+
 # Gate strategy metadata
 GATE_STRATEGY <- list(
   id = "quadrant_control",

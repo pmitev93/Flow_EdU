@@ -1593,6 +1593,10 @@ server <- function(input, output, session) {
           source(gate_path, local = GATES_env)
           GATES_selected <- GATES_env$GATES
           GATE_STRATEGY_selected <- GATES_env$GATE_STRATEGY
+          # Load QC thresholds if available
+          if(!is.null(GATES_env$QC_THRESHOLDS)) {
+            GATES_selected$qc_thresholds <- GATES_env$QC_THRESHOLDS
+          }
         }, error = function(e) {
           showNotification(sprintf("Error loading %s: %s", gate_file, e$message),
                            type = "error")
@@ -2580,6 +2584,10 @@ server <- function(input, output, session) {
       source(gate_path, local = GATES_env)
       creator_rv$current_gates <- GATES_env$GATES
       creator_rv$current_strategy <- GATES_env$GATE_STRATEGY
+      # Load QC thresholds if available
+      if(!is.null(GATES_env$QC_THRESHOLDS)) {
+        creator_rv$current_gates$qc_thresholds <- GATES_env$QC_THRESHOLDS
+      }
 
       showNotification("Strategy loaded successfully!", type = "message", duration = 2)
     }, error = function(e) {
@@ -4481,23 +4489,53 @@ GATE_STRATEGY <- list(
       analyzed_numeric <- analyzed
       analyzed_numeric$Correlation <- as.numeric(analyzed_numeric$Correlation)
 
+      # Prepare Slope column if it exists
+      has_slope <- "Slope" %in% names(analyzed_numeric)
+      if(has_slope) {
+        analyzed_numeric$Slope <- as.numeric(analyzed_numeric$Slope)
+      }
+
       # Calculate stats across all experiments for each cell line
-      all_stats <- analyzed_numeric %>%
-        group_by(Cell_line) %>%
-        summarise(
-          Avg_Corr_All = mean(Correlation, na.rm = TRUE),
-          Std_Corr_All = sd(Correlation, na.rm = TRUE),
-          .groups = "drop"
-        )
+      if(has_slope) {
+        all_stats <- analyzed_numeric %>%
+          group_by(Cell_line) %>%
+          summarise(
+            Avg_Corr_All = mean(Correlation, na.rm = TRUE),
+            Std_Corr_All = sd(Correlation, na.rm = TRUE),
+            Avg_Slope_All = mean(Slope, na.rm = TRUE),
+            Std_Slope_All = sd(Slope, na.rm = TRUE),
+            .groups = "drop"
+          )
+      } else {
+        all_stats <- analyzed_numeric %>%
+          group_by(Cell_line) %>%
+          summarise(
+            Avg_Corr_All = mean(Correlation, na.rm = TRUE),
+            Std_Corr_All = sd(Correlation, na.rm = TRUE),
+            .groups = "drop"
+          )
+      }
 
       # Calculate stats for same week for each cell line + week combination
-      week_stats <- analyzed_numeric %>%
-        group_by(Cell_line, Year_Week) %>%
-        summarise(
-          Avg_Corr_Week = mean(Correlation, na.rm = TRUE),
-          Std_Corr_Week = sd(Correlation, na.rm = TRUE),
-          .groups = "drop"
-        )
+      if(has_slope) {
+        week_stats <- analyzed_numeric %>%
+          group_by(Cell_line, Year_Week) %>%
+          summarise(
+            Avg_Corr_Week = mean(Correlation, na.rm = TRUE),
+            Std_Corr_Week = sd(Correlation, na.rm = TRUE),
+            Avg_Slope_Week = mean(Slope, na.rm = TRUE),
+            Std_Slope_Week = sd(Slope, na.rm = TRUE),
+            .groups = "drop"
+          )
+      } else {
+        week_stats <- analyzed_numeric %>%
+          group_by(Cell_line, Year_Week) %>%
+          summarise(
+            Avg_Corr_Week = mean(Correlation, na.rm = TRUE),
+            Std_Corr_Week = sd(Correlation, na.rm = TRUE),
+            .groups = "drop"
+          )
+      }
 
       # Merge stats back to display_data
       display_data <- display_data %>%
@@ -4559,6 +4597,18 @@ GATE_STRATEGY <- list(
     }
     if("Std_Corr_Week" %in% names(display_data)) {
       dt <- dt %>% formatRound('Std_Corr_Week', digits = 4)
+    }
+    if("Avg_Slope_All" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Avg_Slope_All', digits = 4)
+    }
+    if("Std_Slope_All" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Std_Slope_All', digits = 4)
+    }
+    if("Avg_Slope_Week" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Avg_Slope_Week', digits = 4)
+    }
+    if("Std_Slope_Week" %in% names(display_data)) {
+      dt <- dt %>% formatRound('Std_Slope_Week', digits = 4)
     }
 
     dt
