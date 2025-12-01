@@ -373,8 +373,12 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
     
     axis(1, at = seq(0, 20e6, 5e6), labels = format_axis(seq(0, 20e6, 5e6)), cex.axis = 0.5)
     axis(2, at = seq(0, 4e6, 1e6), labels = format_axis(seq(0, 4e6, 1e6)), cex.axis = 0.5)
-    
-    polygon(gates$singlet[, 1], gates$singlet[, 2], 
+
+    # Add blue tint to gate region
+    polygon(gates$singlet[, 1], gates$singlet[, 2],
+            col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+    polygon(gates$singlet[, 1], gates$singlet[, 2],
             border = "black", lwd = 1)
     
     inside_gate <- sum(point.in.polygon(
@@ -465,15 +469,17 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
 
   # Add gate (polygon or vertical line)
   if(is.matrix(gates$live_cells)) {
-    # Old polygon-based gate
+    # Old polygon-based gate - add blue tint first
+    polygon(gates$live_cells[, 1], gates$live_cells[, 2],
+            col = rgb(0.5, 0.7, 1, 0.25), border = NA)
     polygon(gates$live_cells[, 1], gates$live_cells[, 2],
             border = "black", lwd = 1.5)
   } else {
     # New threshold-based gate (vertical line)
-    abline(v = gates$live_cells$threshold, col = "black", lwd = 2, lty = 2)
     # Add shading for kept region (left of line)
     rect(xleft = 100, ybottom = 0, xright = gates$live_cells$threshold, ytop = 15e6,
-         col = rgb(0.5, 0.7, 1, 0.15), border = NA)
+         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+    abline(v = gates$live_cells$threshold, col = "black", lwd = 2, lty = 2)
   }
 
   # Calculate stats
@@ -560,9 +566,15 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
 
     # Add gate (polygon or vertical line)
     if(is.matrix(gates$live_cells)) {
+      # Add blue tint first
+      polygon(gates$live_cells[, 1], gates$live_cells[, 2],
+              col = rgb(0.5, 0.7, 1, 0.25), border = NA)
       polygon(gates$live_cells[, 1], gates$live_cells[, 2],
               border = "black", lwd = 1)
     } else {
+      # Add shading for kept region (left of line)
+      rect(xleft = 100, ybottom = 0, xright = gates$live_cells$threshold, ytop = 15e6,
+           col = rgb(0.5, 0.7, 1, 0.25), border = NA)
       abline(v = gates$live_cells$threshold, col = "black", lwd = 1.5, lty = 2)
     }
 
@@ -667,17 +679,19 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
 
   # Add gate (polygon or vertical lines)
   if(is.matrix(gates$s_phase_outliers)) {
-    # Old polygon-based gate
+    # Old polygon-based gate - add blue tint first
+    polygon(gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2],
+            col = rgb(0.5, 0.7, 1, 0.25), border = NA)
     polygon(gates$s_phase_outliers[, 1], gates$s_phase_outliers[, 2],
             border = "black", lwd = 1.5)
   } else {
     # New range-based gate (two vertical lines)
-    abline(v = gates$s_phase_outliers$lower_threshold, col = "black", lwd = 2, lty = 2)
-    abline(v = gates$s_phase_outliers$upper_threshold, col = "black", lwd = 2, lty = 2)
     # Add shading for kept region (between lines)
     rect(xleft = gates$s_phase_outliers$lower_threshold, ybottom = 1e3,
          xright = gates$s_phase_outliers$upper_threshold, ytop = 1e8,
-         col = rgb(0.5, 0.7, 1, 0.15), border = NA)
+         col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+    abline(v = gates$s_phase_outliers$lower_threshold, col = "black", lwd = 2, lty = 2)
+    abline(v = gates$s_phase_outliers$upper_threshold, col = "black", lwd = 2, lty = 2)
   }
 
   # Calculate stats
