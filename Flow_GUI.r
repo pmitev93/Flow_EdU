@@ -473,21 +473,29 @@ ui <- fluidPage(
                           h4("Selected Samples"),
                           verbatimTextOutput("selected_samples_list"),
                           fluidRow(
-                            column(3, actionButton("plot_comparison", "Generate Comparison Plot", 
+                            column(3, actionButton("plot_comparison", "Generate Comparison Plot",
                                                    class = "btn-primary")),
-                            column(3, actionButton("reorder_samples", "Reorder Samples", 
+                            column(3, actionButton("reorder_samples", "Reorder Samples",
                                                    class = "btn-secondary")),
                             column(3, downloadButton("download_prism", "Download for Prism",
                                                      class = "btn-success")),
                             column(3, selectInput("reference_group", "Reference for comparisons:",
                                                   choices = NULL))
+                          ),
+                          br(),
+                          fluidRow(
+                            column(3, radioButtons("comparison_metric", "Metric:",
+                                                   choices = c("Correlation" = "correlation",
+                                                               "Slope" = "slope"),
+                                                   selected = "correlation",
+                                                   inline = TRUE))
                           )
                    )
                  ),
-                 
+
                  fluidRow(
                    column(12,
-                          h4("Correlation Comparison"),
+                          h4(textOutput("comparison_plot_title")),
                           plotOutput("comparison_plot", height = "600px")
                    )
                  ),
@@ -1042,8 +1050,25 @@ server <- function(input, output, session) {
         # Scan for available gate files
         rv$available_gate_files <- scan_gate_files()
 
-        # Initialize gate strategies with default (gdef)
-        default_gate <- "gates_gdef.r"
+        # Load saved default gate strategy (if exists), otherwise use gdef
+        default_gate_file <- ".default_gate_strategy"
+        default_gate <- if(file.exists(default_gate_file)) {
+          saved_gate <- tryCatch({
+            readLines(default_gate_file, n = 1, warn = FALSE)
+          }, error = function(e) {
+            "gates_gdef.r"
+          })
+          # Verify the saved gate file exists
+          if(saved_gate %in% rv$available_gate_files) {
+            saved_gate
+          } else {
+            "gates_gdef.r"
+          }
+        } else {
+          "gates_gdef.r"
+        }
+
+        # Initialize gate strategies with default
         rv$experiment_gate_strategies <- setNames(
           rep(list(default_gate), length(exp_names)),
           exp_names
@@ -1294,6 +1319,13 @@ server <- function(input, output, session) {
     exp_names <- names(rv$experiment_folders)
     default_gate <- input$default_gate_strategy
 
+    # Save default gate strategy for next session
+    tryCatch({
+      writeLines(default_gate, ".default_gate_strategy")
+    }, error = function(e) {
+      cat(sprintf("Warning: Could not save default gate strategy: %s\n", e$message))
+    })
+
     # Update all experiment gate strategies
     rv$experiment_gate_strategies <- setNames(
       rep(list(default_gate), length(exp_names)),
@@ -1305,7 +1337,7 @@ server <- function(input, output, session) {
       updateSelectInput(session, paste0("gate_strategy_", i), selected = default_gate)
     }
 
-    showNotification(sprintf("Applied %s to all experiments",
+    showNotification(sprintf("Applied %s to all experiments (saved as default)",
                              names(rv$available_gate_files)[rv$available_gate_files == default_gate]),
                      type = "message")
   })
@@ -4635,29 +4667,64 @@ GATE_STRATEGY <- list(
                       choices = choices,
                       selected = unique_lines[1])
   })
-  
-  
+
+
+  # Dynamic plot title based on selected metric
+  output$comparison_plot_title <- renderText({
+    metric <- input$comparison_metric
+    if(is.null(metric)) metric <- "correlation"
+
+    if(metric == "correlation") {
+      "Correlation Comparison"
+    } else {
+      "Slope Comparison"
+    }
+  })
+
+
   # Render comparison plot
   output$comparison_plot <- renderPlot({
     req(rv$comparison_samples())
-    
+
     plot_data <- rv$comparison_samples()
-    
+
     if(nrow(plot_data) == 0) {
       plot.new()
       text(0.5, 0.5, "Select samples and click 'Generate Comparison Plot'", cex = 1.5)
       return()
     }
-    
-    # Convert correlation to numeric
-    plot_data$Correlation <- as.numeric(plot_data$Correlation)
-    
+
+    # Determine which metric to use
+    metric <- input$comparison_metric
+    if(is.null(metric)) metric <- "correlation"
+
+    # Set column name and labels based on metric
+    if(metric == "correlation") {
+      metric_col <- "Correlation"
+      y_label <- "EdU vs HA Correlation (r)"
+      plot_title <- "Multi-Sample Correlation Comparison"
+    } else {
+      metric_col <- "Slope"
+      y_label <- "EdU vs HA Slope"
+      plot_title <- "Multi-Sample Slope Comparison"
+    }
+
+    # Check if metric column exists in data
+    if(!metric_col %in% names(plot_data)) {
+      plot.new()
+      text(0.5, 0.5, sprintf("%s data not available for selected samples", metric_col), cex = 1.5)
+      return()
+    }
+
+    # Convert metric to numeric
+    plot_data[[metric_col]] <- as.numeric(plot_data[[metric_col]])
+
     # Group by cell line to get means
     plot_summary <- plot_data %>%
       group_by(Cell_line, Mutation, Gene) %>%
       summarize(
-        mean_corr = mean(Correlation, na.rm = TRUE),
-        sd_corr = ifelse(n() > 1, sd(Correlation, na.rm = TRUE), 0),  # Set SD to 0 for single replicates
+        mean_value = mean(.data[[metric_col]], na.rm = TRUE),
+        sd_value = ifelse(n() > 1, sd(.data[[metric_col]], na.rm = TRUE), 0),  # Set SD to 0 for single replicates
         n = n(),
         .groups = 'drop'
       ) %>%
@@ -4666,21 +4733,21 @@ GATE_STRATEGY <- list(
         Mutation = as.character(Mutation),
         Gene = as.character(Gene)
       )
-    
-    # Sort: use custom order if available, otherwise WT first then by correlation
+
+    # Sort: use custom order if available, otherwise WT first then by metric
     if(!is.null(rv$sample_order())) {
       # Apply custom order
       plot_summary$Cell_line <- factor(plot_summary$Cell_line, levels = rv$sample_order())
       plot_summary <- plot_summary %>% arrange(Cell_line)
     } else {
-      # Default: WT first, others by correlation
+      # Default: WT first, others by metric value
       wt_rows <- grep("^WT", plot_summary$Mutation, ignore.case = TRUE)
       if(length(wt_rows) > 0) {
         wt_data <- plot_summary[wt_rows, ]
-        other_data <- plot_summary[-wt_rows, ] %>% arrange(mean_corr)
+        other_data <- plot_summary[-wt_rows, ] %>% arrange(mean_value)
         plot_summary <- bind_rows(wt_data, other_data)
       } else {
-        plot_summary <- plot_summary %>% arrange(mean_corr)
+        plot_summary <- plot_summary %>% arrange(mean_value)
       }
     }
     
@@ -4705,63 +4772,63 @@ GATE_STRATEGY <- list(
     bars_width <- n_samples * (bar_width + bar_space)
     x_max <- max(bars_width, 15)  # Always extend to at least 15 units
     
-    bp <- barplot(plot_summary$mean_corr,
+    bp <- barplot(plot_summary$mean_value,
                   names.arg = plot_summary$label,
                   las = 2,
                   xlim = c(0, x_max),  # Fixed x-range
                   ylim = c(-0.8,
-                           max(c(0, plot_data$Correlation, plot_summary$mean_corr), na.rm = TRUE) + 0.3),
-                  ylab = "EdU vs HA Correlation (r)",
+                           max(c(0, plot_data[[metric_col]], plot_summary$mean_value), na.rm = TRUE) + 0.3),
+                  ylab = y_label,
                   main = "",
                   col = "lightgrey",
                   border = "black",
                   cex.names = 0.8,
                   width = bar_width,
                   space = bar_space)
-    
+
     # Add title with space for legend
-    title(main = "Multi-Sample Correlation Comparison", line = 3.5)
-    
+    title(main = plot_title, line = 3.5)
+
     # Add error bars (SD) - only for samples with SD > 0
     for(i in seq_len(nrow(plot_summary))) {
-      if(!is.na(plot_summary$sd_corr[i]) && plot_summary$sd_corr[i] > 0) {
-        arrows(bp[i], plot_summary$mean_corr[i] - plot_summary$sd_corr[i],
-               bp[i], plot_summary$mean_corr[i] + plot_summary$sd_corr[i],
+      if(!is.na(plot_summary$sd_value[i]) && plot_summary$sd_value[i] > 0) {
+        arrows(bp[i], plot_summary$mean_value[i] - plot_summary$sd_value[i],
+               bp[i], plot_summary$mean_value[i] + plot_summary$sd_value[i],
                angle = 90, code = 3, length = 0.1)
       }
     }
-    
+
     # Add horizontal line at 0
     abline(h = 0, lty = 2, col = "gray40")
-    
+
     # Add individual data points
     for(i in seq_len(nrow(plot_summary))) {
       cell_line <- plot_summary$Cell_line[i]
       cell_data <- plot_data[plot_data$Cell_line == cell_line, ]
-      
+
       # Add jitter to x position for visibility
       x_pos <- bp[i] + runif(nrow(cell_data), -0.15, 0.15)
-      
+
       for(j in seq_len(nrow(cell_data))) {
         exp_name <- cell_data$Experiment[j]
-        points(x_pos[j], cell_data$Correlation[j], 
-               pch = 21, cex = 2, 
-               bg = exp_colors[exp_name], 
+        points(x_pos[j], cell_data[[metric_col]][j],
+               pch = 21, cex = 2,
+               bg = exp_colors[exp_name],
                col = "black", lwd = 1.5)
       }
     }
-    
+
     # Add statistical significance using Holm-Sidak correction (all at same height)
     if(nrow(plot_summary) > 1) {
       # Prepare data for matched analysis
       # If there are multiple replicates per experiment/cell_line, take the mean
       wide_data <- plot_data %>%
-        select(Experiment, Cell_line, Correlation) %>%
-        pivot_wider(names_from = Cell_line, values_from = Correlation, values_fn = mean)
-      
+        select(Experiment, Cell_line, all_of(metric_col)) %>%
+        pivot_wider(names_from = Cell_line, values_from = all_of(metric_col), values_fn = mean)
+
       long_data <- wide_data %>%
-        pivot_longer(cols = -Experiment, names_to = "Cell_line", values_to = "Correlation") %>%
-        filter(!is.na(Correlation))
+        pivot_longer(cols = -Experiment, names_to = "Cell_line", values_to = "metric_value") %>%
+        filter(!is.na(metric_value))
       
       # Reference group - use selected reference or default to first
       ref_group <- if(!is.null(input$reference_group) && input$reference_group != "") {
@@ -4786,13 +4853,13 @@ GATE_STRATEGY <- list(
         # Match by experiment - only keep experiments that have both samples
         merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
 
-        # Remove any rows with NA correlations
-        merged <- merged %>% filter(!is.na(Correlation_ref) & !is.na(Correlation_test))
+        # Remove any rows with NA values
+        merged <- merged %>% filter(!is.na(metric_value_ref) & !is.na(metric_value_test))
 
         if(nrow(merged) >= 2) {
           # Paired t-test (only for experiments with both samples)
           tryCatch({
-            t_result <- t.test(merged$Correlation_ref, merged$Correlation_test, paired = TRUE)
+            t_result <- t.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
             p_values <- c(p_values, t_result$p.value)
             test_groups <- c(test_groups, test_group)
           }, error = function(e) {
@@ -4806,13 +4873,13 @@ GATE_STRATEGY <- list(
           test_groups <- c(test_groups, test_group)
         }
       }
-      
+
       # Apply Holm-Sidak correction
       p_adjusted <- p.adjust(p_values, method = "holm")
-      
+
       # Find the maximum y position for all bars
-      max_y <- max(c(plot_summary$mean_corr + plot_summary$sd_corr, 
-                     plot_data$Correlation))
+      max_y <- max(c(plot_summary$mean_value + plot_summary$sd_value,
+                     plot_data[[metric_col]]), na.rm = TRUE)
       sig_y_pos <- max_y + 0.12
       
       # Display results
