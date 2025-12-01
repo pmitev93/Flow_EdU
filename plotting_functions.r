@@ -126,9 +126,13 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
   
   axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
   axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
-  
-  # Add gate polygon
-  polygon(gates$debris[, 1], gates$debris[, 2], 
+
+  # Add blue tint to gate region
+  polygon(gates$debris[, 1], gates$debris[, 2],
+          col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+  # Add gate polygon border
+  polygon(gates$debris[, 1], gates$debris[, 2],
           border = "black", lwd = 1)
   
   # Calculate stats
@@ -201,8 +205,12 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
     
     axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
     axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
-    
-    polygon(gates$debris[, 1], gates$debris[, 2], 
+
+    # Add blue tint to gate region
+    polygon(gates$debris[, 1], gates$debris[, 2],
+            col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+    polygon(gates$debris[, 1], gates$debris[, 2],
             border = "black", lwd = 1)
     
     # Add % inside gate
@@ -280,9 +288,13 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
   # Add these two lines here:
   axis(1, at = seq(0, 15e6, 5e6), labels = c("0M", "5M", "10M", "15M"), mgp = c(3, 0.5, 0))
   axis(2, at = seq(0, 4e6, 1e6), labels = c("0M", "1M", "2M", "3M", "4M"), mgp = c(3, 0.5, 0))
-  
-  # Add gate polygon
-  polygon(gates$singlet[, 1], gates$singlet[, 2], 
+
+  # Add blue tint to gate region
+  polygon(gates$singlet[, 1], gates$singlet[, 2],
+          col = rgb(0.5, 0.7, 1, 0.25), border = NA)
+
+  # Add gate polygon border
+  polygon(gates$singlet[, 1], gates$singlet[, 2],
           border = "black", lwd = 1.5)
   
   # Calculate stats
