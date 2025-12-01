@@ -4633,7 +4633,37 @@ GATE_STRATEGY <- list(
   output$selected_samples_list <- renderText({
     req(input$comparison_sample_selector_rows_selected)
 
+    # Use the SAME filtering logic as the table rendering
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    # Filter to only explicitly loaded experiments (MUST match table rendering)
+    if(length(rv$loaded_experiment_names) > 0) {
+      analyzed <- analyzed[analyzed$Experiment %in% rv$loaded_experiment_names, ]
+    }
+
+    # Filter by selected gating strategies (MUST match table rendering)
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("msc_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
+        }
+      }
+
+      # Only keep rows with selected gating strategies
+      if(length(selected_strategies) > 0) {
+        analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
+                            analyzed$Gate_ID %in% selected_strategies, ]
+      } else {
+        analyzed <- analyzed[0, ]
+      }
+    }
+
+    # Now get the selected rows from the filtered data
     selected_rows <- input$comparison_sample_selector_rows_selected
     selected_data <- analyzed[selected_rows, ]
     
@@ -4838,8 +4868,8 @@ GATE_STRATEGY <- list(
       }
     }
     
-    # Create labels - just mutation name (no cell line number)
-    plot_summary$label <- plot_summary$Mutation
+    # Create labels with mutation name and cell line number
+    plot_summary$label <- paste0(plot_summary$Mutation, " (#", plot_summary$Cell_line, ")")
     
     # Assign lighter colors to experiments for points
     exp_colors <- rainbow(length(unique(plot_data$Experiment)), alpha = 0.5)
@@ -4848,23 +4878,32 @@ GATE_STRATEGY <- list(
     # Create the plot with adaptive top margin based on number of experiments
     n_experiments <- length(unique(plot_data$Experiment))
     top_margin <- 8 + ceiling(n_experiments * 0.7)  # Scales with number of experiments
-    par(mar = c(8, 4, top_margin, 4))
+    par(mar = c(14, 4, top_margin, 4))  # Increased bottom margin from 8 to 14 for longer labels
     
     # Fixed narrow bars, add empty space on right when few samples
     n_samples <- nrow(plot_summary)
     bar_width <- 0.8  # Fixed narrow width
     bar_space <- 1  # Fixed moderate spacing
-    
+
     # Calculate total x-range: expand to fixed width regardless of sample count
     bars_width <- n_samples * (bar_width + bar_space)
     x_max <- max(bars_width, 15)  # Always extend to at least 15 units
-    
+
+    # Calculate ylim to include error bars (mean +/- SD) and all data points
+    y_max <- max(c(0,
+                   plot_data[[metric_col]],
+                   plot_summary$mean_value + plot_summary$sd_value),
+                 na.rm = TRUE) + 0.3
+    y_min <- min(c(0,
+                   plot_data[[metric_col]],
+                   plot_summary$mean_value - plot_summary$sd_value),
+                 na.rm = TRUE) - 0.3
+
     bp <- barplot(plot_summary$mean_value,
                   names.arg = plot_summary$label,
                   las = 2,
                   xlim = c(0, x_max),  # Fixed x-range
-                  ylim = c(-0.8,
-                           max(c(0, plot_data[[metric_col]], plot_summary$mean_value), na.rm = TRUE) + 0.3),
+                  ylim = c(y_min, y_max),  # Ensure all points and error bars are visible
                   ylab = y_label,
                   main = "",
                   col = "lightgrey",
