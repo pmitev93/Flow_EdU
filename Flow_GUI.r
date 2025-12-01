@@ -2467,8 +2467,8 @@ server <- function(input, output, session) {
 
     # Set up multi-panel layout
     if(!is.null(ha_threshold)) {
-      # 4x2 grid for 8 plots
-      par(mfrow = c(4, 2), mar = c(5, 4, 3, 1))
+      # 2x4 grid for 8 plots (2 rows x 4 columns)
+      par(mfrow = c(2, 4), mar = c(5, 4, 3, 1))
 
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
@@ -2495,8 +2495,8 @@ server <- function(input, output, session) {
                                        gates = gates_to_use, channels = CHANNELS)
       }
     } else {
-      # 3x2 grid for 6 plots
-      par(mfrow = c(3, 2), mar = c(5, 4, 3, 1))
+      # 2x3 grid for 6 plots (2 rows x 3 columns)
+      par(mfrow = c(2, 3), mar = c(5, 4, 3, 1))
 
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
