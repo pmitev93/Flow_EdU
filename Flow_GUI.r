@@ -464,6 +464,7 @@ ui <- fluidPage(
                    column(12,
                           h4("Select Samples to Compare"),
                           DTOutput("comparison_sample_selector"),
+                          actionButton("select_all_samples", "Select All", class = "btn-sm btn-primary"),
                           actionButton("clear_selection", "Clear Selection", class = "btn-sm")
                    )
                  ),
@@ -1118,10 +1119,11 @@ server <- function(input, output, session) {
     })
   })
 
-  # LAZY LOAD: Load cached analyses when Results Table tab is viewed
+  # LAZY LOAD: Load cached analyses when Results Table or Multi-Sample Comparison tab is viewed
   observeEvent(input$main_tabs, {
-    # Only load if Results Table is selected and caches haven't been loaded yet
-    if(input$main_tabs == "Results Table" && !isTRUE(rv$caches_loaded)) {
+    # Load if Results Table or Multi-Sample Comparison is selected and caches haven't been loaded yet
+    if((input$main_tabs == "Results Table" || input$main_tabs == "Multi-Sample Comparison") &&
+       !isTRUE(rv$caches_loaded)) {
       req(rv$all_results)
       req(rv$experiment_folders)
 
@@ -4639,8 +4641,44 @@ GATE_STRATEGY <- list(
   })
   
   # Clear selection
+  # Select all currently displayed samples
+  observeEvent(input$select_all_samples, {
+    req(rv$all_results)
+
+    # Filter to only analyzed samples (those with non-NA correlation)
+    analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    # Filter by selected gating strategies (same logic as the table rendering)
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("msc_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
+        }
+      }
+
+      # Only keep rows with selected gating strategies
+      if(length(selected_strategies) > 0) {
+        analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
+                            analyzed$Gate_ID %in% selected_strategies, ]
+      } else {
+        analyzed <- analyzed[0, ]
+      }
+    }
+
+    # Select all rows in the filtered table
+    if(nrow(analyzed) > 0) {
+      dataTableProxy('comparison_sample_selector') %>%
+        selectRows(1:nrow(analyzed))
+    }
+  })
+
   observeEvent(input$clear_selection, {
-    dataTableProxy('comparison_sample_selector') %>% 
+    dataTableProxy('comparison_sample_selector') %>%
       selectRows(NULL)
   })
   
@@ -4648,7 +4686,32 @@ GATE_STRATEGY <- list(
   observeEvent(input$plot_comparison, {
     req(input$comparison_sample_selector_rows_selected)
 
+    # Use the SAME filtering logic as the table rendering
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    # Filter by selected gating strategies (MUST match table rendering logic)
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
+
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("msc_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
+        }
+      }
+
+      # Only keep rows with selected gating strategies
+      if(length(selected_strategies) > 0) {
+        analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
+                            analyzed$Gate_ID %in% selected_strategies, ]
+      } else {
+        analyzed <- analyzed[0, ]
+      }
+    }
+
+    # Now get the selected rows from the filtered data
     selected_rows <- input$comparison_sample_selector_rows_selected
     selected_data <- analyzed[selected_rows, ]
     
@@ -4696,7 +4759,7 @@ GATE_STRATEGY <- list(
 
     # Determine which metric to use
     metric <- input$comparison_metric
-    if(is.null(metric)) metric <- "correlation"
+    if(is.null(metric) || is.na(metric) || metric == "") metric <- "correlation"
 
     # Set column name and labels based on metric
     if(metric == "correlation") {
