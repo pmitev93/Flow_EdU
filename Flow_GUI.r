@@ -533,8 +533,15 @@ ui <- fluidPage(
                                                   choices = c("Paired t-test" = "paired_t",
                                                             "Unpaired t-test" = "unpaired_t",
                                                             "Wilcoxon signed-rank (paired)" = "wilcoxon_paired",
-                                                            "Mann-Whitney U (unpaired)" = "mann_whitney"),
-                                                  selected = "paired_t"))
+                                                            "Mann-Whitney U (unpaired)" = "mann_whitney",
+                                                            "One-way RM ANOVA (Gaussian)" = "rm_anova",
+                                                            "One-way RM ANOVA (Nonparametric)" = "friedman"),
+                                                  selected = "paired_t")),
+                            column(4, selectInput("fdr_correction", "FDR Correction:",
+                                                  choices = c("Holm-Sidak" = "holm",
+                                                            "Benjamini-Hochberg" = "BH",
+                                                            "Benjamini-Krieger-Yekutieli" = "BY"),
+                                                  selected = "holm"))
                           )
                    )
                  ),
@@ -2794,13 +2801,12 @@ server <- function(input, output, session) {
             control_name <- exp$metadata$sample_name[control_idx]
 
             tryCatch({
-              thresholds <- calculate_quadrant_thresholds(
-                control_fcs, control_name, gates_to_use,
-                gate_strategy$edu_quantile, gate_strategy$ha_quantile,
-                CHANNELS
+              quadrant_result <- calculate_quadrant_from_paired_control(
+                control_fcs, fcs, control_name, sample_name,
+                gates_to_use, CHANNELS
               )
-              ha_threshold <- thresholds$ha_threshold
-              edu_threshold <- thresholds$edu_threshold
+              ha_threshold <- quadrant_result$ha_threshold
+              edu_threshold <- quadrant_result$edu_threshold
             }, error = function(e) {
               cat(sprintf("Quadrant threshold error for %s: %s\n", exp_name, e$message))
             })
@@ -2809,17 +2815,26 @@ server <- function(input, output, session) {
           }
         }
 
-        # If quadrant failed or not used, try standard gating
+        # If quadrant failed or not used, try standard gating (find Empty_Vector control)
         if(is.null(ha_threshold)) {
-          tryCatch({
-            ha_threshold <- calculate_ha_threshold(fcs, sample_name,
-                                                   gates = gates_to_use,
-                                                   channels = CHANNELS)
-            cat(sprintf("Calculated HA threshold for %s: %s\n", exp_name,
-                       if(!is.null(ha_threshold)) sprintf("%.2f", ha_threshold) else "NULL"))
-          }, error = function(e) {
-            cat(sprintf("Standard HA threshold error for %s: %s\n", exp_name, e$message))
-          })
+          control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+          if(!is.null(control_idx)) {
+            control_fcs <- exp$flowset[[control_idx]]
+            control_name <- exp$metadata$sample_name[control_idx]
+
+            tryCatch({
+              control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                                     gates = gates_to_use,
+                                                                     channels = CHANNELS)
+              ha_threshold <- control_result$threshold
+              cat(sprintf("Calculated HA threshold for %s: %s\n", exp_name,
+                         if(!is.null(ha_threshold)) sprintf("%.2f", ha_threshold) else "NULL"))
+            }, error = function(e) {
+              cat(sprintf("Standard HA threshold error for %s: %s\n", exp_name, e$message))
+            })
+          } else {
+            cat(sprintf("No Empty_Vector_Dox- control found in %s\n", exp_name))
+          }
         }
       }
 
@@ -5410,11 +5425,13 @@ GATE_STRATEGY <- list(
       }
     }
 
-    # Add statistical significance using Holm-Sidak correction (all at same height)
+    # Add statistical significance (all at same height)
     if(nrow(plot_summary) > 1) {
-      # Get selected statistical test type
+      # Get selected statistical test type and FDR correction
       test_type <- input$stat_test_type
       if(is.null(test_type)) test_type <- "paired_t"
+      fdr_method <- input$fdr_correction
+      if(is.null(fdr_method)) fdr_method <- "holm"
 
       # Prepare data for matched analysis
       # If there are multiple replicates per experiment/cell_line, take the mean
@@ -5434,72 +5451,161 @@ GATE_STRATEGY <- list(
       }
       ref_data <- long_data %>% filter(Cell_line == ref_group)
 
-      # Perform pairwise statistical tests
+      # Perform statistical tests
       p_values <- c()
       test_groups <- c()
 
-      for(i in 1:nrow(plot_summary)) {
-        test_group <- plot_summary$Cell_line[i]
+      if(test_type %in% c("rm_anova", "friedman")) {
+        # ANOVA tests: test all groups together first, then post-hoc pairwise
+        # Check if we have sufficient data
+        cell_lines <- unique(long_data$Cell_line)
+        experiments <- unique(long_data$Experiment)
 
-        # Skip the reference group itself
-        if(test_group == ref_group) next
+        # Need at least 3 groups and matched data across experiments
+        if(length(cell_lines) >= 2 && length(experiments) >= 3) {
+          # Create complete wide format for ANOVA
+          anova_wide <- long_data %>%
+            pivot_wider(names_from = Cell_line, values_from = metric_value)
 
-        test_data <- long_data %>% filter(Cell_line == test_group)
+          # Only keep rows with complete cases
+          anova_wide_complete <- anova_wide[complete.cases(anova_wide), ]
 
-        # Match by experiment - only keep experiments that have both samples
-        merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
-
-        # Remove any rows with NA values
-        merged <- merged %>% filter(!is.na(metric_value_ref) & !is.na(metric_value_test))
-
-        # Perform test based on selected type
-        if(test_type %in% c("paired_t", "wilcoxon_paired")) {
-          # Paired tests require matched data
-          if(nrow(merged) >= 2) {
+          if(nrow(anova_wide_complete) >= 3) {
             tryCatch({
-              if(test_type == "paired_t") {
-                test_result <- t.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
-              } else {  # wilcoxon_paired
-                test_result <- wilcox.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
+              if(test_type == "rm_anova") {
+                # Repeated measures ANOVA (Gaussian)
+                # Convert to long format for aov
+                anova_long <- anova_wide_complete %>%
+                  pivot_longer(cols = -Experiment, names_to = "Cell_line", values_to = "metric_value")
+
+                # Perform repeated measures ANOVA
+                anova_result <- aov(metric_value ~ Cell_line + Error(Experiment/Cell_line), data = anova_long)
+                anova_summary <- summary(anova_result)
+
+                # Extract p-value from within-subjects effect
+                if(length(anova_summary) >= 2 && !is.null(anova_summary[[2]])) {
+                  anova_p <- anova_summary[[2]][[1]]$`Pr(>F)`[1]
+                  cat(sprintf("RM ANOVA p-value: %.4f\n", anova_p))
+                }
+
+              } else {  # friedman
+                # Friedman test (nonparametric repeated measures)
+                # Convert to matrix: rows = experiments, columns = cell lines
+                anova_matrix <- as.matrix(anova_wide_complete[, -1])
+                friedman_result <- friedman.test(anova_matrix)
+                anova_p <- friedman_result$p.value
+                cat(sprintf("Friedman test p-value: %.4f\n", anova_p))
               }
-              p_values <- c(p_values, test_result$p.value)
-              test_groups <- c(test_groups, test_group)
+
+              # If ANOVA/Friedman is significant, do post-hoc pairwise comparisons
+              if(!is.na(anova_p) && anova_p < 0.05) {
+                # Perform pairwise comparisons using appropriate test
+                for(i in 1:nrow(plot_summary)) {
+                  test_group <- plot_summary$Cell_line[i]
+                  if(test_group == ref_group) next
+
+                  # Get matched data for this pair
+                  pair_data <- anova_wide_complete %>%
+                    select(Experiment, all_of(c(ref_group, test_group)))
+
+                  if(nrow(pair_data) >= 3) {
+                    if(test_type == "rm_anova") {
+                      # Use paired t-test for post-hoc
+                      test_result <- t.test(pair_data[[ref_group]], pair_data[[test_group]], paired = TRUE)
+                    } else {
+                      # Use Wilcoxon for post-hoc
+                      test_result <- wilcox.test(pair_data[[ref_group]], pair_data[[test_group]], paired = TRUE)
+                    }
+                    p_values <- c(p_values, test_result$p.value)
+                    test_groups <- c(test_groups, test_group)
+                  }
+                }
+              } else {
+                # ANOVA not significant - mark all as ns
+                for(i in 1:nrow(plot_summary)) {
+                  test_group <- plot_summary$Cell_line[i]
+                  if(test_group == ref_group) next
+                  p_values <- c(p_values, 1.0)  # Non-significant
+                  test_groups <- c(test_groups, test_group)
+                }
+              }
             }, error = function(e) {
-              # If test fails, mark as NA
-              p_values <<- c(p_values, NA)
-              test_groups <<- c(test_groups, test_group)
+              cat(sprintf("ANOVA error: %s\n", e$message))
+              # Fall back to marking all as NA
+              for(i in 1:nrow(plot_summary)) {
+                test_group <- plot_summary$Cell_line[i]
+                if(test_group == ref_group) next
+                p_values <<- c(p_values, NA)
+                test_groups <<- c(test_groups, test_group)
+              }
             })
-          } else {
-            # Not enough matched pairs for comparison
-            p_values <- c(p_values, NA)
-            test_groups <- c(test_groups, test_group)
           }
-        } else {
-          # Unpaired tests - use all available data
-          if(nrow(ref_data) >= 2 && nrow(test_data) >= 2) {
-            tryCatch({
-              if(test_type == "unpaired_t") {
-                test_result <- t.test(ref_data$metric_value, test_data$metric_value, paired = FALSE)
-              } else {  # mann_whitney
-                test_result <- wilcox.test(ref_data$metric_value, test_data$metric_value, paired = FALSE)
-              }
-              p_values <- c(p_values, test_result$p.value)
+        }
+      } else {
+        # Pairwise tests (existing t-tests and Wilcoxon)
+        for(i in 1:nrow(plot_summary)) {
+          test_group <- plot_summary$Cell_line[i]
+
+          # Skip the reference group itself
+          if(test_group == ref_group) next
+
+          test_data <- long_data %>% filter(Cell_line == test_group)
+
+          # Match by experiment - only keep experiments that have both samples
+          merged <- merge(ref_data, test_data, by = "Experiment", suffixes = c("_ref", "_test"))
+
+          # Remove any rows with NA values
+          merged <- merged %>% filter(!is.na(metric_value_ref) & !is.na(metric_value_test))
+
+          # Perform test based on selected type
+          if(test_type %in% c("paired_t", "wilcoxon_paired")) {
+            # Paired tests require matched data
+            if(nrow(merged) >= 2) {
+              tryCatch({
+                if(test_type == "paired_t") {
+                  test_result <- t.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
+                } else {  # wilcoxon_paired
+                  test_result <- wilcox.test(merged$metric_value_ref, merged$metric_value_test, paired = TRUE)
+                }
+                p_values <- c(p_values, test_result$p.value)
+                test_groups <- c(test_groups, test_group)
+              }, error = function(e) {
+                # If test fails, mark as NA
+                p_values <<- c(p_values, NA)
+                test_groups <<- c(test_groups, test_group)
+              })
+            } else {
+              # Not enough matched pairs for comparison
+              p_values <- c(p_values, NA)
               test_groups <- c(test_groups, test_group)
-            }, error = function(e) {
-              # If test fails, mark as NA
-              p_values <<- c(p_values, NA)
-              test_groups <<- c(test_groups, test_group)
-            })
+            }
           } else {
-            # Not enough data for comparison
-            p_values <- c(p_values, NA)
-            test_groups <- c(test_groups, test_group)
+            # Unpaired tests - use all available data
+            if(nrow(ref_data) >= 2 && nrow(test_data) >= 2) {
+              tryCatch({
+                if(test_type == "unpaired_t") {
+                  test_result <- t.test(ref_data$metric_value, test_data$metric_value, paired = FALSE)
+                } else {  # mann_whitney
+                  test_result <- wilcox.test(ref_data$metric_value, test_data$metric_value, paired = FALSE)
+                }
+                p_values <- c(p_values, test_result$p.value)
+                test_groups <- c(test_groups, test_group)
+              }, error = function(e) {
+                # If test fails, mark as NA
+                p_values <<- c(p_values, NA)
+                test_groups <<- c(test_groups, test_group)
+              })
+            } else {
+              # Not enough data for comparison
+              p_values <- c(p_values, NA)
+              test_groups <- c(test_groups, test_group)
+            }
           }
         }
       }
 
-      # Apply Holm-Sidak correction
-      p_adjusted <- p.adjust(p_values, method = "holm")
+      # Apply selected FDR correction method
+      p_adjusted <- p.adjust(p_values, method = fdr_method)
 
       # Use y_max from ylim calculation (already includes error bars + padding)
       sig_y_pos <- y_max - 0.18  # Position near top of plot
