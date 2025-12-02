@@ -5977,15 +5977,6 @@ GATE_STRATEGY <- list(
         return()
       }
 
-      # Create Analysis_Results directory if it doesn't exist
-      results_dir <- "Analysis_Results"
-      if(!dir.exists(results_dir)) {
-        dir.create(results_dir, recursive = TRUE)
-      }
-
-      # Set output file path to Analysis_Results folder
-      output_file <- file.path(results_dir, basename(file))
-
       unique_groups <- plot_data %>%
         group_by(Cell_line, Mutation) %>%
         summarize(.groups = 'drop') %>%
@@ -5995,98 +5986,67 @@ GATE_STRATEGY <- list(
 
       unique_experiments <- unique(plot_data$Experiment)
 
-      # Create dataframes for each metric with ALL replicates
-      # Format: one row per replicate, grouped by experiment
+      # Create dataframes with Experiment column + all replicates
+      # Format: Row = one experiment+replicate, with experiment name repeated
 
-      # Correlation data
-      corr_data_list <- list()
-      for(i in 1:nrow(unique_groups)) {
-        cell_line <- unique_groups$Cell_line[i]
-        mutation <- unique_groups$Mutation[i]
-        col_name <- col_names[i]
+      # Build rows: one row per experiment+replicate
+      all_corr_rows <- list()
+      all_slope_rows <- list()
+      all_ha_rows <- list()
+      all_strength_rows <- list()
 
-        cell_data <- plot_data %>%
-          filter(Cell_line == cell_line) %>%
-          select(Experiment, Correlation, N_cells) %>%
-          arrange(Experiment)
+      for(exp in unique_experiments) {
+        exp_data <- plot_data %>% filter(Experiment == exp)
 
-        # Extract all correlation values (all replicates)
-        corr_values <- as.numeric(cell_data$Correlation)
-        corr_data_list[[col_name]] <- corr_values
+        # Find max replicates for this experiment
+        n_reps <- exp_data %>%
+          group_by(Cell_line) %>%
+          summarize(n = n(), .groups = 'drop') %>%
+          pull(n) %>%
+          max()
+
+        # Create one row per replicate
+        for(rep_idx in 1:n_reps) {
+          # Correlation row
+          corr_row <- list(Experiment = exp)
+          slope_row <- list(Experiment = exp)
+          ha_row <- list(Experiment = exp)
+          strength_row <- list(Experiment = exp)
+
+          for(i in 1:nrow(unique_groups)) {
+            cell_line <- unique_groups$Cell_line[i]
+            col_name <- col_names[i]
+
+            cell_data <- exp_data %>%
+              filter(Cell_line == cell_line) %>%
+              arrange(Sample)
+
+            if(nrow(cell_data) >= rep_idx) {
+              corr_row[[col_name]] <- round(as.numeric(cell_data$Correlation[rep_idx]), 4)
+              slope_row[[col_name]] <- if("Slope" %in% names(cell_data)) round(as.numeric(cell_data$Slope[rep_idx]), 4) else NA_real_
+              ha_row[[col_name]] <- if("HA_Pos_Pct" %in% names(cell_data)) round(as.numeric(cell_data$HA_Pos_Pct[rep_idx]), 2) else NA_real_
+              strength_row[[col_name]] <- if("Strength_Ratio" %in% names(cell_data)) round(as.numeric(cell_data$Strength_Ratio[rep_idx]), 4) else NA_real_
+            } else {
+              corr_row[[col_name]] <- NA_real_
+              slope_row[[col_name]] <- NA_real_
+              ha_row[[col_name]] <- NA_real_
+              strength_row[[col_name]] <- NA_real_
+            }
+          }
+
+          all_corr_rows <- c(all_corr_rows, list(as.data.frame(corr_row, stringsAsFactors = FALSE)))
+          all_slope_rows <- c(all_slope_rows, list(as.data.frame(slope_row, stringsAsFactors = FALSE)))
+          all_ha_rows <- c(all_ha_rows, list(as.data.frame(ha_row, stringsAsFactors = FALSE)))
+          all_strength_rows <- c(all_strength_rows, list(as.data.frame(strength_row, stringsAsFactors = FALSE)))
+        }
       }
 
-      # Find maximum number of replicates to determine dataframe length
-      max_length <- max(sapply(corr_data_list, length))
+      corr_df <- bind_rows(all_corr_rows)
+      slope_df <- bind_rows(all_slope_rows)
+      ha_df <- bind_rows(all_ha_rows)
+      strength_df <- bind_rows(all_strength_rows)
 
-      # Pad shorter columns with NA to match length
-      corr_df <- data.frame(lapply(corr_data_list, function(x) {
-        c(x, rep(NA_real_, max_length - length(x)))
-      }), stringsAsFactors = FALSE)
-
-      # Round correlation values
-      corr_df <- data.frame(lapply(corr_df, function(x) round(x, 4)))
-
-      # Slope data
-      slope_data_list <- list()
-      for(i in 1:nrow(unique_groups)) {
-        cell_line <- unique_groups$Cell_line[i]
-
-        cell_data <- plot_data %>%
-          filter(Cell_line == cell_line) %>%
-          select(Experiment, Slope) %>%
-          arrange(Experiment)
-
-        slope_values <- as.numeric(cell_data$Slope)
-        slope_data_list[[col_names[i]]] <- slope_values
-      }
-
-      slope_df <- data.frame(lapply(slope_data_list, function(x) {
-        c(x, rep(NA_real_, max_length - length(x)))
-      }), stringsAsFactors = FALSE)
-
-      slope_df <- data.frame(lapply(slope_df, function(x) round(x, 4)))
-
-      # HA_Pos_Pct data
-      ha_data_list <- list()
-      for(i in 1:nrow(unique_groups)) {
-        cell_line <- unique_groups$Cell_line[i]
-
-        cell_data <- plot_data %>%
-          filter(Cell_line == cell_line) %>%
-          select(Experiment, HA_Pos_Pct) %>%
-          arrange(Experiment)
-
-        ha_values <- as.numeric(cell_data$HA_Pos_Pct)
-        ha_data_list[[col_names[i]]] <- ha_values
-      }
-
-      ha_df <- data.frame(lapply(ha_data_list, function(x) {
-        c(x, rep(NA_real_, max_length - length(x)))
-      }), stringsAsFactors = FALSE)
-
-      ha_df <- data.frame(lapply(ha_df, function(x) round(x, 2)))
-
-      # Strength_Ratio data
-      strength_data_list <- list()
-      for(i in 1:nrow(unique_groups)) {
-        cell_line <- unique_groups$Cell_line[i]
-
-        cell_data <- plot_data %>%
-          filter(Cell_line == cell_line) %>%
-          select(Experiment, Strength_Ratio) %>%
-          arrange(Experiment)
-
-        strength_values <- as.numeric(cell_data$Strength_Ratio)
-        strength_data_list[[col_names[i]]] <- strength_values
-      }
-
-      strength_df <- data.frame(lapply(strength_data_list, function(x) {
-        c(x, rep(NA_real_, max_length - length(x)))
-      }), stringsAsFactors = FALSE)
-
-      strength_df <- data.frame(lapply(strength_df, function(x) round(x, 4)))
-
-      # Write to Excel with multiple sheets
+      # Write to Excel
       wb <- createWorkbook()
       addWorksheet(wb, "Correlation")
       writeData(wb, "Correlation", corr_df)
@@ -6100,12 +6060,18 @@ GATE_STRATEGY <- list(
       addWorksheet(wb, "Strength_Ratio")
       writeData(wb, "Strength_Ratio", strength_df)
 
-      saveWorkbook(wb, output_file, overwrite = TRUE)
+      # Save to browser download location (no prompt)
+      saveWorkbook(wb, file, overwrite = TRUE)
 
-      # Copy to the file path expected by downloadHandler
-      file.copy(output_file, file, overwrite = TRUE)
+      # Also save backup to Analysis_Results folder
+      results_dir <- "Analysis_Results"
+      if(!dir.exists(results_dir)) {
+        dir.create(results_dir, recursive = TRUE)
+      }
+      backup_file <- file.path(results_dir, paste0("correlation_data_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx"))
+      saveWorkbook(wb, backup_file, overwrite = TRUE)
 
-      showNotification(sprintf("Data exported to %s", output_file),
+      showNotification(sprintf("Downloaded! Backup: %s", backup_file),
                       type = "message", duration = 5)
     }
   )
