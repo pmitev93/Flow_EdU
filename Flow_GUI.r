@@ -163,19 +163,32 @@ ui <- fluidPage(
         # ADD THIS NEW TAB:
         tabPanel("Overview Plots",
                  h3("Experiment Overview"),
-                 selectInput("overview_experiment", "Select Experiment:",
-                             choices = NULL),
-                 selectInput("overview_gate_strategy", "Gating Strategy:",
-                             choices = NULL),
-                 selectInput("overview_gate", "Select Gate:",
-                             choices = c("Gate 1: Debris" = "gate1",
-                                         "Gate 2: Singlets" = "gate2",
-                                         "Gate 3: Live Cells" = "gate3",
-                                         "Gate 4: S-phase Outliers" = "gate4",
-                                         "Gate 5: FxCycle Quantile" = "gate5",
-                                         "Gate 6: EdU + FxCycle" = "gate6",
-                                         "Gate 7: HA-Positive" = "gate7",
-                                         "Final: Correlation" = "correlation")),
+                 fluidRow(
+                   column(4, selectInput("overview_experiment", "Select Experiment:",
+                                        choices = NULL)),
+                   column(4, selectInput("overview_gate_strategy", "Gating Strategy:",
+                                        choices = NULL)),
+                   column(4, selectInput("overview_gate", "Select Gate:",
+                                        choices = c("Gate 1: Debris" = "gate1",
+                                                    "Gate 2: Singlets" = "gate2",
+                                                    "Gate 3: Live Cells" = "gate3",
+                                                    "Gate 4: S-phase Outliers" = "gate4",
+                                                    "Gate 5: FxCycle Quantile" = "gate5",
+                                                    "Gate 6: EdU + FxCycle" = "gate6",
+                                                    "Gate 7: HA-Positive" = "gate7",
+                                                    "Final: Correlation" = "correlation")))
+                 ),
+                 fluidRow(
+                   column(12,
+                          div(style = "text-align: center; margin-bottom: 10px;",
+                              actionButton("overview_prev_experiment", "← Previous Experiment",
+                                         class = "btn-primary"),
+                              actionButton("overview_next_experiment", "Next Experiment →",
+                                         class = "btn-primary",
+                                         style = "margin-left: 10px;")
+                          )
+                   )
+                 ),
                  plotOutput("overview_plot", height = "800px")
         ),
 
@@ -190,7 +203,7 @@ ui <- fluidPage(
                    column(4, selectInput("sample_overview_sample", "Select Sample:",
                                         choices = NULL))
                  ),
-                 plotOutput("sample_overview_plot", height = "600px")
+                 plotOutput("sample_overview_plot", height = "900px")
         ),
 
         # Gating Strategy Creator Tab
@@ -2152,6 +2165,33 @@ server <- function(input, output, session) {
     }
   })
 
+  # Previous/Next experiment buttons for Overview Plots
+  observeEvent(input$overview_prev_experiment, {
+    req(rv$experiments)
+    exp_names <- names(rv$experiments)
+    if(length(exp_names) > 0) {
+      current_idx <- which(exp_names == input$overview_experiment)
+      if(length(current_idx) > 0) {
+        # Go to previous, wrap around to end if at beginning
+        new_idx <- if(current_idx == 1) length(exp_names) else current_idx - 1
+        updateSelectInput(session, "overview_experiment", selected = exp_names[new_idx])
+      }
+    }
+  })
+
+  observeEvent(input$overview_next_experiment, {
+    req(rv$experiments)
+    exp_names <- names(rv$experiments)
+    if(length(exp_names) > 0) {
+      current_idx <- which(exp_names == input$overview_experiment)
+      if(length(current_idx) > 0) {
+        # Go to next, wrap around to beginning if at end
+        new_idx <- if(current_idx == length(exp_names)) 1 else current_idx + 1
+        updateSelectInput(session, "overview_experiment", selected = exp_names[new_idx])
+      }
+    }
+  })
+
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
     req(rv$experiments, input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
@@ -2469,13 +2509,10 @@ server <- function(input, output, session) {
 
     # Set up multi-panel layout
     if(!is.null(ha_threshold)) {
-      # 1x8 grid for 8 plots (1 row x 8 columns)
-      par(mfrow = c(1, 8), mar = c(5, 4, 3, 1))
+      # 2x4 grid for 8 plots (2 rows x 4 columns) - Gates 5-8 on top, 1-4 on bottom
+      par(mfrow = c(2, 4), mar = c(5, 4, 3, 1))
 
-      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+      # Top row: Gates 5, 6, 7, 8
       plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
 
@@ -2496,6 +2533,12 @@ server <- function(input, output, session) {
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
                                        gates = gates_to_use, channels = CHANNELS)
       }
+
+      # Bottom row: Gates 1, 2, 3, 4
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
     } else {
       # 1x6 grid for 6 plots (1 row x 6 columns)
       par(mfrow = c(1, 6), mar = c(5, 4, 3, 1))
@@ -4724,7 +4767,15 @@ GATE_STRATEGY <- list(
     # Now get the selected rows from the filtered data
     selected_rows <- input$comparison_sample_selector_rows_selected
     selected_data <- analyzed[selected_rows, ]
-    
+
+    # Filter out rows with NA Cell_line or NA Mutation before grouping
+    selected_data <- selected_data %>%
+      filter(!is.na(Cell_line) & !is.na(Mutation))
+
+    if(nrow(selected_data) == 0) {
+      return("No valid samples selected")
+    }
+
     # Group by cell line
     grouped <- selected_data %>%
       group_by(Cell_line, Mutation) %>%
@@ -4734,7 +4785,7 @@ GATE_STRATEGY <- list(
         Mutation = as.character(Mutation)
       ) %>%
       arrange(Cell_line)
-    
+
     paste(sprintf("%s (%s): %d replicates",
                   grouped$Cell_line,
                   grouped$Mutation,
@@ -4826,10 +4877,20 @@ GATE_STRATEGY <- list(
     # Now get the selected rows from the filtered data
     selected_rows <- input$comparison_sample_selector_rows_selected
     selected_data <- analyzed[selected_rows, ]
-    
+
+    # Filter out rows with NA Cell_line or NA Mutation (critical for plotting)
+    selected_data <- selected_data %>%
+      filter(!is.na(Cell_line) & !is.na(Mutation))
+
+    if(nrow(selected_data) == 0) {
+      showNotification("No valid samples selected (all have NA cell line or mutation)",
+                       type = "error", duration = 5)
+      return()
+    }
+
     # Store for plotting
     rv$comparison_samples(selected_data)
-    
+
     # Update reference group choices
     unique_lines <- unique(selected_data$Cell_line)
     # Properly match each cell line to its mutation
