@@ -206,6 +206,27 @@ ui <- fluidPage(
                  plotOutput("sample_overview_plot", height = "900px")
         ),
 
+        # Cross-Experiment View Tab
+        tabPanel("Cross-Experiment View",
+                 h3("One Sample Across All Experiments"),
+                 fluidRow(
+                   column(4, selectInput("multiview_sample", "Select Sample:",
+                                        choices = NULL)),
+                   column(4, selectInput("multiview_gate_strategy", "Gating Strategy:",
+                                        choices = NULL)),
+                   column(4, selectInput("multiview_gate", "Select Gate:",
+                                        choices = c("Gate 1: Debris" = "gate1",
+                                                    "Gate 2: Singlets" = "gate2",
+                                                    "Gate 3: Live Cells" = "gate3",
+                                                    "Gate 4: S-phase Outliers" = "gate4",
+                                                    "Gate 5: FxCycle Quantile" = "gate5",
+                                                    "Gate 6: EdU + FxCycle" = "gate6",
+                                                    "Gate 7: HA-Positive" = "gate7",
+                                                    "Final: Correlation" = "correlation")))
+                 ),
+                 plotOutput("multiview_plot", height = "800px")
+        ),
+
         # Gating Strategy Creator Tab
         tabPanel("Gating Strategy Creator",
                  h3("Create or Modify Gating Strategies"),
@@ -2165,6 +2186,83 @@ server <- function(input, output, session) {
     }
   })
 
+  # Update multiview sample selector when experiments are loaded (all unique samples)
+  observe({
+    req(rv$experiments)
+
+    # Collect all unique sample names from all experiments
+    all_samples <- c()
+    for(exp_name in names(rv$experiments)) {
+      exp <- rv$experiments[[exp_name]]
+      if(!is.null(exp) && !is.null(exp$metadata$sample_name)) {
+        all_samples <- c(all_samples, exp$metadata$sample_name)
+      }
+    }
+
+    # Get unique samples and sort
+    unique_samples <- unique(all_samples)
+    unique_samples <- sort(unique_samples)
+
+    # Set default to "121_Empty_Vector_Dox-" if it exists
+    default_sample <- if("121_Empty_Vector_Dox-" %in% unique_samples) {
+      "121_Empty_Vector_Dox-"
+    } else {
+      unique_samples[1]
+    }
+
+    updateSelectInput(session, "multiview_sample",
+                      choices = unique_samples,
+                      selected = default_sample)
+  })
+
+  # Update multiview gating strategy selector
+  observe({
+    req(rv$experiments)
+
+    # Get all available gating strategies across all experiments
+    all_gates <- c()
+    for(exp_name in names(rv$experiments)) {
+      available_gates <- rv$experiment_available_gates[[exp_name]]
+      if(!is.null(available_gates) && length(available_gates) > 0) {
+        all_gates <- c(all_gates, available_gates)
+      }
+    }
+
+    # If none found yet, try to scan cache directories
+    if(length(all_gates) == 0) {
+      cache_files <- list.files(CACHE_DIR, pattern = "\\.rds$", full.names = TRUE, recursive = TRUE)
+      if(length(cache_files) > 0) {
+        gate_ids <- character(0)
+        for(cache_file in cache_files) {
+          tryCatch({
+            cache_data <- readRDS(cache_file)
+            gate_id <- if(!is.null(cache_data$gate_id)) {
+              cache_data$gate_id
+            } else {
+              get_readable_gate_id(cache_data$fingerprint)
+            }
+            gate_ids <- c(gate_ids, gate_id)
+          }, error = function(e) {
+            # Skip files that can't be read
+          })
+        }
+        all_gates <- gate_ids
+      }
+    }
+
+    # Get unique and sort
+    unique_gates <- unique(all_gates)
+    if(length(unique_gates) == 0) {
+      unique_gates <- "gdef"  # Default
+    } else {
+      unique_gates <- sort(unique_gates)
+    }
+
+    updateSelectInput(session, "multiview_gate_strategy",
+                      choices = unique_gates,
+                      selected = unique_gates[1])
+  })
+
   # Previous/Next experiment buttons for Overview Plots
   observeEvent(input$overview_prev_experiment, {
     req(rv$experiments)
@@ -2549,6 +2647,188 @@ server <- function(input, output, session) {
       plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+    }
+  })
+
+  # Multiview plot - one sample across all experiments
+  output$multiview_plot <- renderPlot({
+    req(rv$experiments, input$multiview_sample, input$multiview_gate, input$multiview_gate_strategy)
+
+    selected_sample <- input$multiview_sample
+    selected_gate <- input$multiview_gate
+    selected_strategy <- input$multiview_gate_strategy
+
+    # Find all experiments that have this sample
+    experiments_with_sample <- list()
+    for(exp_name in names(rv$experiments)) {
+      exp <- rv$experiments[[exp_name]]
+      if(!is.null(exp) && !is.null(exp$metadata$sample_name)) {
+        sample_idx <- which(exp$metadata$sample_name == selected_sample)
+        if(length(sample_idx) > 0) {
+          experiments_with_sample[[exp_name]] <- sample_idx[1]  # Use first match if duplicates
+        }
+      }
+    }
+
+    n_experiments <- length(experiments_with_sample)
+
+    if(n_experiments == 0) {
+      plot.new()
+      text(0.5, 0.5, paste("Sample", selected_sample, "not found in any experiment"),
+           cex = 1.5, col = "red")
+      return()
+    }
+
+    # Set up multi-panel layout
+    # Calculate grid dimensions
+    n_cols <- min(4, n_experiments)
+    n_rows <- ceiling(n_experiments / n_cols)
+
+    par(mfrow = c(n_rows, n_cols), mar = c(4, 4, 3, 1))
+
+    # Plot each experiment
+    for(exp_name in names(experiments_with_sample)) {
+      exp <- rv$experiments[[exp_name]]
+      idx <- experiments_with_sample[[exp_name]]
+      fcs <- exp$flowset[[idx]]
+      sample_name <- exp$metadata$sample_name[idx]
+
+      # Use gates for this experiment+strategy combination
+      composite_key <- paste0(exp_name, "::", selected_strategy)
+      gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+        rv$experiment_gates[[composite_key]]
+      } else {
+        GATES
+      }
+
+      # Get strategy metadata
+      gate_strategy_key <- paste0("GATE_STRATEGY_", selected_strategy)
+      gate_strategy <- if(!is.null(rv$gate_strategies[[gate_strategy_key]])) {
+        rv$gate_strategies[[gate_strategy_key]]
+      } else {
+        NULL
+      }
+
+      # If gate strategy not in memory, try to load from cache
+      if(is.null(gate_strategy)) {
+        cache_dir <- file.path("analysis_cache", exp_name)
+        if(dir.exists(cache_dir)) {
+          cache_files <- list.files(cache_dir, pattern = "\\.rds$", full.names = TRUE)
+          for(cache_file in cache_files) {
+            tryCatch({
+              cache_data <- readRDS(cache_file)
+              if(!is.null(cache_data$gate_id) && cache_data$gate_id == selected_strategy) {
+                if(!is.null(cache_data$gate_strategy)) {
+                  gate_strategy <- cache_data$gate_strategy
+                  rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
+
+                  # Also load the gates themselves
+                  if(!is.null(cache_data$gates)) {
+                    composite_key <- paste0(exp_name, "::", selected_strategy)
+                    rv$experiment_gates[[composite_key]] <- cache_data$gates
+                    gates_to_use <- cache_data$gates
+                  }
+                  break
+                }
+              }
+            }, error = function(e) {
+              # Skip files that can't be read
+            })
+          }
+        }
+      }
+
+      # Re-evaluate gates_to_use after cache loading
+      composite_key <- paste0(exp_name, "::", selected_strategy)
+      if(!is.null(rv$experiment_gates[[composite_key]])) {
+        gates_to_use <- rv$experiment_gates[[composite_key]]
+      }
+
+      # Check if using quadrant strategy
+      use_quadrant <- !is.null(gate_strategy$analysis_type) &&
+                      gate_strategy$analysis_type == "quadrant_ratio" &&
+                      !is.null(gates_to_use$quadrant)
+
+      # Calculate thresholds for gates 7 and correlation if needed
+      ha_threshold <- NULL
+      edu_threshold <- NULL
+
+      if(selected_gate == "gate7" || selected_gate == "correlation") {
+        if(use_quadrant) {
+          # Quadrant strategy: find paired control
+          control_idx <- find_paired_control(sample_name, exp$metadata)
+          if(!is.null(control_idx)) {
+            control_fcs <- exp$flowset[[control_idx]]
+            control_name <- exp$metadata$sample_name[control_idx]
+
+            tryCatch({
+              thresholds <- calculate_quadrant_thresholds(
+                control_fcs, control_name, gates_to_use,
+                gate_strategy$edu_quantile, gate_strategy$ha_quantile,
+                CHANNELS
+              )
+              ha_threshold <- thresholds$ha_threshold
+              edu_threshold <- thresholds$edu_threshold
+            }, error = function(e) {
+              warning(sprintf("Error calculating thresholds for %s: %s", exp_name, e$message))
+            })
+          }
+        } else {
+          # Standard gating: use relative threshold
+          tryCatch({
+            ha_threshold <- calculate_ha_threshold(fcs, sample_name,
+                                                   gates = gates_to_use,
+                                                   channels = CHANNELS)
+          }, error = function(e) {
+            warning(sprintf("Error calculating HA threshold for %s: %s", exp_name, e$message))
+          })
+        }
+      }
+
+      # Plot the selected gate with experiment name as title
+      tryCatch({
+        if(selected_gate == "gate1") {
+          plot_debris_gate_single(fcs, exp_name, gates = gates_to_use)
+
+        } else if(selected_gate == "gate2") {
+          plot_singlet_gate_single(fcs, exp_name, gates = gates_to_use)
+
+        } else if(selected_gate == "gate3") {
+          plot_live_gate_single(fcs, exp_name, gates = gates_to_use)
+
+        } else if(selected_gate == "gate4") {
+          plot_sphase_outlier_gate_single(fcs, exp_name, gates = gates_to_use)
+
+        } else if(selected_gate == "gate5") {
+          plot_fxcycle_quantile_gate_single(fcs, exp_name, gates = gates_to_use)
+
+        } else if(selected_gate == "gate6") {
+          plot_edu_fxcycle_gate_single(fcs, exp_name, gates = gates_to_use)
+
+        } else if(selected_gate == "gate7") {
+          if(!is.null(ha_threshold)) {
+            plot_ha_gate_single(fcs, exp_name, ha_threshold, gates = gates_to_use)
+          } else {
+            plot.new()
+            text(0.5, 0.5, "No threshold", cex = 1.2)
+            title(exp_name)
+          }
+
+        } else if(selected_gate == "correlation") {
+          if(!is.null(ha_threshold)) {
+            plot_edu_ha_correlation_single(fcs, exp_name, ha_threshold,
+                                          gates = gates_to_use, channels = CHANNELS)
+          } else {
+            plot.new()
+            text(0.5, 0.5, "No threshold", cex = 1.2)
+            title(exp_name)
+          }
+        }
+      }, error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 0.8, col = "red")
+        title(exp_name)
+      })
     }
   })
 
@@ -4705,13 +4985,20 @@ GATE_STRATEGY <- list(
 
     # Only auto-select if rows were added (not removed)
     if(length(newly_added) > 0) {
-      # Get cell lines and gating strategies of newly added samples
-      new_cell_lines <- unique(analyzed$Cell_line[newly_added])
-      new_gate_ids <- unique(analyzed$Gate_ID[newly_added])
+      # Find matching rows for EACH newly added sample (cell line + gate ID pair)
+      matching_rows <- c()
+      for(row_idx in newly_added) {
+        cell_line <- analyzed$Cell_line[row_idx]
+        gate_id <- analyzed$Gate_ID[row_idx]
 
-      # Find all rows with matching cell lines AND gating strategies
-      matching_rows <- which(analyzed$Cell_line %in% new_cell_lines &
-                            analyzed$Gate_ID %in% new_gate_ids)
+        # Find all rows with this EXACT cell line AND gate ID combination
+        matches <- which(analyzed$Cell_line == cell_line &
+                        analyzed$Gate_ID == gate_id)
+        matching_rows <- c(matching_rows, matches)
+      }
+
+      # Remove duplicates
+      matching_rows <- unique(matching_rows)
 
       # Combine with existing selection
       all_selected <- unique(c(selected_rows, matching_rows))
