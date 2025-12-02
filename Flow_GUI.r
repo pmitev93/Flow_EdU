@@ -182,13 +182,15 @@ ui <- fluidPage(
         # Sample Overview Tab
         tabPanel("Sample Overview",
                  h3("All Gates for Single Sample"),
-                 selectInput("sample_overview_experiment", "Select Experiment:",
-                             choices = NULL),
-                 selectInput("sample_overview_gate_strategy", "Gating Strategy:",
-                             choices = NULL),
-                 selectInput("sample_overview_sample", "Select Sample:",
-                             choices = NULL),
-                 plotOutput("sample_overview_plot", height = "1200px")
+                 fluidRow(
+                   column(4, selectInput("sample_overview_experiment", "Select Experiment:",
+                                        choices = NULL)),
+                   column(4, selectInput("sample_overview_gate_strategy", "Gating Strategy:",
+                                        choices = NULL)),
+                   column(4, selectInput("sample_overview_sample", "Select Sample:",
+                                        choices = NULL))
+                 ),
+                 plotOutput("sample_overview_plot", height = "600px")
         ),
 
         # Gating Strategy Creator Tab
@@ -2467,8 +2469,8 @@ server <- function(input, output, session) {
 
     # Set up multi-panel layout
     if(!is.null(ha_threshold)) {
-      # 2x4 grid for 8 plots (2 rows x 4 columns)
-      par(mfrow = c(2, 4), mar = c(5, 4, 3, 1))
+      # 1x8 grid for 8 plots (1 row x 8 columns)
+      par(mfrow = c(1, 8), mar = c(5, 4, 3, 1))
 
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
@@ -2495,8 +2497,8 @@ server <- function(input, output, session) {
                                        gates = gates_to_use, channels = CHANNELS)
       }
     } else {
-      # 2x3 grid for 6 plots (2 rows x 3 columns)
-      par(mfrow = c(2, 3), mar = c(5, 4, 3, 1))
+      # 1x6 grid for 6 plots (1 row x 6 columns)
+      par(mfrow = c(1, 6), mar = c(5, 4, 3, 1))
 
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
