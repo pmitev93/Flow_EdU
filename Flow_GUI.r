@@ -547,9 +547,17 @@ ui <- fluidPage(
                  ),
 
                  fluidRow(
+                   column(2, numericInput("plot_height", "Plot Height (px):",
+                                         value = 600, min = 400, max = 1200, step = 50)),
+                   column(2, numericInput("bar_width", "Bar Width:",
+                                         value = 0.8, min = 0.3, max = 2.0, step = 0.1)),
+                   column(2, numericInput("sig_spacing", "Significance Spacing:",
+                                         value = 0.25, min = 0.1, max = 0.5, step = 0.05)),
+                   column(6, h4(textOutput("comparison_plot_title")))
+                 ),
+                 fluidRow(
                    column(12,
-                          h4(textOutput("comparison_plot_title")),
-                          plotOutput("comparison_plot", height = "600px")
+                          uiOutput("comparison_plot_ui")
                    )
                  ),
                  
@@ -5280,6 +5288,14 @@ GATE_STRATEGY <- list(
   })
 
 
+  # Dynamic UI for comparison plot with adjustable height
+  output$comparison_plot_ui <- renderUI({
+    plot_height <- input$plot_height
+    if(is.null(plot_height)) plot_height <- 600
+
+    plotOutput("comparison_plot", height = paste0(plot_height, "px"))
+  })
+
   # Render comparison plot
   output$comparison_plot <- renderPlot({
     req(rv$comparison_samples())
@@ -5361,20 +5377,24 @@ GATE_STRATEGY <- list(
     top_margin <- 8 + ceiling(n_experiments * 0.7)  # Scales with number of experiments
     par(mar = c(14, 4, top_margin, 4))  # Increased bottom margin from 8 to 14 for longer labels
     
-    # Fixed narrow bars, add empty space on right when few samples
+    # Get user-defined bar width and significance spacing
     n_samples <- nrow(plot_summary)
-    bar_width <- 0.8  # Fixed narrow width
+    bar_width <- input$bar_width
+    if(is.null(bar_width)) bar_width <- 0.8
     bar_space <- 1  # Fixed moderate spacing
+
+    sig_spacing <- input$sig_spacing
+    if(is.null(sig_spacing)) sig_spacing <- 0.25
 
     # Calculate total x-range: expand to fixed width regardless of sample count
     bars_width <- n_samples * (bar_width + bar_space)
     x_max <- max(bars_width, 15)  # Always extend to at least 15 units
 
-    # Calculate ylim to include error bars (mean +/- SD) and all data points
+    # Calculate ylim to include error bars (mean +/- SD), all data points, AND significance annotations
     y_max <- max(c(0,
                    plot_data[[metric_col]],
                    plot_summary$mean_value + plot_summary$sd_value),
-                 na.rm = TRUE) + 0.3
+                 na.rm = TRUE) + 0.3 + sig_spacing  # Extra space for significance
     y_min <- min(c(0,
                    plot_data[[metric_col]],
                    plot_summary$mean_value - plot_summary$sd_value),
@@ -5422,6 +5442,20 @@ GATE_STRATEGY <- list(
                pch = 21, cex = 2,
                bg = exp_colors[exp_name],
                col = "black", lwd = 1.5)
+      }
+    }
+
+    # Add mean value labels on top of each bar
+    for(i in seq_len(nrow(plot_summary))) {
+      mean_val <- plot_summary$mean_value[i]
+      if(!is.na(mean_val)) {
+        # Position label above error bar if present, otherwise above bar
+        label_y <- if(!is.na(plot_summary$sd_value[i]) && plot_summary$sd_value[i] > 0) {
+          mean_val + plot_summary$sd_value[i] + 0.05
+        } else {
+          mean_val + 0.05
+        }
+        text(bp[i], label_y, sprintf("%.3f", mean_val), cex = 0.7, pos = 3, col = "blue")
       }
     }
 
@@ -5604,36 +5638,40 @@ GATE_STRATEGY <- list(
         }
       }
 
-      # Apply selected FDR correction method
-      p_adjusted <- p.adjust(p_values, method = fdr_method)
+      # Apply selected FDR correction method (only if we have p-values)
+      if(length(p_values) > 0) {
+        p_adjusted <- p.adjust(p_values, method = fdr_method)
 
-      # Use y_max from ylim calculation (already includes error bars + padding)
-      sig_y_pos <- y_max - 0.18  # Position near top of plot
+        # Position significance near top of plot, with user-defined spacing
+        sig_y_pos <- y_max - 0.08  # Position near top of plot
 
-      # Display results
-      for(i in seq_along(test_groups)) {
-        plot_idx <- which(plot_summary$Cell_line == test_groups[i])
+        # Display results
+        for(i in seq_along(test_groups)) {
+          plot_idx <- which(plot_summary$Cell_line == test_groups[i])
 
-        # Only display if we have a valid p-value (skip n/a cases)
-        if(!is.na(p_adjusted[i])) {
-          stars <- if(p_adjusted[i] < 0.001) "***"
-          else if(p_adjusted[i] < 0.01) "**"
-          else if(p_adjusted[i] < 0.05) "*"
-          else "ns"
+          # Only display if we have a valid p-value (skip n/a cases)
+          if(length(plot_idx) > 0 && !is.na(p_adjusted[i])) {
+            stars <- if(p_adjusted[i] < 0.001) "***"
+            else if(p_adjusted[i] < 0.01) "**"
+            else if(p_adjusted[i] < 0.05) "*"
+            else "ns"
 
-          # Format p-value
-          if(p_adjusted[i] < 0.001) {
-            p_text <- sprintf("(p<0.001)")
-          } else {
-            p_text <- sprintf("(p=%.3f)", p_adjusted[i])
+            # Format p-value
+            if(p_adjusted[i] < 0.001) {
+              p_text <- sprintf("(p<0.001)")
+            } else {
+              p_text <- sprintf("(p=%.3f)", p_adjusted[i])
+            }
+
+            # Show stars/ns at consistent height
+            text(bp[plot_idx], sig_y_pos, stars, cex = 1.2, font = 2, col = "black")
+
+            # Show p-value below stars with better spacing
+            text(bp[plot_idx], sig_y_pos - (sig_spacing * 0.5), p_text, cex = 0.7, col = "black")
           }
-
-          # Show stars/ns at consistent height
-          text(bp[plot_idx], sig_y_pos, stars, cex = 1.2, font = 2, col = "black")
-
-          # Show p-value below stars
-          text(bp[plot_idx], sig_y_pos - 0.06, p_text, cex = 0.7, col = "black")
         }
+      } else {
+        cat("No p-values generated from statistical tests\n")
       }
     }
     
@@ -5931,27 +5969,37 @@ GATE_STRATEGY <- list(
     },
     content = function(file) {
       req(rv$comparison_samples())
-      
+
       plot_data <- rv$comparison_samples()
-      
+
       if(nrow(plot_data) == 0) {
         showNotification("No data selected for download", type = "error")
         return()
       }
-      
+
+      # Create Analysis_Results directory if it doesn't exist
+      results_dir <- "Analysis_Results"
+      if(!dir.exists(results_dir)) {
+        dir.create(results_dir, recursive = TRUE)
+      }
+
+      # Set output file path to Analysis_Results folder
+      output_file <- file.path(results_dir, basename(file))
+
       unique_groups <- plot_data %>%
         group_by(Cell_line, Mutation) %>%
         summarize(.groups = 'drop') %>%
         arrange(Cell_line)
-      
+
       col_names <- paste0(unique_groups$Mutation, " (#", unique_groups$Cell_line, ")")
-      
+
       unique_experiments <- unique(plot_data$Experiment)
-      
-      output_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
-      
-      low_cell_warnings <- list()
-      
+
+      # Create dataframes for each metric with ALL replicates
+      # Format: one row per replicate, grouped by experiment
+
+      # Correlation data
+      corr_data_list <- list()
       for(i in 1:nrow(unique_groups)) {
         cell_line <- unique_groups$Cell_line[i]
         mutation <- unique_groups$Mutation[i]
@@ -5959,132 +6007,106 @@ GATE_STRATEGY <- list(
 
         cell_data <- plot_data %>%
           filter(Cell_line == cell_line) %>%
-          select(Experiment, Correlation, HA_Pos_Pct, Strength_Ratio, N_cells)
+          select(Experiment, Correlation, N_cells) %>%
+          arrange(Experiment)
 
-        values <- sapply(unique_experiments, function(exp) {
-          match_idx <- which(cell_data$Experiment == exp)
-          if(length(match_idx) > 0) {
-            corr <- as.numeric(cell_data$Correlation[match_idx[1]])
-            n_cells <- as.numeric(cell_data$N_cells[match_idx[1]])
-
-            is_empty_vector <- grepl("Empty.?Vector", mutation, ignore.case = TRUE)
-            if(!is.na(n_cells) && n_cells < 500 && !is_empty_vector) {
-              if(is.null(low_cell_warnings[[exp]])) {
-                low_cell_warnings[[exp]] <- character(0)
-              }
-              low_cell_warnings[[exp]] <- c(low_cell_warnings[[exp]],
-                                            paste0(mutation, " (#", cell_line, ")"))
-            }
-
-            if(!is.na(corr)) {
-              return(round(corr, 4))
-            } else {
-              return(NA_real_)
-            }
-          } else {
-            return(NA_real_)
-          }
-        })
-
-        output_df[[col_name]] <- values
+        # Extract all correlation values (all replicates)
+        corr_values <- as.numeric(cell_data$Correlation)
+        corr_data_list[[col_name]] <- corr_values
       }
 
-      # Create separate dataframes for Slope, HA_Pos_Pct and Strength_Ratio
-      slope_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
-      ha_pos_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
-      strength_df <- data.frame(Experiment = unique_experiments, stringsAsFactors = FALSE)
+      # Find maximum number of replicates to determine dataframe length
+      max_length <- max(sapply(corr_data_list, length))
 
+      # Pad shorter columns with NA to match length
+      corr_df <- data.frame(lapply(corr_data_list, function(x) {
+        c(x, rep(NA_real_, max_length - length(x)))
+      }), stringsAsFactors = FALSE)
+
+      # Round correlation values
+      corr_df <- data.frame(lapply(corr_df, function(x) round(x, 4)))
+
+      # Slope data
+      slope_data_list <- list()
       for(i in 1:nrow(unique_groups)) {
         cell_line <- unique_groups$Cell_line[i]
-        mutation <- unique_groups$Mutation[i]
-        col_name <- col_names[i]
 
         cell_data <- plot_data %>%
           filter(Cell_line == cell_line) %>%
-          select(Experiment, Slope, HA_Pos_Pct, Strength_Ratio)
+          select(Experiment, Slope) %>%
+          arrange(Experiment)
 
-        # Slope values
-        slope_values <- sapply(unique_experiments, function(exp) {
-          match_idx <- which(cell_data$Experiment == exp)
-          if(length(match_idx) > 0) {
-            slope <- as.numeric(cell_data$Slope[match_idx[1]])
-            if(!is.na(slope)) {
-              return(round(slope, 4))
-            }
-          }
-          return(NA_real_)
-        })
-
-        # HA_Pos_Pct values
-        ha_values <- sapply(unique_experiments, function(exp) {
-          match_idx <- which(cell_data$Experiment == exp)
-          if(length(match_idx) > 0) {
-            ha_pct <- as.numeric(cell_data$HA_Pos_Pct[match_idx[1]])
-            if(!is.na(ha_pct)) {
-              return(round(ha_pct, 2))
-            }
-          }
-          return(NA_real_)
-        })
-
-        # Strength_Ratio values
-        strength_values <- sapply(unique_experiments, function(exp) {
-          match_idx <- which(cell_data$Experiment == exp)
-          if(length(match_idx) > 0) {
-            strength <- as.numeric(cell_data$Strength_Ratio[match_idx[1]])
-            if(!is.na(strength)) {
-              return(round(strength, 4))
-            }
-          }
-          return(NA_real_)
-        })
-
-        slope_df[[col_name]] <- slope_values
-        ha_pos_df[[col_name]] <- ha_values
-        strength_df[[col_name]] <- strength_values
-      }
-      
-      warnings_col <- sapply(unique_experiments, function(exp) {
-        if(!is.null(low_cell_warnings[[exp]]) && length(low_cell_warnings[[exp]]) > 0) {
-          return(paste(low_cell_warnings[[exp]], collapse = "; "))
-        } else {
-          return("")
-        }
-      })
-
-      output_df$Low_Cell_Warning <- warnings_col
-
-      if(!require("writexl", quietly = TRUE)) {
-        install.packages("writexl", repos = "http://cran.r-project.org")
-        library(writexl)
+        slope_values <- as.numeric(cell_data$Slope)
+        slope_data_list[[col_names[i]]] <- slope_values
       }
 
-      # Add warnings to other sheets
-      slope_df$Low_Cell_Warning <- warnings_col
-      ha_pos_df$Low_Cell_Warning <- warnings_col
-      strength_df$Low_Cell_Warning <- warnings_col
+      slope_df <- data.frame(lapply(slope_data_list, function(x) {
+        c(x, rep(NA_real_, max_length - length(x)))
+      }), stringsAsFactors = FALSE)
 
-      notes_df <- data.frame(
-        Note = c("Four sheets: Correlation, Slope, HA_Pos_Pct, and Strength_Ratio",
-                 "Correlation values: 4 decimal places",
-                 "Slope values: 4 decimal places",
-                 "HA_Pos_Pct values: percentage (2 decimal places)",
-                 "Strength_Ratio values: 4 decimal places",
-                 "Each row = one experiment, each column = one cell line",
-                 "Low_Cell_Warning lists cell lines with N_cells < 500",
-                 paste0("Data exported: ", Sys.time())),
-        stringsAsFactors = FALSE
-      )
+      slope_df <- data.frame(lapply(slope_df, function(x) round(x, 4)))
 
-      write_xlsx(list(
-        "Correlation" = output_df,
-        "Slope" = slope_df,
-        "HA_Pos_Pct" = ha_pos_df,
-        "Strength_Ratio" = strength_df,
-        "Notes" = notes_df
-      ), path = file)
-      
-      showNotification("Data downloaded successfully!", type = "message", duration = 3)
+      # HA_Pos_Pct data
+      ha_data_list <- list()
+      for(i in 1:nrow(unique_groups)) {
+        cell_line <- unique_groups$Cell_line[i]
+
+        cell_data <- plot_data %>%
+          filter(Cell_line == cell_line) %>%
+          select(Experiment, HA_Pos_Pct) %>%
+          arrange(Experiment)
+
+        ha_values <- as.numeric(cell_data$HA_Pos_Pct)
+        ha_data_list[[col_names[i]]] <- ha_values
+      }
+
+      ha_df <- data.frame(lapply(ha_data_list, function(x) {
+        c(x, rep(NA_real_, max_length - length(x)))
+      }), stringsAsFactors = FALSE)
+
+      ha_df <- data.frame(lapply(ha_df, function(x) round(x, 2)))
+
+      # Strength_Ratio data
+      strength_data_list <- list()
+      for(i in 1:nrow(unique_groups)) {
+        cell_line <- unique_groups$Cell_line[i]
+
+        cell_data <- plot_data %>%
+          filter(Cell_line == cell_line) %>%
+          select(Experiment, Strength_Ratio) %>%
+          arrange(Experiment)
+
+        strength_values <- as.numeric(cell_data$Strength_Ratio)
+        strength_data_list[[col_names[i]]] <- strength_values
+      }
+
+      strength_df <- data.frame(lapply(strength_data_list, function(x) {
+        c(x, rep(NA_real_, max_length - length(x)))
+      }), stringsAsFactors = FALSE)
+
+      strength_df <- data.frame(lapply(strength_df, function(x) round(x, 4)))
+
+      # Write to Excel with multiple sheets
+      wb <- createWorkbook()
+      addWorksheet(wb, "Correlation")
+      writeData(wb, "Correlation", corr_df)
+
+      addWorksheet(wb, "Slope")
+      writeData(wb, "Slope", slope_df)
+
+      addWorksheet(wb, "HA_Positive_Pct")
+      writeData(wb, "HA_Positive_Pct", ha_df)
+
+      addWorksheet(wb, "Strength_Ratio")
+      writeData(wb, "Strength_Ratio", strength_df)
+
+      saveWorkbook(wb, output_file, overwrite = TRUE)
+
+      # Copy to the file path expected by downloadHandler
+      file.copy(output_file, file, overwrite = TRUE)
+
+      showNotification(sprintf("Data exported to %s", output_file),
+                      type = "message", duration = 5)
     }
   )
 }
