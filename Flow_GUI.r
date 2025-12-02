@@ -5965,7 +5965,7 @@ GATE_STRATEGY <- list(
   
   output$download_prism <- downloadHandler(
     filename = function() {
-      paste0("correlation_data_", format(Sys.Date(), "%Y%m%d"), ".xlsx")
+      paste0("correlation_data_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".xlsx")
     },
     content = function(file) {
       req(rv$comparison_samples())
@@ -5986,10 +5986,10 @@ GATE_STRATEGY <- list(
 
       unique_experiments <- unique(plot_data$Experiment)
 
-      # Create dataframes with Experiment column + all replicates
-      # Format: Row = one experiment+replicate, with experiment name repeated
+      # Create dataframes with Experiment column
+      # Format: ONE row per experiment, columns = cell lines
 
-      # Build rows: one row per experiment+replicate
+      # Build rows: one row per experiment
       all_corr_rows <- list()
       all_slope_rows <- list()
       all_ha_rows <- list()
@@ -5998,47 +5998,37 @@ GATE_STRATEGY <- list(
       for(exp in unique_experiments) {
         exp_data <- plot_data %>% filter(Experiment == exp)
 
-        # Find max replicates for this experiment
-        n_reps <- exp_data %>%
-          group_by(Cell_line) %>%
-          summarize(n = n(), .groups = 'drop') %>%
-          pull(n) %>%
-          max()
+        # Create one row per experiment
+        corr_row <- list(Experiment = exp)
+        slope_row <- list(Experiment = exp)
+        ha_row <- list(Experiment = exp)
+        strength_row <- list(Experiment = exp)
 
-        # Create one row per replicate
-        for(rep_idx in 1:n_reps) {
-          # Correlation row
-          corr_row <- list(Experiment = exp)
-          slope_row <- list(Experiment = exp)
-          ha_row <- list(Experiment = exp)
-          strength_row <- list(Experiment = exp)
+        for(i in 1:nrow(unique_groups)) {
+          cell_line <- unique_groups$Cell_line[i]
+          col_name <- col_names[i]
 
-          for(i in 1:nrow(unique_groups)) {
-            cell_line <- unique_groups$Cell_line[i]
-            col_name <- col_names[i]
+          cell_data <- exp_data %>%
+            filter(Cell_line == cell_line)
 
-            cell_data <- exp_data %>%
-              filter(Cell_line == cell_line) %>%
-              arrange(Sample)
-
-            if(nrow(cell_data) >= rep_idx) {
-              corr_row[[col_name]] <- round(as.numeric(cell_data$Correlation[rep_idx]), 4)
-              slope_row[[col_name]] <- if("Slope" %in% names(cell_data)) round(as.numeric(cell_data$Slope[rep_idx]), 4) else NA_real_
-              ha_row[[col_name]] <- if("HA_Pos_Pct" %in% names(cell_data)) round(as.numeric(cell_data$HA_Pos_Pct[rep_idx]), 2) else NA_real_
-              strength_row[[col_name]] <- if("Strength_Ratio" %in% names(cell_data)) round(as.numeric(cell_data$Strength_Ratio[rep_idx]), 4) else NA_real_
-            } else {
-              corr_row[[col_name]] <- NA_real_
-              slope_row[[col_name]] <- NA_real_
-              ha_row[[col_name]] <- NA_real_
-              strength_row[[col_name]] <- NA_real_
-            }
+          # Take first value if it exists (should only be one per experiment)
+          if(nrow(cell_data) > 0) {
+            corr_row[[col_name]] <- round(as.numeric(cell_data$Correlation[1]), 4)
+            slope_row[[col_name]] <- if("Slope" %in% names(cell_data)) round(as.numeric(cell_data$Slope[1]), 4) else NA_real_
+            ha_row[[col_name]] <- if("HA_Pos_Pct" %in% names(cell_data)) round(as.numeric(cell_data$HA_Pos_Pct[1]), 2) else NA_real_
+            strength_row[[col_name]] <- if("Strength_Ratio" %in% names(cell_data)) round(as.numeric(cell_data$Strength_Ratio[1]), 4) else NA_real_
+          } else {
+            corr_row[[col_name]] <- NA_real_
+            slope_row[[col_name]] <- NA_real_
+            ha_row[[col_name]] <- NA_real_
+            strength_row[[col_name]] <- NA_real_
           }
-
-          all_corr_rows <- c(all_corr_rows, list(as.data.frame(corr_row, stringsAsFactors = FALSE)))
-          all_slope_rows <- c(all_slope_rows, list(as.data.frame(slope_row, stringsAsFactors = FALSE)))
-          all_ha_rows <- c(all_ha_rows, list(as.data.frame(ha_row, stringsAsFactors = FALSE)))
-          all_strength_rows <- c(all_strength_rows, list(as.data.frame(strength_row, stringsAsFactors = FALSE)))
         }
+
+        all_corr_rows <- c(all_corr_rows, list(as.data.frame(corr_row, stringsAsFactors = FALSE)))
+        all_slope_rows <- c(all_slope_rows, list(as.data.frame(slope_row, stringsAsFactors = FALSE)))
+        all_ha_rows <- c(all_ha_rows, list(as.data.frame(ha_row, stringsAsFactors = FALSE)))
+        all_strength_rows <- c(all_strength_rows, list(as.data.frame(strength_row, stringsAsFactors = FALSE)))
       }
 
       corr_df <- bind_rows(all_corr_rows)
