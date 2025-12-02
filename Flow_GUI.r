@@ -210,11 +210,11 @@ ui <- fluidPage(
         tabPanel("Cross-Experiment View",
                  h3("One Sample Across All Experiments"),
                  fluidRow(
-                   column(4, selectInput("multiview_sample", "Select Sample:",
+                   column(3, selectInput("multiview_sample", "Select Sample:",
                                         choices = NULL)),
-                   column(4, selectInput("multiview_gate_strategy", "Gating Strategy:",
+                   column(3, selectInput("multiview_gate_strategy", "Gating Strategy:",
                                         choices = NULL)),
-                   column(4, selectInput("multiview_gate", "Select Gate:",
+                   column(3, selectInput("multiview_gate", "Select Gate:",
                                         choices = c("Gate 1: Debris" = "gate1",
                                                     "Gate 2: Singlets" = "gate2",
                                                     "Gate 3: Live Cells" = "gate3",
@@ -222,9 +222,12 @@ ui <- fluidPage(
                                                     "Gate 5: FxCycle Quantile" = "gate5",
                                                     "Gate 6: EdU + FxCycle" = "gate6",
                                                     "Gate 7: HA-Positive" = "gate7",
-                                                    "Final: Correlation" = "correlation")))
+                                                    "Final: Correlation" = "correlation"))),
+                   column(3, checkboxInput("multiview_exclude_dox_minus",
+                                          "Exclude Dox- samples",
+                                          value = TRUE))
                  ),
-                 plotOutput("multiview_plot", height = "800px")
+                 uiOutput("multiview_plot_ui")
         ),
 
         # Gating Strategy Creator Tab
@@ -2186,9 +2189,9 @@ server <- function(input, output, session) {
     }
   })
 
-  # Update multiview sample selector when experiments are loaded (all unique samples)
+  # Update multiview sample selector when experiments are loaded or filter changes
   observe({
-    req(rv$experiments)
+    req(rv$experiments, input$multiview_exclude_dox_minus)
 
     # Collect all unique sample names from all experiments
     all_samples <- c()
@@ -2203,9 +2206,14 @@ server <- function(input, output, session) {
     unique_samples <- unique(all_samples)
     unique_samples <- sort(unique_samples)
 
-    # Set default to "121_Empty_Vector_Dox-" if it exists
-    default_sample <- if("121_Empty_Vector_Dox-" %in% unique_samples) {
-      "121_Empty_Vector_Dox-"
+    # Filter out Dox- samples if checkbox is checked
+    if(isTRUE(input$multiview_exclude_dox_minus)) {
+      unique_samples <- unique_samples[!grepl("Dox-", unique_samples, fixed = TRUE)]
+    }
+
+    # Set default to "121_Empty_Vector_Dox+" if it exists (Dox+, not Dox-)
+    default_sample <- if("121_Empty_Vector_Dox+" %in% unique_samples) {
+      "121_Empty_Vector_Dox+"
     } else {
       unique_samples[1]
     }
@@ -2650,6 +2658,30 @@ server <- function(input, output, session) {
     }
   })
 
+  # Dynamic UI for multiview plot with adjustable height
+  output$multiview_plot_ui <- renderUI({
+    req(rv$experiments, input$multiview_sample)
+
+    # Count experiments that have this sample
+    selected_sample <- input$multiview_sample
+    n_experiments <- 0
+    for(exp_name in names(rv$experiments)) {
+      exp <- rv$experiments[[exp_name]]
+      if(!is.null(exp) && !is.null(exp$metadata$sample_name)) {
+        if(selected_sample %in% exp$metadata$sample_name) {
+          n_experiments <- n_experiments + 1
+        }
+      }
+    }
+
+    # Calculate height: 300px per row, up to 4 columns per row
+    n_cols <- min(4, n_experiments)
+    n_rows <- ceiling(n_experiments / n_cols)
+    plot_height <- max(400, n_rows * 300)
+
+    plotOutput("multiview_plot", height = paste0(plot_height, "px"))
+  })
+
   # Multiview plot - one sample across all experiments
   output$multiview_plot <- renderPlot({
     req(rv$experiments, input$multiview_sample, input$multiview_gate, input$multiview_gate_strategy)
@@ -2770,17 +2802,23 @@ server <- function(input, output, session) {
               ha_threshold <- thresholds$ha_threshold
               edu_threshold <- thresholds$edu_threshold
             }, error = function(e) {
-              warning(sprintf("Error calculating thresholds for %s: %s", exp_name, e$message))
+              cat(sprintf("Quadrant threshold error for %s: %s\n", exp_name, e$message))
             })
+          } else {
+            cat(sprintf("No paired control found for %s in %s\n", sample_name, exp_name))
           }
-        } else {
-          # Standard gating: use relative threshold
+        }
+
+        # If quadrant failed or not used, try standard gating
+        if(is.null(ha_threshold)) {
           tryCatch({
             ha_threshold <- calculate_ha_threshold(fcs, sample_name,
                                                    gates = gates_to_use,
                                                    channels = CHANNELS)
+            cat(sprintf("Calculated HA threshold for %s: %s\n", exp_name,
+                       if(!is.null(ha_threshold)) sprintf("%.2f", ha_threshold) else "NULL"))
           }, error = function(e) {
-            warning(sprintf("Error calculating HA threshold for %s: %s", exp_name, e$message))
+            cat(sprintf("Standard HA threshold error for %s: %s\n", exp_name, e$message))
           })
         }
       }
@@ -4948,6 +4986,11 @@ GATE_STRATEGY <- list(
 
     # Apply the same filtering as the table display
     analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+    # Filter to only explicitly loaded experiments (MUST match table rendering)
+    if(length(rv$loaded_experiment_names) > 0) {
+      analyzed <- analyzed[analyzed$Experiment %in% rv$loaded_experiment_names, ]
+    }
 
     # Filter by selected gating strategies
     available_strategies <- unique(rv$all_results$Gate_ID)
