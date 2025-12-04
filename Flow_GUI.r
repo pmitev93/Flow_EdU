@@ -5998,11 +5998,18 @@ GATE_STRATEGY <- list(
       for(exp in unique_experiments) {
         exp_data <- plot_data %>% filter(Experiment == exp)
 
+        # Get gating strategy for this experiment (should be same across all samples in experiment)
+        gate_strategy <- if("Gate_ID" %in% names(exp_data) && nrow(exp_data) > 0) {
+          unique(exp_data$Gate_ID)[1]
+        } else {
+          "Unknown"
+        }
+
         # Create one row per experiment
-        corr_row <- list(Experiment = exp)
-        slope_row <- list(Experiment = exp)
-        ha_row <- list(Experiment = exp)
-        strength_row <- list(Experiment = exp)
+        corr_row <- list(Experiment = exp, Gate_Strategy = gate_strategy)
+        slope_row <- list(Experiment = exp, Gate_Strategy = gate_strategy)
+        ha_row <- list(Experiment = exp, Gate_Strategy = gate_strategy)
+        strength_row <- list(Experiment = exp, Gate_Strategy = gate_strategy)
 
         for(i in 1:nrow(unique_groups)) {
           cell_line <- unique_groups$Cell_line[i]
@@ -6036,13 +6043,13 @@ GATE_STRATEGY <- list(
       ha_df <- bind_rows(all_ha_rows)
       strength_df <- bind_rows(all_strength_rows)
 
-      # Write to Excel
+      # Write to Excel (Slope first as requested)
       wb <- createWorkbook()
-      addWorksheet(wb, "Correlation")
-      writeData(wb, "Correlation", corr_df)
-
       addWorksheet(wb, "Slope")
       writeData(wb, "Slope", slope_df)
+
+      addWorksheet(wb, "Correlation")
+      writeData(wb, "Correlation", corr_df)
 
       addWorksheet(wb, "HA_Positive_Pct")
       writeData(wb, "HA_Positive_Pct", ha_df)
