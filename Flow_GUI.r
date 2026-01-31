@@ -2647,45 +2647,48 @@ server <- function(input, output, session) {
     # Set up multi-panel layout
     if(!is.null(ha_threshold)) {
       # 2x4 grid for 8 plots (2 rows x 4 columns) - Gates 5-8 on top, 1-4 on bottom
-      par(mfrow = c(2, 4), mar = c(5, 4, 3, 1))
+      # Increased left margin from 4 to 6 to prevent y-axis label cutoff with larger fonts
+      par(mfrow = c(2, 4), mar = c(5, 6, 3, 1))
 
       # Top row: Gates 5, 6, 7, 8
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
 
       if(use_quadrant) {
         # Show quadrant plot for Gate 7
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
                                        gates = gates_to_use, channels = CHANNELS,
-                                       show_sample_name = TRUE,
+                                       show_sample_name = FALSE,
                                        edu_threshold = edu_threshold)
         # Show quadrant plot again (same as Gate 7 for quadrant strategy)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
                                        gates = gates_to_use, channels = CHANNELS,
-                                       show_sample_name = TRUE,
+                                       show_sample_name = FALSE,
                                        edu_threshold = edu_threshold)
       } else {
         # Show traditional Gate 7 and correlation plot
-        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS)
+                                       gates = gates_to_use, channels = CHANNELS,
+                                       show_sample_name = FALSE)
       }
 
       # Bottom row: Gates 1, 2, 3, 4
-      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
     } else {
       # 1x6 grid for 6 plots (1 row x 6 columns)
-      par(mfrow = c(1, 6), mar = c(5, 4, 3, 1))
+      # Increased left margin from 4 to 6 to prevent y-axis label cutoff with larger fonts
+      par(mfrow = c(1, 6), mar = c(5, 6, 3, 1))
 
-      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_live_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use)
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
     }
   })
 
