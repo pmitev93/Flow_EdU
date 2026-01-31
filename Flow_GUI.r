@@ -489,7 +489,21 @@ ui <- fluidPage(
                  ),
                  plotOutput("correlation_plot", height = "600px")
         ),
-        
+
+        tabPanel("Final: Correlation New",
+                 fluidRow(
+                   column(4, selectInput("correlation_new_experiment", "Experiment:", choices = NULL)),
+                   column(4, selectInput("correlation_new_gate_strategy", "Gating Strategy:", choices = NULL)),
+                   column(4, selectInput("correlation_new_sample", "Sample:", choices = NULL))
+                 ),
+                 fluidRow(
+                   column(2, actionButton("correlation_new_prev", "Previous", class = "btn-sm")),
+                   column(8, h4(textOutput("current_sample_name_new"), align = "center")),
+                   column(2, actionButton("correlation_new_next", "Next", class = "btn-sm", style = "float: right;"))
+                 ),
+                 plotOutput("correlation_plot_new", height = "600px")
+        ),
+
         tabPanel("Multi-Sample Comparison",
                  h3("Compare Multiple Samples"),
 
@@ -1525,6 +1539,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "gate6_experiment", choices = exp_choices)
     updateSelectInput(session, "gate7_experiment", choices = exp_choices)
     updateSelectInput(session, "correlation_experiment", choices = exp_choices)
+    updateSelectInput(session, "correlation_new_experiment", choices = exp_choices)
   })
 
   # Set up observers for all gate tabs
@@ -1536,6 +1551,7 @@ server <- function(input, output, session) {
   update_gate_selectors("gate6", "gate6_experiment", "gate6_gate_strategy", "gate6_sample")
   update_gate_selectors("gate7", "gate7_experiment", "gate7_gate_strategy", "gate7_sample")
   update_gate_selectors("correlation", "correlation_experiment", "correlation_gate_strategy", "correlation_sample")
+  update_gate_selectors("correlation_new", "correlation_new_experiment", "correlation_new_gate_strategy", "correlation_new_sample")
 
   # Load selected experiments (FCS data only, no analysis)
   observeEvent(input$load_selected, {
@@ -3771,11 +3787,31 @@ GATE_STRATEGY <- list(
       exp <- rv$experiments[[input$correlation_experiment]]
       idx <- as.numeric(input$correlation_sample)
       return(exp$metadata$sample_name[idx])
+    } else if(tab_name == "Final: Correlation New") {
+      req(rv$experiments, input$correlation_new_experiment, input$correlation_new_sample)
+      exp <- rv$experiments[[input$correlation_new_experiment]]
+      idx <- as.numeric(input$correlation_new_sample)
+      return(exp$metadata$sample_name[idx])
     }
 
     return("")
   })
-  
+
+  # Current sample name for Correlation New tab
+  output$current_sample_name_new <- renderText({
+    req(input$main_tabs)
+    tab_name <- input$main_tabs
+
+    if(tab_name == "Final: Correlation New") {
+      req(rv$experiments, input$correlation_new_experiment, input$correlation_new_sample)
+      exp <- rv$experiments[[input$correlation_new_experiment]]
+      idx <- as.numeric(input$correlation_new_sample)
+      return(exp$metadata$sample_name[idx])
+    }
+
+    return("")
+  })
+
   # Navigation functions for all gates
   navigate_sample <- function(direction) {
     req(input$main_tabs)
@@ -3870,6 +3906,17 @@ GATE_STRATEGY <- list(
         new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
       }
       updateSelectInput(session, "correlation_sample", selected = as.character(new_idx))
+    } else if(tab_name == "Final: Correlation New") {
+      req(rv$experiments, input$correlation_new_experiment, input$correlation_new_sample)
+      exp <- rv$experiments[[input$correlation_new_experiment]]
+      current_idx <- as.numeric(input$correlation_new_sample)
+      n_samples <- length(exp$flowset)
+      if(direction == "next") {
+        new_idx <- if(current_idx < n_samples) current_idx + 1 else 1
+      } else {
+        new_idx <- if(current_idx > 1) current_idx - 1 else n_samples
+      }
+      updateSelectInput(session, "correlation_new_sample", selected = as.character(new_idx))
     }
   }
   
@@ -3904,7 +3951,11 @@ GATE_STRATEGY <- list(
   # Correlation navigation
   observeEvent(input$correlation_prev, { navigate_sample("prev") })
   observeEvent(input$correlation_next, { navigate_sample("next") })
-  
+
+  # Correlation New navigation
+  observeEvent(input$correlation_new_prev, { navigate_sample("prev") })
+  observeEvent(input$correlation_new_next, { navigate_sample("next") })
+
   # ==============================================================================
   # GATE EDITING FUNCTIONALITY
   # ==============================================================================
@@ -4676,7 +4727,41 @@ GATE_STRATEGY <- list(
     plot_edu_ha_correlation_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
                                      gates = gates_to_use)
   })
-  
+
+  # New publication-quality correlation plot
+  output$correlation_plot_new <- renderPlot({
+    req(rv$experiments, input$correlation_new_experiment, input$correlation_new_sample, input$correlation_new_gate_strategy)
+    exp <- rv$experiments[[input$correlation_new_experiment]]
+    exp_name <- input$correlation_new_experiment
+    idx <- as.numeric(input$correlation_new_sample)
+
+    # Use gates for this experiment+strategy combination
+    composite_key <- paste0(exp_name, "::", input$correlation_new_gate_strategy)
+    gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+      rv$experiment_gates[[composite_key]]
+    } else {
+      GATES
+    }
+
+    # Calculate HA threshold for this experiment
+    control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+    if(is.null(control_idx)) {
+      plot.new()
+      text(0.5, 0.5, "No control sample found", cex = 1.5)
+      return()
+    }
+
+    control_fcs <- exp$flowset[[control_idx]]
+    control_name <- exp$metadata$sample_name[control_idx]
+    control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                           gates = gates_to_use,
+                                                           channels = CHANNELS)
+    ha_threshold <- control_result$threshold
+
+    plot_edu_ha_correlation_publication(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                                         gates = gates_to_use)
+  })
+
   # Status text
   output$status_text <- renderText({
     status <- "Ready"

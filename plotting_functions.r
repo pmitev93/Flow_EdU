@@ -1560,6 +1560,191 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   ))
 }
 
+## Publication-quality correlation plot with dynamic axes ----
+
+plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE, edu_threshold = NULL) {
+  # Apply Gates 1-6 (same as original)
+  fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
+
+  # Gate 5: FxCycle quantile
+  fxcycle_gate <- gates$fxcycle_quantile
+  fxcycle_values <- exprs(fcs_data)[, channels$FxCycle]
+  fxcycle_limits <- quantile(fxcycle_values, probs = fxcycle_gate$probs, na.rm = TRUE)
+  fxcycle_filter <- fxcycle_values >= fxcycle_limits[1] & fxcycle_values <= fxcycle_limits[2]
+  fcs_data <- Subset(fcs_data, fxcycle_filter)
+
+  # Gate 6: EdU + FxCycle
+  edu_gate <- gates$edu_fxcycle_sphase
+  edu_values <- exprs(fcs_data)[, channels$EdU]
+
+  is_dox_minus <- grepl("Dox-", sample_name, ignore.case = TRUE)
+  if(is_dox_minus) {
+    edu_threshold_g6 <- quantile(edu_values, probs = 0.10, na.rm = TRUE)
+  } else {
+    edu_threshold_g6 <- quantile(edu_values, probs = edu_gate$edu_prob, na.rm = TRUE)
+  }
+
+  fxcycle_values2 <- exprs(fcs_data)[, channels$FxCycle]
+  fxcycle_bounds <- quantile(fxcycle_values2, probs = edu_gate$fxcycle_probs, na.rm = TRUE)
+
+  edu_fxcycle_filter <- edu_values >= edu_threshold_g6 &
+    fxcycle_values2 >= fxcycle_bounds[1] &
+    fxcycle_values2 <= fxcycle_bounds[2]
+  fcs_data <- Subset(fcs_data, edu_fxcycle_filter)
+
+  # Gate 7: HA-positive (skip if edu_threshold provided)
+  if(is.null(edu_threshold)) {
+    ha_values <- exprs(fcs_data)[, channels$HA]
+    ha_filter <- ha_values >= ha_threshold
+    fcs_data <- Subset(fcs_data, ha_filter)
+  }
+
+  # Extract final data
+  ha_final <- exprs(fcs_data)[, channels$HA]
+  edu_final <- exprs(fcs_data)[, channels$EdU]
+
+  # Check if we have enough cells to plot
+  if(length(ha_final) < 10) {
+    plot(1, 1, type = "n", xlim = c(2, 6.5), ylim = c(4, 7),
+         xlab = "log10(HA-A)", ylab = "log10(EdU-A)",
+         main = sprintf("%s\nEdU vs HA Correlation", sample_name),
+         xaxs = "i", yaxs = "i",
+         cex.lab = 1.8, cex.axis = 1.5, cex.main = 1.8)
+    text(4.25, 5.5, sprintf("Insufficient cells for plotting\n(n = %d)", length(ha_final)),
+         cex = 1.4, col = "red", font = 2)
+
+    return(invisible(list(
+      sample_name = sample_name,
+      correlation = NA,
+      slope = NA,
+      n_cells = length(ha_final),
+      ha_log = numeric(0),
+      edu_log = numeric(0)
+    )))
+  }
+
+  # Log10 transform
+  ha_log <- log10(ha_final + 1)
+  edu_log <- log10(edu_final + 1)
+
+  # Calculate correlation and regression
+  correlation <- cor(ha_log, edu_log, use = "complete.obs")
+  lm_fit <- lm(edu_log ~ ha_log)
+  r_squared <- summary(lm_fit)$r.squared
+  slope <- coef(lm_fit)[2]
+
+  # Calculate dynamic axis limits with small margins
+  ha_range <- range(ha_log, na.rm = TRUE)
+  edu_range <- range(edu_log, na.rm = TRUE)
+
+  # Add 5% margin on each side
+  ha_margin <- diff(ha_range) * 0.05
+  edu_margin <- diff(edu_range) * 0.05
+
+  xlim_dynamic <- c(ha_range[1] - ha_margin, ha_range[2] + ha_margin)
+  ylim_dynamic <- c(edu_range[1] - edu_margin, edu_range[2] + edu_margin)
+
+  # Plot with density colors
+  dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
+
+  par(mgp = c(3, 0.7, 0))
+
+  plot_title <- sprintf("%s\nEdU vs HA Correlation", sample_name)
+
+  plot(ha_log, edu_log,
+       pch = 16,
+       cex = 0.5,
+       col = dens,
+       xlab = "log10(HA-A)",
+       ylab = "log10(EdU-A)",
+       main = plot_title,
+       xlim = xlim_dynamic,
+       ylim = ylim_dynamic,
+       xaxs = "i",
+       yaxs = "i",
+       cex.lab = 1.8,    # Larger axis labels
+       cex.axis = 1.5,   # Larger axis tick labels
+       cex.main = 1.8)   # Larger title
+
+  # Add threshold lines if edu_threshold is provided (quadrant mode)
+  if(!is.null(edu_threshold)) {
+    ha_threshold_log <- log10(ha_threshold + 1)
+    edu_threshold_log <- log10(edu_threshold + 1)
+
+    total_cells <- length(ha_log)
+    q1_ha_pos_edu_high <- sum(ha_log >= ha_threshold_log & edu_log >= edu_threshold_log)
+    q2_ha_neg_edu_high <- sum(ha_log < ha_threshold_log & edu_log >= edu_threshold_log)
+    q3_ha_neg_edu_low <- sum(ha_log < ha_threshold_log & edu_log < edu_threshold_log)
+    q4_ha_pos_edu_low <- sum(ha_log >= ha_threshold_log & edu_log < edu_threshold_log)
+
+    q1_pct <- (q1_ha_pos_edu_high / total_cells) * 100
+    q2_pct <- (q2_ha_neg_edu_high / total_cells) * 100
+    q3_pct <- (q3_ha_neg_edu_low / total_cells) * 100
+    q4_pct <- (q4_ha_pos_edu_low / total_cells) * 100
+
+    strength_ratio <- if((q1_pct + q4_pct) > 0) {
+      q4_pct / (q1_pct + q4_pct)
+    } else {
+      NA_real_
+    }
+
+    # Add colored background for quadrants
+    rect(ha_threshold_log, edu_threshold_log, xlim_dynamic[2], ylim_dynamic[2],
+         col = rgb(0, 0, 1, alpha = 0.1), border = NA)
+    rect(ha_threshold_log, ylim_dynamic[1], xlim_dynamic[2], edu_threshold_log,
+         col = rgb(1, 0, 0, alpha = 0.1), border = NA)
+
+    # Re-plot points on top
+    points(ha_log, edu_log, pch = 16, cex = 0.5, col = dens)
+
+    # Draw threshold lines
+    abline(v = ha_threshold_log, col = "black", lwd = 2, lty = 1)
+    abline(h = edu_threshold_log, col = "black", lwd = 2, lty = 1)
+
+    # Add quadrant percentages (larger font)
+    x_center_left <- (xlim_dynamic[1] + ha_threshold_log) / 2
+    x_center_right <- (ha_threshold_log + xlim_dynamic[2]) / 2
+    y_center_top <- (edu_threshold_log + ylim_dynamic[2]) / 2
+    y_center_bottom <- (ylim_dynamic[1] + edu_threshold_log) / 2
+
+    text(x_center_left, y_center_top, sprintf("%.1f%%", q2_pct), col = "black", cex = 1.2, font = 2)
+    text(x_center_right, y_center_top, sprintf("%.1f%%", q1_pct), col = "blue", cex = 1.2, font = 2)
+    text(x_center_left, y_center_bottom, sprintf("%.1f%%", q3_pct), col = "black", cex = 1.2, font = 2)
+    text(x_center_right, y_center_bottom, sprintf("%.1f%%", q4_pct), col = "red", cex = 1.2, font = 2)
+
+    # Display strength ratio (larger font)
+    if(!is.na(strength_ratio)) {
+      text(mean(xlim_dynamic), ylim_dynamic[1] + edu_margin * 0.5,
+           sprintf("Strength Ratio = %.3f", strength_ratio),
+           col = "black", cex = 1.3, font = 2, pos = 3)
+    }
+  } else {
+    # Add regression line (only in non-quadrant mode)
+    abline(lm_fit, col = "black", lwd = 2, lty = 2)
+  }
+
+  # Display ONLY slope at top left (larger font, publication quality)
+  text(xlim_dynamic[1] + ha_margin * 0.5, ylim_dynamic[2] - edu_margin * 0.5,
+       sprintf("Slope = %.3f", slope),
+       col = "black", cex = 1.4, font = 2, pos = 4)
+
+  # Add cell count at bottom right (keep this as requested)
+  legend("bottomright",
+         legend = sprintf("n = %s cells", format(length(ha_log), big.mark = ",")),
+         bty = "n",
+         cex = 1.3)
+
+  # Return correlation data
+  invisible(list(
+    sample_name = sample_name,
+    correlation = correlation,
+    slope = slope,
+    n_cells = length(ha_log),
+    ha_log = ha_log,
+    edu_log = edu_log
+  ))
+}
+
 plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS) {
   # Count only Dox+ samples
   n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
