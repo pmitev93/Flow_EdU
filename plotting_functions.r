@@ -1482,7 +1482,11 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
   par(mgp = c(3, 0.7, 0))
 
   # Create title with sample name and subtitle
-  plot_title <- sprintf("%s\nEdU vs HA Correlation", sample_name)
+  plot_title <- if(show_sample_name) {
+    sprintf("%s\nEdU vs HA Correlation", sample_name)
+  } else {
+    "EdU vs HA Correlation"
+  }
 
   plot(ha_log, edu_log,
        pch = 16,
@@ -1670,7 +1674,8 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
   # Plot with density colors
   dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 
-  par(mgp = c(3, 0.7, 0))
+  # Increase left margin to 5.5 to prevent y-axis label cutoff with larger fonts
+  par(mar = c(5, 5.5, 4, 2), mgp = c(3, 0.7, 0))
 
   plot_title <- sprintf("%s\nEdU vs HA Correlation", sample_name)
 
