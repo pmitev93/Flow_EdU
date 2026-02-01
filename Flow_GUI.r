@@ -2664,8 +2664,8 @@ server <- function(input, output, session) {
     if(!is.null(ha_threshold)) {
       # 4x2 grid for 8 plots (4 rows x 2 columns)
       # Gates 1,2 at top; Gates 7,8 at bottom
-      # Increased left margin to 7 to prevent y-axis label cutoff with even larger fonts
-      par(mfrow = c(4, 2), mar = c(5, 7, 3, 1))
+      # Increased left margin to 7, right margin to 2.5 to prevent label cutoff
+      par(mfrow = c(4, 2), mar = c(5, 7, 3, 2.5))
 
       # Row 1: Gates 1, 2
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
@@ -2700,7 +2700,7 @@ server <- function(input, output, session) {
       }
     } else {
       # 3x2 grid for 6 plots (3 rows x 2 columns) when no threshold available
-      par(mfrow = c(3, 2), mar = c(5, 7, 3, 1))
+      par(mfrow = c(3, 2), mar = c(5, 7, 3, 2.5))
 
       # Row 1: Gates 1, 2
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)

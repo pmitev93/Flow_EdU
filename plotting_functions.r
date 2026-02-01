@@ -127,7 +127,7 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
 
-  axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
   # Add blue tint to gate region
@@ -206,7 +206,7 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
              ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
     }
     
-    axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
+    axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 1.0, 0))
     axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0))
 
     # Add blue tint to gate region
@@ -292,7 +292,7 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
   }
 
   # Add these two lines here:
-  axis(1, at = seq(0, 15e6, 5e6), labels = c("0M", "5M", "10M", "15M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 15e6, 5e6), labels = c("0M", "5M", "10M", "15M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = seq(0, 4e6, 1e6), labels = c("0M", "1M", "2M", "3M", "4M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
   # Add blue tint to gate region
@@ -473,7 +473,7 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
 
-  axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
   # Add gate (polygon or vertical line)
@@ -570,7 +570,7 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
          yaxt = "n",
          log = "x")
     
-    axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 0.5, 0))
+    axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 1.0, 0))
     axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), cex.axis = 0.5)
 
     # Add gate (polygon or vertical line)
@@ -686,7 +686,7 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
 
-  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
   # Add gate (polygon or vertical lines)
@@ -888,7 +888,7 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
        cex.axis = 2.0,
        cex.main = 2.5)
 
-  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
   # Add blue tint to gated region (between quantile bounds)
@@ -1038,7 +1038,7 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
        cex.axis = 2.0,
        cex.main = 2.5)
 
-  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
   # Add blue tint to gated region
@@ -1197,7 +1197,7 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
          main = if(show_sample_name) sprintf("Gate 7: HA-Positive\n%s", sample_name) else "Gate 7: HA-Positive",
          log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0))
     axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
-         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0))
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
          labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
     text(1000, 50000, sprintf("Insufficient cells for plotting\n(n = %d)", length(x)),
@@ -1234,7 +1234,7 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        cex.main = 2.5)
 
   axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
-       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
        labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
 
