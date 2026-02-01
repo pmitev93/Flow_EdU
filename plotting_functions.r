@@ -1701,7 +1701,8 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
        cex.axis = 1.8,   # Larger axis tick labels
        cex.main = 2.2,   # Larger title
        font.lab = 2,     # Bold axis labels
-       font.main = 2)    # Bold title
+       font.main = 2,    # Bold title
+       font.axis = 2)    # Bold axis tick numbers
 
   # Add threshold lines if edu_threshold is provided (quadrant mode)
   if(!is.null(edu_threshold)) {
@@ -1760,16 +1761,21 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
     abline(lm_fit, col = "black", lwd = 2, lty = 2)
   }
 
-  # Display ONLY slope at top left (larger font, publication quality)
-  text(xlim_dynamic[1] + ha_margin * 0.5, ylim_dynamic[2] - edu_margin * 0.5,
+  # Display ONLY slope above right end of regression line (larger font, publication quality)
+  # Calculate y position at right end of regression line
+  intercept <- coef(lm_fit)[1]
+  x_right <- xlim_dynamic[2]
+  y_at_right <- intercept + slope * x_right
+  # Position text slightly above the line
+  text(x_right, y_at_right + edu_margin * 1.5,
        sprintf("Slope = %.3f", slope),
-       col = "black", cex = 1.4, font = 2, pos = 4)
+       col = "black", cex = 1.8, font = 2, pos = 2)  # pos=2 means left-justified
 
   # Add cell count at bottom right (keep this as requested)
   legend("bottomright",
          legend = sprintf("n = %s cells", format(length(ha_log), big.mark = ",")),
          bty = "n",
-         cex = 1.3)
+         cex = 1.6)
 
   # Return correlation data
   invisible(list(

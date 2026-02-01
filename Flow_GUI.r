@@ -501,7 +501,14 @@ ui <- fluidPage(
                    column(8, h4(textOutput("current_sample_name_new"), align = "center")),
                    column(2, actionButton("correlation_new_next", "Next", class = "btn-sm", style = "float: right;"))
                  ),
-                 plotOutput("correlation_plot_new", height = "600px")
+                 fluidRow(
+                   column(3, numericInput("corr_plot_width", "Plot Width (px):",
+                                         value = 600, min = 400, max = 1200, step = 50)),
+                   column(3, numericInput("corr_plot_height", "Plot Height (px):",
+                                         value = 600, min = 400, max = 1200, step = 50)),
+                   column(6, HTML("<p style='margin-top: 25px;'><i>Adjust dimensions for publication-quality export</i></p>"))
+                 ),
+                 uiOutput("correlation_plot_new_ui")
         ),
 
         tabPanel("Multi-Sample Comparison",
@@ -4729,6 +4736,14 @@ GATE_STRATEGY <- list(
 
     plot_edu_ha_correlation_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
                                      gates = gates_to_use)
+  })
+
+  # Dynamic UI for correlation plot with adjustable dimensions
+  output$correlation_plot_new_ui <- renderUI({
+    height_px <- if(!is.null(input$corr_plot_height)) input$corr_plot_height else 600
+    width_px <- if(!is.null(input$corr_plot_width)) input$corr_plot_width else 600
+
+    plotOutput("correlation_plot_new", height = paste0(height_px, "px"), width = paste0(width_px, "px"))
   })
 
   # New publication-quality correlation plot
