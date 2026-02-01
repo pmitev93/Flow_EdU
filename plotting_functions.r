@@ -1761,13 +1761,8 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
     abline(lm_fit, col = "black", lwd = 2, lty = 2)
   }
 
-  # Display ONLY slope above right end of regression line (larger font, publication quality)
-  # Calculate y position at right end of regression line
-  intercept <- coef(lm_fit)[1]
-  x_right <- xlim_dynamic[2]
-  y_at_right <- intercept + slope * x_right
-  # Position text slightly above the line
-  text(x_right, y_at_right + edu_margin * 1.5,
+  # Display ONLY slope in top right corner (larger font, publication quality)
+  text(xlim_dynamic[2] - ha_margin * 0.5, ylim_dynamic[2] - edu_margin * 0.5,
        sprintf("Slope = %.3f", slope),
        col = "black", cex = 1.8, font = 2, pos = 2)  # pos=2 means left-justified
 
