@@ -506,8 +506,10 @@ ui <- fluidPage(
                                          value = 600, min = 400, max = 1200, step = 50)),
                    column(3, numericInput("corr_plot_height", "Plot Height (px):",
                                          value = 600, min = 400, max = 1200, step = 50)),
-                   column(6, HTML("<p style='margin-top: 25px;'><i>Adjust dimensions for publication-quality export</i></p>"))
+                   column(3, checkboxInput("corr_manual_axes", "Manual Axis Limits", value = FALSE)),
+                   column(3, HTML("<p style='margin-top: 25px;'><i>Adjust for publication</i></p>"))
                  ),
+                 uiOutput("correlation_axis_controls"),
                  uiOutput("correlation_plot_new_ui")
         ),
 
@@ -4738,6 +4740,18 @@ GATE_STRATEGY <- list(
                                      gates = gates_to_use)
   })
 
+  # Conditional UI for manual axis controls
+  output$correlation_axis_controls <- renderUI({
+    if(isTRUE(input$corr_manual_axes)) {
+      fluidRow(
+        column(3, numericInput("corr_x_min", "X-axis Min:", value = 2, step = 0.1)),
+        column(3, numericInput("corr_x_max", "X-axis Max:", value = 6.5, step = 0.1)),
+        column(3, numericInput("corr_y_min", "Y-axis Min:", value = 4, step = 0.1)),
+        column(3, numericInput("corr_y_max", "Y-axis Max:", value = 7, step = 0.1))
+      )
+    }
+  })
+
   # Dynamic UI for correlation plot with adjustable dimensions
   output$correlation_plot_new_ui <- renderUI({
     height_px <- if(!is.null(input$corr_plot_height)) input$corr_plot_height else 600
@@ -4776,8 +4790,17 @@ GATE_STRATEGY <- list(
                                                            channels = CHANNELS)
     ha_threshold <- control_result$threshold
 
-    plot_edu_ha_correlation_publication(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
-                                         gates = gates_to_use)
+    # Determine axis limits (manual or dynamic)
+    if(isTRUE(input$corr_manual_axes)) {
+      xlim_manual <- c(input$corr_x_min, input$corr_x_max)
+      ylim_manual <- c(input$corr_y_min, input$corr_y_max)
+      plot_edu_ha_correlation_publication(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                                           gates = gates_to_use,
+                                           xlim = xlim_manual, ylim = ylim_manual)
+    } else {
+      plot_edu_ha_correlation_publication(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                                           gates = gates_to_use)
+    }
   })
 
   # Status text

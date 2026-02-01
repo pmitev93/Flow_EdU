@@ -1589,7 +1589,7 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
 
 ## Publication-quality correlation plot with dynamic axes ----
 
-plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE, edu_threshold = NULL) {
+plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE, edu_threshold = NULL, xlim = NULL, ylim = NULL) {
   # Apply Gates 1-6 (same as original)
   fcs_data <- apply_sequential_gates(fcs_data, up_to_gate = 4, gates = gates, channels = channels)
 
@@ -1660,16 +1660,25 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
   r_squared <- summary(lm_fit)$r.squared
   slope <- coef(lm_fit)[2]
 
-  # Calculate dynamic axis limits with small margins
-  ha_range <- range(ha_log, na.rm = TRUE)
-  edu_range <- range(edu_log, na.rm = TRUE)
+  # Use manual axis limits if provided, otherwise calculate dynamic limits
+  if(!is.null(xlim) && !is.null(ylim)) {
+    # Manual limits
+    xlim_dynamic <- xlim
+    ylim_dynamic <- ylim
+    ha_margin <- diff(xlim) * 0.05
+    edu_margin <- diff(ylim) * 0.05
+  } else {
+    # Calculate dynamic axis limits with small margins
+    ha_range <- range(ha_log, na.rm = TRUE)
+    edu_range <- range(edu_log, na.rm = TRUE)
 
-  # Add 5% margin on each side
-  ha_margin <- diff(ha_range) * 0.05
-  edu_margin <- diff(edu_range) * 0.05
+    # Add 5% margin on each side
+    ha_margin <- diff(ha_range) * 0.05
+    edu_margin <- diff(edu_range) * 0.05
 
-  xlim_dynamic <- c(ha_range[1] - ha_margin, ha_range[2] + ha_margin)
-  ylim_dynamic <- c(edu_range[1] - edu_margin, edu_range[2] + edu_margin)
+    xlim_dynamic <- c(ha_range[1] - ha_margin, ha_range[2] + ha_margin)
+    ylim_dynamic <- c(edu_range[1] - edu_margin, edu_range[2] + edu_margin)
+  }
 
   # Plot with density colors - use more saturated color palette for better visibility
   dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("darkblue", "cyan", "yellow", "red")))
