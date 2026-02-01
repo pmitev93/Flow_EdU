@@ -1671,17 +1671,24 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
   xlim_dynamic <- c(ha_range[1] - ha_margin, ha_range[2] + ha_margin)
   ylim_dynamic <- c(edu_range[1] - edu_margin, edu_range[2] + edu_margin)
 
-  # Plot with density colors
-  dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
+  # Plot with density colors - use more saturated color palette for better visibility
+  dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("darkblue", "cyan", "yellow", "red")))
+
+  # Make colors more opaque, especially for low cell counts
+  # Extract RGB values and reduce transparency
+  dens_rgb <- col2rgb(dens, alpha = TRUE)
+  # Set minimum alpha to 200 (out of 255) to ensure visibility
+  dens_rgb[4, ] <- pmax(dens_rgb[4, ], 200)
+  dens <- rgb(dens_rgb[1, ], dens_rgb[2, ], dens_rgb[3, ], dens_rgb[4, ], maxColorValue = 255)
 
   # Increase left margin to 5.5 to prevent y-axis label cutoff with larger fonts
   par(mar = c(5, 5.5, 4, 2), mgp = c(3, 0.7, 0))
 
-  plot_title <- sprintf("%s\nEdU vs HA Correlation", sample_name)
+  plot_title <- "EdU vs HA Correlation"
 
   plot(ha_log, edu_log,
        pch = 16,
-       cex = 0.5,
+       cex = 0.8,        # Increased from 0.5 for better visibility
        col = dens,
        xlab = "log10(HA-A)",
        ylab = "log10(EdU-A)",
@@ -1690,9 +1697,11 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
        ylim = ylim_dynamic,
        xaxs = "i",
        yaxs = "i",
-       cex.lab = 1.8,    # Larger axis labels
-       cex.axis = 1.5,   # Larger axis tick labels
-       cex.main = 1.8)   # Larger title
+       cex.lab = 2.2,    # Larger and will be bold
+       cex.axis = 1.8,   # Larger axis tick labels
+       cex.main = 2.2,   # Larger title
+       font.lab = 2,     # Bold axis labels
+       font.main = 2)    # Bold title
 
   # Add threshold lines if edu_threshold is provided (quadrant mode)
   if(!is.null(edu_threshold)) {
@@ -1723,7 +1732,7 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
          col = rgb(1, 0, 0, alpha = 0.1), border = NA)
 
     # Re-plot points on top
-    points(ha_log, edu_log, pch = 16, cex = 0.5, col = dens)
+    points(ha_log, edu_log, pch = 16, cex = 0.8, col = dens)
 
     # Draw threshold lines
     abline(v = ha_threshold_log, col = "black", lwd = 2, lty = 1)
