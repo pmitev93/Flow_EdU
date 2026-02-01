@@ -203,7 +203,14 @@ ui <- fluidPage(
                    column(4, selectInput("sample_overview_sample", "Select Sample:",
                                         choices = NULL))
                  ),
-                 plotOutput("sample_overview_plot", height = "900px")
+                 fluidRow(
+                   column(4, numericInput("overview_plot_width", "Plot Width (px):",
+                                         value = 1200, min = 600, max = 2000, step = 100)),
+                   column(4, numericInput("overview_plot_height", "Plot Height (px):",
+                                         value = 1200, min = 600, max = 2000, step = 100)),
+                   column(4, HTML("<p style='margin-top: 25px;'><i>Adjust grid dimensions</i></p>"))
+                 ),
+                 uiOutput("sample_overview_plot_ui")
         ),
 
         # Cross-Experiment View Tab
@@ -2653,16 +2660,26 @@ server <- function(input, output, session) {
       }
     }
 
-    # Set up multi-panel layout
+    # Set up multi-panel layout: 4 rows x 2 columns
     if(!is.null(ha_threshold)) {
-      # 2x4 grid for 8 plots (2 rows x 4 columns) - Gates 5-8 on top, 1-4 on bottom
-      # Increased left margin from 4 to 6 to prevent y-axis label cutoff with larger fonts
-      par(mfrow = c(2, 4), mar = c(5, 6, 3, 1))
+      # 4x2 grid for 8 plots (4 rows x 2 columns)
+      # Gates 1,2 at top; Gates 7,8 at bottom
+      # Increased left margin to 7 to prevent y-axis label cutoff with even larger fonts
+      par(mfrow = c(4, 2), mar = c(5, 7, 3, 1))
 
-      # Top row: Gates 5, 6, 7, 8
+      # Row 1: Gates 1, 2
+      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+      # Row 2: Gates 3, 4
+      plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+      # Row 3: Gates 5, 6
       plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
 
+      # Row 4: Gates 7, 8
       if(use_quadrant) {
         # Show quadrant plot for Gate 7
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
@@ -2681,24 +2698,30 @@ server <- function(input, output, session) {
                                        gates = gates_to_use, channels = CHANNELS,
                                        show_sample_name = FALSE)
       }
-
-      # Bottom row: Gates 1, 2, 3, 4
-      plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
     } else {
-      # 1x6 grid for 6 plots (1 row x 6 columns)
-      # Increased left margin from 4 to 6 to prevent y-axis label cutoff with larger fonts
-      par(mfrow = c(1, 6), mar = c(5, 6, 3, 1))
+      # 3x2 grid for 6 plots (3 rows x 2 columns) when no threshold available
+      par(mfrow = c(3, 2), mar = c(5, 7, 3, 1))
 
+      # Row 1: Gates 1, 2
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+      # Row 2: Gates 3, 4
       plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+      # Row 3: Gates 5, 6
       plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
     }
+  })
+
+  # Dynamic UI for sample overview plot with adjustable dimensions
+  output$sample_overview_plot_ui <- renderUI({
+    height_px <- if(!is.null(input$overview_plot_height)) input$overview_plot_height else 1200
+    width_px <- if(!is.null(input$overview_plot_width)) input$overview_plot_width else 1200
+
+    plotOutput("sample_overview_plot", height = paste0(height_px, "px"), width = paste0(width_px, "px"))
   })
 
   # Dynamic UI for multiview plot with adjustable height
