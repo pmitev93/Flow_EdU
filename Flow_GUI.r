@@ -514,7 +514,13 @@ ui <- fluidPage(
                    column(3, numericInput("corr_plot_height", "Plot Height (px):",
                                          value = 600, min = 400, max = 1200, step = 50)),
                    column(3, checkboxInput("corr_manual_axes", "Manual Axis Limits", value = FALSE)),
-                   column(3, HTML("<p style='margin-top: 25px;'><i>Adjust for publication</i></p>"))
+                   column(3, selectInput("corr_export_format", "Export Format:",
+                                        choices = c("SVG" = "svg", "PDF" = "pdf", "PNG" = "png"),
+                                        selected = "svg"))
+                 ),
+                 fluidRow(
+                   column(3, downloadButton("download_corr_plot", "Download Plot", class = "btn-primary")),
+                   column(9, HTML("<p style='margin-top: 7px;'><i>Export publication-quality vector graphic</i></p>"))
                  ),
                  uiOutput("correlation_axis_controls"),
                  uiOutput("correlation_plot_new_ui")
@@ -4825,6 +4831,78 @@ GATE_STRATEGY <- list(
                                            gates = gates_to_use)
     }
   })
+
+  # Download handler for correlation plot
+  output$download_corr_plot <- downloadHandler(
+    filename = function() {
+      exp_name <- input$correlation_new_experiment
+      sample_idx <- input$correlation_new_sample
+      format <- input$corr_export_format
+      timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+      paste0("correlation_", exp_name, "_sample", sample_idx, "_", timestamp, ".", format)
+    },
+    content = function(file) {
+      req(rv$experiments, input$correlation_new_experiment, input$correlation_new_sample, input$correlation_new_gate_strategy)
+
+      exp <- rv$experiments[[input$correlation_new_experiment]]
+      exp_name <- input$correlation_new_experiment
+      idx <- as.numeric(input$correlation_new_sample)
+
+      # Use gates for this experiment+strategy combination
+      composite_key <- paste0(exp_name, "::", input$correlation_new_gate_strategy)
+      gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+        rv$experiment_gates[[composite_key]]
+      } else {
+        GATES
+      }
+
+      # Calculate HA threshold
+      control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+      if(is.null(control_idx)) {
+        showNotification("No control sample found", type = "error")
+        return()
+      }
+
+      control_fcs <- exp$flowset[[control_idx]]
+      control_name <- exp$metadata$sample_name[control_idx]
+      control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                             gates = gates_to_use,
+                                                             channels = CHANNELS)
+      ha_threshold <- control_result$threshold
+
+      # Get plot dimensions (convert px to inches for vector formats)
+      width_px <- if(!is.null(input$corr_plot_width)) input$corr_plot_width else 600
+      height_px <- if(!is.null(input$corr_plot_height)) input$corr_plot_height else 600
+      width_in <- width_px / 96  # 96 DPI standard
+      height_in <- height_px / 96
+
+      # Open appropriate graphics device
+      format <- input$corr_export_format
+      if(format == "svg") {
+        svg(file, width = width_in, height = height_in)
+      } else if(format == "pdf") {
+        pdf(file, width = width_in, height = height_in)
+      } else if(format == "png") {
+        png(file, width = width_px, height = height_px, res = 300)
+      }
+
+      # Render plot
+      if(isTRUE(input$corr_manual_axes)) {
+        xlim_manual <- c(input$corr_x_min, input$corr_x_max)
+        ylim_manual <- c(input$corr_y_min, input$corr_y_max)
+        plot_edu_ha_correlation_publication(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                                             gates = gates_to_use,
+                                             xlim = xlim_manual, ylim = ylim_manual)
+      } else {
+        plot_edu_ha_correlation_publication(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
+                                             gates = gates_to_use)
+      }
+
+      dev.off()
+
+      showNotification(sprintf("Plot exported as %s", format), type = "message", duration = 3)
+    }
+  )
 
   # Status text
   output$status_text <- renderText({
