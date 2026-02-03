@@ -1771,7 +1771,7 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
   }
 
   # Display ONLY slope in top right corner (larger font, publication quality)
-  text(xlim_dynamic[2] - ha_margin * 0.5, ylim_dynamic[2] - edu_margin * 2.0,
+  text(xlim_dynamic[2] - ha_margin * 0.5, ylim_dynamic[2] - edu_margin * 3.0,
        sprintf("Slope = %.3f", slope),
        col = "black", cex = 1.8, font = 2, pos = 2)  # pos=2 means left-justified
 
