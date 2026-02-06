@@ -204,11 +204,18 @@ ui <- fluidPage(
                                         choices = NULL))
                  ),
                  fluidRow(
-                   column(4, numericInput("overview_plot_width", "Plot Width (px):",
+                   column(3, numericInput("overview_plot_width", "Plot Width (px):",
                                          value = 1200, min = 600, max = 2000, step = 100)),
-                   column(4, numericInput("overview_plot_height", "Plot Height (px):",
+                   column(3, numericInput("overview_plot_height", "Plot Height (px):",
                                          value = 1200, min = 600, max = 2000, step = 100)),
-                   column(4, HTML("<p style='margin-top: 25px;'><i>Adjust grid dimensions</i></p>"))
+                   column(3, selectInput("overview_export_format", "Export Format:",
+                                        choices = c("SVG" = "svg", "PDF" = "pdf", "PNG" = "png"),
+                                        selected = "svg")),
+                   column(3, HTML("<p style='margin-top: 25px;'></p>"))
+                 ),
+                 fluidRow(
+                   column(3, downloadButton("download_overview_plot", "Download Plot", class = "btn-primary")),
+                   column(9, HTML("<p style='margin-top: 7px;'><i>Export publication-quality vector graphic</i></p>"))
                  ),
                  uiOutput("sample_overview_plot_ui")
         ),
@@ -2729,6 +2736,192 @@ server <- function(input, output, session) {
 
     plotOutput("sample_overview_plot", height = paste0(height_px, "px"), width = paste0(width_px, "px"))
   })
+
+  # Download handler for Sample Overview plot
+  output$download_overview_plot <- downloadHandler(
+    filename = function() {
+      exp_name <- input$sample_overview_experiment
+      sample_idx <- input$sample_overview_sample
+      format <- input$overview_export_format
+      timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+      paste0("sample_overview_", exp_name, "_sample", sample_idx, "_", timestamp, ".", format)
+    },
+    content = function(file) {
+      req(rv$experiments, input$sample_overview_experiment,
+          input$sample_overview_gate_strategy, input$sample_overview_sample)
+
+      exp <- rv$experiments[[input$sample_overview_experiment]]
+      exp_name <- input$sample_overview_experiment
+      idx <- as.numeric(input$sample_overview_sample)
+      sample_name <- exp$metadata$sample_name[idx]
+      fcs <- exp$flowset[[idx]]
+
+      # Use gates for this experiment+strategy combination
+      composite_key <- paste0(exp_name, "::", input$sample_overview_gate_strategy)
+      gates_to_use <- if(!is.null(rv$experiment_gates[[composite_key]])) {
+        rv$experiment_gates[[composite_key]]
+      } else {
+        GATES
+      }
+
+      # Get strategy metadata
+      gate_strategy_key <- paste0("GATE_STRATEGY_", input$sample_overview_gate_strategy)
+      gate_strategy <- if(!is.null(rv$gate_strategies[[gate_strategy_key]])) {
+        rv$gate_strategies[[gate_strategy_key]]
+      } else {
+        NULL
+      }
+
+      # If gate strategy not in memory, try to load from cache
+      if(is.null(gate_strategy)) {
+        cache_dir <- file.path("analysis_cache", exp_name)
+        if(dir.exists(cache_dir)) {
+          cache_files <- list.files(cache_dir, pattern = "\\.rds$", full.names = TRUE)
+          for(cache_file in cache_files) {
+            tryCatch({
+              cache_data <- readRDS(cache_file)
+              if(!is.null(cache_data$gate_id) && cache_data$gate_id == input$sample_overview_gate_strategy) {
+                # Found matching cache file, extract gate strategy AND gates
+                if(!is.null(cache_data$gate_strategy)) {
+                  gate_strategy <- cache_data$gate_strategy
+                  rv$gate_strategies[[gate_strategy_key]] <- gate_strategy
+
+                  # Also load the gates themselves
+                  if(!is.null(cache_data$gates)) {
+                    composite_key <- paste0(exp_name, "::", input$sample_overview_gate_strategy)
+                    rv$experiment_gates[[composite_key]] <- cache_data$gates
+                    gates_to_use <- cache_data$gates
+                  }
+                  break
+                }
+              }
+            }, error = function(e) {
+              # Skip files that can't be read
+            })
+          }
+        }
+      }
+
+      # Re-evaluate gates_to_use after cache loading
+      composite_key <- paste0(exp_name, "::", input$sample_overview_gate_strategy)
+      if(!is.null(rv$experiment_gates[[composite_key]])) {
+        gates_to_use <- rv$experiment_gates[[composite_key]]
+      }
+
+      # Check if using quadrant strategy
+      use_quadrant <- !is.null(gate_strategy$analysis_type) &&
+                      gate_strategy$analysis_type == "quadrant_ratio" &&
+                      !is.null(gates_to_use$quadrant)
+
+      # Calculate thresholds based on strategy
+      ha_threshold <- NULL
+      edu_threshold <- NULL
+
+      if(use_quadrant) {
+        # Quadrant strategy: find paired control
+        control_idx <- find_paired_control(sample_name, exp$metadata)
+        if(!is.null(control_idx)) {
+          control_fcs <- exp$flowset[[control_idx]]
+          control_name <- exp$metadata$sample_name[control_idx]
+
+          tryCatch({
+            quadrant_result <- calculate_quadrant_from_paired_control(
+              control_fcs, fcs, control_name, sample_name,
+              gates_to_use, CHANNELS
+            )
+            ha_threshold <- quadrant_result$ha_threshold
+            edu_threshold <- quadrant_result$edu_threshold
+          }, error = function(e) {
+            cat(sprintf("Error calculating quadrant thresholds: %s\n", e$message))
+          })
+        }
+      } else {
+        # Old strategy: use global Empty_Vector control
+        control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+        if(!is.null(control_idx)) {
+          control_fcs <- exp$flowset[[control_idx]]
+          control_name <- exp$metadata$sample_name[control_idx]
+          control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                                 gates = gates_to_use,
+                                                                 channels = CHANNELS)
+          ha_threshold <- control_result$threshold
+        }
+      }
+
+      # Get plot dimensions (convert px to inches for vector formats)
+      width_px <- if(!is.null(input$overview_plot_width)) input$overview_plot_width else 1200
+      height_px <- if(!is.null(input$overview_plot_height)) input$overview_plot_height else 1200
+      width_in <- width_px / 96  # 96 DPI standard
+      height_in <- height_px / 96
+
+      # Open appropriate graphics device
+      format <- input$overview_export_format
+      if(format == "svg") {
+        svg(file, width = width_in, height = height_in)
+      } else if(format == "pdf") {
+        pdf(file, width = width_in, height = height_in)
+      } else if(format == "png") {
+        png(file, width = width_px, height = height_px, res = 300)
+      }
+
+      # Render the multi-panel plot
+      if(!is.null(ha_threshold)) {
+        # 4x2 grid for 8 plots (4 rows x 2 columns)
+        par(mfrow = c(4, 2), mar = c(5, 7, 3, 2.5))
+
+        # Row 1: Gates 1, 2
+        plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+        # Row 2: Gates 3, 4
+        plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+        # Row 3: Gates 5, 6
+        plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+        # Row 4: Gates 7, 8
+        if(use_quadrant) {
+          # Show quadrant plot for Gate 7
+          plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                         gates = gates_to_use, channels = CHANNELS,
+                                         show_sample_name = FALSE,
+                                         edu_threshold = edu_threshold)
+          # Show quadrant plot again (same as Gate 7 for quadrant strategy)
+          plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                         gates = gates_to_use, channels = CHANNELS,
+                                         show_sample_name = FALSE,
+                                         edu_threshold = edu_threshold)
+        } else {
+          # Show traditional Gate 7 and correlation plot
+          plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
+          plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
+                                         gates = gates_to_use, channels = CHANNELS,
+                                         show_sample_name = FALSE)
+        }
+      } else {
+        # 3x2 grid for 6 plots (3 rows x 2 columns) when no threshold available
+        par(mfrow = c(3, 2), mar = c(5, 7, 3, 2.5))
+
+        # Row 1: Gates 1, 2
+        plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+        # Row 2: Gates 3, 4
+        plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+
+        # Row 3: Gates 5, 6
+        plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      }
+
+      dev.off()
+
+      showNotification(sprintf("Sample Overview plot exported as %s", format), type = "message", duration = 3)
+    }
+  )
 
   # Dynamic UI for multiview plot with adjustable height
   output$multiview_plot_ui <- renderUI({
