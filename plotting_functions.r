@@ -91,7 +91,7 @@ quick_scan_experiment <- function(experiment_path) {
 # Single sample visualization 
 plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Plot settings
@@ -251,7 +251,7 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
 
 plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gate 1 first (debris removal)
@@ -422,7 +422,7 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
 
 plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gate 1: Debris removal
@@ -629,7 +629,7 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
 
 plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gates 1-3
@@ -863,7 +863,7 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
 
 plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gates 1-4
@@ -1008,7 +1008,7 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
 
 plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gates 1-5
@@ -1188,7 +1188,7 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
 
 plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gates 1-4
@@ -1431,7 +1431,7 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
 
 plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, gates = GATES, channels = CHANNELS, show_sample_name = TRUE, edu_threshold = NULL) {
   # Set Arial font for all text
-  old_par <- par(family = "Arial")
+  old_par <- par(family = "sans")
   on.exit(par(old_par))
 
   # Apply Gates 1-6
