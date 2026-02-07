@@ -906,7 +906,7 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
        log = "y",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5,
+       cex.main = 2.5)
 
   axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
@@ -1061,7 +1061,7 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
        log = "y",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5,
+       cex.main = 2.5)
 
   axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
@@ -1260,7 +1260,7 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        log = "xy",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5,
+       cex.main = 2.5)
 
   axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
        labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
@@ -1534,7 +1534,7 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
        yaxs = "i",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5,
+       cex.main = 2.5)
 
   # Add threshold lines if edu_threshold is provided (quadrant mode)
   if(!is.null(edu_threshold)) {
