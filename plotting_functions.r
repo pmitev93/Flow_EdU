@@ -119,7 +119,8 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
        yaxt = "n",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
   # Add these lines right here:
   format_axis <- function(x) {
@@ -127,8 +128,8 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
 
-  axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
-  axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
+  axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Add blue tint to gate region
   polygon(gates$debris[, 1], gates$debris[, 2],
@@ -148,13 +149,14 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
   ) > 0)
   
   # Add legend
-  legend("bottomright", 
+  legend("bottomright",
          legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
-                    sprintf("Inside gate: %s (%.1f%%)", 
+                    sprintf("Inside gate: %s (%.1f%%)",
                             format(inside_gate, big.mark = ","),
                             100 * inside_gate / total_cells)),
          bty = "n",
-         cex = 1.5)
+         cex = 1.5,
+         family = "Arial")
 }
 
 # Overview: All samples on one plot 
@@ -283,7 +285,8 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
        yaxs = "i",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
   # Custom axis labels
   format_axis <- function(x) {
@@ -292,8 +295,8 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
   }
 
   # Add these two lines here:
-  axis(1, at = seq(0, 15e6, 5e6), labels = c("0M", "5M", "10M", "15M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
-  axis(2, at = seq(0, 4e6, 1e6), labels = c("0M", "1M", "2M", "3M", "4M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 15e6, 5e6), labels = c("0M", "5M", "10M", "15M"), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
+  axis(2, at = seq(0, 4e6, 1e6), labels = c("0M", "1M", "2M", "3M", "4M"), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Add blue tint to gate region
   polygon(gates$singlet[, 1], gates$singlet[, 2],
@@ -313,13 +316,14 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
   ) > 0)
   
   # Add legend
-  legend("bottomright", 
+  legend("bottomright",
          legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
-                    sprintf("Inside gate: %s (%.1f%%)", 
+                    sprintf("Inside gate: %s (%.1f%%)",
                             format(inside_gate, big.mark = ","),
                             100 * inside_gate / total_cells)),
          bty = "n",
-         cex = 1.5)
+         cex = 1.5,
+         family = "Arial")
 }
 
 plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
@@ -465,7 +469,8 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
        log = "x",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)  # Log scale x-axis
+       cex.main = 2.5,
+       family = "Arial")  # Log scale x-axis
 
   # Custom axis labels for log scale
   format_axis <- function(x) {
@@ -473,8 +478,8 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
 
-  axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
-  axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
+  axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Add gate (polygon or vertical line)
   if(is.matrix(gates$live_cells)) {
@@ -678,7 +683,8 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
        log= "y",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
   # Custom axis labels
   format_axis <- function(x) {
@@ -686,8 +692,8 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
            ifelse(x >= 1e6, sprintf("%.0fM", x/1e6), sprintf("%.0fK", x/1e3)))
   }
 
-  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
-  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Add gate (polygon or vertical lines)
   if(is.matrix(gates$s_phase_outliers)) {
@@ -722,13 +728,14 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
   }
   
   # Add legend
-  legend("bottomright", 
+  legend("bottomright",
          legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
-                    sprintf("Inside gate: %s (%.1f%%)", 
+                    sprintf("Inside gate: %s (%.1f%%)",
                             format(inside_gate, big.mark = ","),
                             100 * inside_gate / total_cells)),
          bty = "n",
-         cex = 1.5)
+         cex = 1.5,
+         family = "Arial")
 }
 
 plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
@@ -886,10 +893,11 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
        log = "y",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
-  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
-  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Add blue tint to gated region (between quantile bounds)
   rect(xleft = lower_bound, ybottom = 1e3,
@@ -905,14 +913,15 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
   inside_gate <- sum(fxcycle_values >= lower_bound & fxcycle_values <= upper_bound)
   
   # Add legend
-  legend("bottomright", 
+  legend("bottomright",
          legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
-                    sprintf("Inside gate: %s (%.1f%%)", 
+                    sprintf("Inside gate: %s (%.1f%%)",
                             format(inside_gate, big.mark = ","),
                             100 * inside_gate / total_cells),
                     sprintf("Bounds: %.1fM - %.1fM", lower_bound/1e6, upper_bound/1e6)),
          bty = "n",
-         cex = 1.4)
+         cex = 1.4,
+         family = "Arial")
 }
 
 plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
@@ -1036,10 +1045,11 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
        log = "y",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
-  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0)
-  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+  axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
+  axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Add blue tint to gated region
   rect(xleft = fxcycle_bounds[1], ybottom = edu_threshold,
@@ -1195,13 +1205,13 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
     plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e8),
          xlab = "HA-A", ylab = "EdU-A",
          main = if(show_sample_name) sprintf("Gate 7: HA-Positive\n%s", sample_name) else "Gate 7: HA-Positive",
-         log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0))
+         log = "xy", xaxt = "n", yaxt = "n", xaxs = "i", yaxs = "i", mgp = c(3, 0.5, 0), family = "Arial")
     axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
-         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0))
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0), family = "Arial")
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
-         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), family = "Arial")
     text(1000, 50000, sprintf("Insufficient cells for plotting\n(n = %d)", length(x)),
-         cex = 1.2, col = "red", font = 2)
+         cex = 1.2, col = "red", font = 2, family = "Arial")
     return(invisible(NULL))
   }
 
@@ -1231,12 +1241,13 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
        log = "xy",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
   axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
-       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0), cex.axis = 2.0)
+       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 1.0, 0), cex.axis = 2.0, family = "Arial")
   axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
-       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0)
+       labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0), cex.axis = 2.0, family = "Arial")
 
   # Tint the HA-positive region (only if valid threshold)
   if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
@@ -1450,9 +1461,9 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
     plot(1, 1, type = "n", xlim = c(2, 6.5), ylim = c(4, 7),
          xlab = "log10(HA-A)", ylab = "log10(EdU-A)",
          main = sprintf("%s\nEdU vs HA Correlation", sample_name),
-         xaxs = "i", yaxs = "i")
+         xaxs = "i", yaxs = "i", family = "Arial")
     text(4.25, 5.5, sprintf("Insufficient cells for plotting\n(n = %d)", length(ha_final)),
-         cex = 1.2, col = "red", font = 2)
+         cex = 1.2, col = "red", font = 2, family = "Arial")
 
     return(invisible(list(
       sample_name = sample_name,
@@ -1501,7 +1512,8 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
        yaxs = "i",
        cex.lab = 2.5,
        cex.axis = 2.0,
-       cex.main = 2.5)
+       cex.main = 2.5,
+       family = "Arial")
 
   # Add threshold lines if edu_threshold is provided (quadrant mode)
   if(!is.null(edu_threshold)) {
@@ -1544,15 +1556,15 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
     abline(h = edu_threshold_log, col = "black", lwd = 2, lty = 1)
 
     # Add quadrant percentages
-    text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.8, font = 2)  # Top left (Q2)
-    text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.8, font = 2)   # Top right (Q1) - blue
-    text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.8, font = 2)  # Bottom left (Q3)
-    text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.8, font = 2)    # Bottom right (Q4) - red
+    text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.8, font = 2, family = "Arial")  # Top left (Q2)
+    text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.8, font = 2, family = "Arial")   # Top right (Q1) - blue
+    text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.8, font = 2, family = "Arial")  # Bottom left (Q3)
+    text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.8, font = 2, family = "Arial")    # Bottom right (Q4) - red
 
     # Display strength ratio
     if(!is.na(strength_ratio)) {
       text(4.25, 4.2, sprintf("Strength Ratio = %.3f", strength_ratio),
-           col = "black", cex = 1, font = 2, pos = 3)
+           col = "black", cex = 1, font = 2, pos = 3, family = "Arial")
     }
   } else {
     # Add regression line (only in non-quadrant mode)
@@ -1561,20 +1573,21 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
 
   # Add r and n label at top center (bold)
   text(4.25, 6.85, sprintf("r = %.3f, n = %s", correlation, format(length(ha_log), big.mark = ",")),
-       cex = 1, font = 2, col = "black")
+       cex = 1, font = 2, col = "black", family = "Arial")
 
   # Add R² in top left
-  text(2.15, 6.85, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 4)
+  text(2.15, 6.85, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 4, family = "Arial")
 
   # Add slope in top left below R²
-  text(2.15, 6.65, sprintf("Slope = %.3f", slope), col = "black", cex = 0.9, font = 2, pos = 4)
+  text(2.15, 6.65, sprintf("Slope = %.3f", slope), col = "black", cex = 0.9, font = 2, pos = 4, family = "Arial")
 
   # Add correlation info at bottom right (keep for single plots)
   legend("bottomright",
          legend = c(sprintf("Pearson r = %.3f", correlation),
                     sprintf("n = %s cells", format(length(ha_log), big.mark = ","))),
          bty = "n",
-         cex = 1)
+         cex = 1,
+         family = "Arial")
 
   # Return correlation data
   invisible(list(
