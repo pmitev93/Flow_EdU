@@ -178,6 +178,7 @@ If you use this tool in your research, please cite: "Pending"
 **Framework**: Shiny  
 **License**: [To be added]  
 **Author**: Petar Mitev
+
 **Contact**: pmitev93@gmail.com
 
 ## Version History
