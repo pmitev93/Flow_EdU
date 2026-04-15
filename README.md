@@ -1,4 +1,4 @@
-# Flow_EdU: EdU-HA Correlation Analysis Tool
+# The Multivariate Identification and Tracking of EdU-incorporating Variants (MITEV) EdU Analysis Tool
 
 An R Shiny application for analyzing the relationship between EdU incorporation and HA-tagged protein expression in flow cytometry experiments.
 
