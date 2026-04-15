@@ -177,7 +177,7 @@ If you use this tool in your research, please cite: "Pending"
 **Language**: R  
 **Framework**: Shiny  
 **License**: [To be added]  
-**Author**: [Your name/lab]  
+**Author**: Petar Mitev
 **Contact**: pmitev93@gmail.com
 
 ## Version History
