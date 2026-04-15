@@ -170,9 +170,7 @@ To create a new strategy:
 
 ## Citation
 
-If you use this tool in your research, please cite:
-
-[Your paper citation will go here]
+If you use this tool in your research, please cite: "Pending"
 
 ## Technical Details
 
@@ -180,7 +178,7 @@ If you use this tool in your research, please cite:
 **Framework**: Shiny  
 **License**: [To be added]  
 **Author**: [Your name/lab]  
-**Contact**: [Your email]
+**Contact**: pmitev93@gmail.com
 
 ## Version History
 
