@@ -672,9 +672,9 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
 
   # Create title
   plot_title <- if(show_sample_name) {
-    sprintf("Gate 4: S-phase Outlier Removal\n%s", sample_name)
+    sprintf("Gate 4: DNA Content Outlier Removal\n%s", sample_name)
   } else {
-    "Gate 4: S-phase Outlier Removal"
+    "Gate 4: DNA Content Outlier Removal"
   }
 
   plot(x, y,
@@ -1039,9 +1039,9 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
 
   # Create title
   plot_title <- if(show_sample_name) {
-    sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range\n%s", edu_prob * 100, sample_name)
+    sprintf("Gate 6: Top %.0f%% EdU\n%s", edu_prob * 100, sample_name)
   } else {
-    sprintf("Gate 6: Top %.0f%% EdU + FxCycle Range", edu_prob * 100)
+    sprintf("Gate 6: Top %.0f%% EdU", edu_prob * 100)
   }
 
   plot(x, y,
@@ -1285,18 +1285,12 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
     0
   }
 
-  # Add legend
-  legend_text <- c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
+  # Add legend (threshold removed as it may display incorrectly)
+  legend("bottomright",
+         legend = c(sprintf("Total: %s", format(total_cells, big.mark = ",")),
                    sprintf("HA+: %s (%.1f%%)",
                            format(inside_gate, big.mark = ","),
-                           100 * inside_gate / total_cells))
-
-  if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
-    legend_text <- c(legend_text, sprintf("Threshold: %.0fK", ha_threshold/1e3))
-  }
-
-  legend("bottomright",
-         legend = legend_text,
+                           100 * inside_gate / total_cells)),
          bty = "n",
          cex = 1.4)
 }
@@ -1592,23 +1586,14 @@ plot_edu_ha_correlation_single <- function(fcs_data, sample_name, ha_threshold, 
     abline(lm_fit, col = "black", lwd = 1.5, lty=2)
   }
 
-  # Add r and n label at top center (bold)
-  text(4.25, 6.85, sprintf("r = %.3f, n = %s", correlation, format(length(ha_log), big.mark = ",")),
-       cex = 1, font = 2, col = "black")
-
-  # Add R² in top left
-  text(2.15, 6.85, sprintf("R² = %.3f", r_squared), col = "black", cex = 0.9, font = 2, pos = 4)
-
-  # Add slope in top left below R²
-  text(2.15, 6.65, sprintf("Slope = %.3f", slope), col = "black", cex = 0.9, font = 2, pos = 4)
-
-  # Add correlation info at bottom right (keep for single plots)
+  # Add all statistics in bottom right legend
   legend("bottomright",
          legend = c(sprintf("Pearson r = %.3f", correlation),
+                    sprintf("R² = %.3f", r_squared),
+                    sprintf("Slope = %.3f", slope),
                     sprintf("n = %s cells", format(length(ha_log), big.mark = ","))),
          bty = "n",
-         cex = 1,
-)
+         cex = 1.4)
 
   # Return correlation data
   invisible(list(
