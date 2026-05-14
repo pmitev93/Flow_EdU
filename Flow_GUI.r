@@ -544,6 +544,13 @@ ui <- fluidPage(
                  ),
                  fluidRow(
                    column(12,
+                          h5("Select by Experiment"),
+                          uiOutput("experiment_selection_buttons")
+                   )
+                 ),
+
+                 fluidRow(
+                   column(12,
                           h4("Select Samples to Compare"),
                           DTOutput("comparison_sample_selector"),
                           actionButton("select_all_samples", "Select All", class = "btn-sm btn-primary"),
@@ -5565,7 +5572,101 @@ GATE_STRATEGY <- list(
                   grouped$n),
           collapse = "\n")
   })
-  
+  # Render experiment selection buttons
+  output$experiment_selection_buttons <- renderUI({
+    req(rv$all_results)
+
+    # Get unique experiments from loaded data
+    experiments <- unique(rv$all_results$Experiment[!is.na(rv$all_results$Correlation)])
+
+    if(length(rv$loaded_experiment_names) > 0) {
+      experiments <- experiments[experiments %in% rv$loaded_experiment_names]
+    }
+
+    if(length(experiments) == 0) {
+      return(NULL)
+    }
+
+    # Create a button for each experiment
+    buttons <- lapply(experiments, function(exp) {
+      button_id <- paste0("select_exp_", gsub("[^A-Za-z0-9]", "_", exp))
+      actionButton(button_id, exp, class = "btn-sm btn-info", style = "margin: 2px;")
+    })
+
+    div(
+      style = "margin-bottom: 10px;",
+      buttons
+    )
+  })
+
+  # Create observers for each experiment button dynamically
+  observe({
+    req(rv$all_results)
+
+    experiments <- unique(rv$all_results$Experiment[!is.na(rv$all_results$Correlation)])
+
+    if(length(rv$loaded_experiment_names) > 0) {
+      experiments <- experiments[experiments %in% rv$loaded_experiment_names]
+    }
+
+    lapply(experiments, function(exp) {
+      button_id <- paste0("select_exp_", gsub("[^A-Za-z0-9]", "_", exp))
+
+      observeEvent(input[[button_id]], {
+        req(rv$all_results)
+
+        # Filter to analyzed samples from THIS experiment only
+        analyzed <- rv$all_results[!is.na(rv$all_results$Correlation) &
+                                   rv$all_results$Experiment == exp, ]
+
+        # Filter by selected gating strategies
+        available_strategies <- unique(rv$all_results$Gate_ID)
+        available_strategies <- available_strategies[!is.na(available_strategies)]
+
+        if(length(available_strategies) > 0) {
+          selected_strategies <- c()
+          for(strategy in available_strategies) {
+            checkbox_id <- paste0("msc_gate_", strategy)
+            if(isTRUE(input[[checkbox_id]])) {
+              selected_strategies <- c(selected_strategies, strategy)
+            }
+          }
+
+          if(length(selected_strategies) > 0) {
+            analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
+                                analyzed$Gate_ID %in% selected_strategies, ]
+          } else {
+            analyzed <- analyzed[0, ]
+          }
+        }
+
+        # Get row indices of this experiment's samples in the full filtered table
+        if(nrow(analyzed) > 0) {
+          # Get the full filtered table (same as what's displayed)
+          all_analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+
+          if(length(rv$loaded_experiment_names) > 0) {
+            all_analyzed <- all_analyzed[all_analyzed$Experiment %in% rv$loaded_experiment_names, ]
+          }
+
+          if(length(available_strategies) > 0 && length(selected_strategies) > 0) {
+            all_analyzed <- all_analyzed[!is.na(all_analyzed$Gate_ID) &
+                                        all_analyzed$Gate_ID %in% selected_strategies, ]
+          }
+
+          # Find which rows in the displayed table belong to this experiment
+          rows_to_select <- which(all_analyzed$Experiment == exp)
+
+          if(length(rows_to_select) > 0) {
+            dataTableProxy('comparison_sample_selector') %>%
+              selectRows(rows_to_select)
+          }
+        }
+      }, ignoreInit = TRUE)
+    })
+  })
+
+
   # Clear selection
   # Select all currently displayed samples
   observeEvent(input$select_all_samples, {

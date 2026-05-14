@@ -1872,6 +1872,7 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
       correlation <- cor(ha_log, edu_log, use = "complete.obs")
       lm_fit <- lm(edu_log ~ ha_log)
       r_squared <- summary(lm_fit)$r.squared
+      slope <- coef(lm_fit)[2]  # Extract slope coefficient
 
       dens <- densCols(ha_log, edu_log, colramp = colorRampPalette(c("blue", "cyan", "yellow", "red")))
 
@@ -1895,7 +1896,10 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
 
       # Add R² in top left
       text(2.15, 6.8, sprintf("R²=%.3f", r_squared), col = "black", cex = 0.7, font = 2, pos = 4)
-      
+
+      # Add slope below R²
+      text(2.15, 6.5, sprintf("Slope=%.3f", slope), col = "black", cex = 0.7, font = 2, pos = 4)
+
       # Flag if low cell count or extreme correlation
       is_empty_vector <- grepl("Empty_Vector", sample_name, ignore.case = TRUE)
       is_flagged <- length(ha_log) < 500 && !is_empty_vector
