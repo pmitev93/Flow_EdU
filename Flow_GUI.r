@@ -546,10 +546,12 @@ ui <- fluidPage(
                    column(12,
                           h5("Quick Select by Experiment"),
                           fluidRow(
-                            column(9, uiOutput("experiment_checkboxes")),
+                            column(9, selectizeInput("experiment_selector_msc", NULL,
+                                                    choices = NULL, multiple = TRUE,
+                                                    options = list(placeholder = "Select experiments..."))),
                             column(3,
                                    br(),
-                                   actionButton("apply_experiment_filter", "Select from Checked Experiments",
+                                   actionButton("apply_experiment_filter", "Add to Selection",
                                                class = "btn-sm btn-info btn-block"))
                           )
                    )
@@ -5578,8 +5580,8 @@ GATE_STRATEGY <- list(
                   grouped$n),
           collapse = "\n")
   })
-  # Render experiment selection checkboxes
-  output$experiment_checkboxes <- renderUI({
+  # Update experiment selector dropdown
+  observe({
     req(rv$all_results)
 
     # Get unique experiments from loaded data
@@ -5589,57 +5591,32 @@ GATE_STRATEGY <- list(
       experiments <- experiments[experiments %in% rv$loaded_experiment_names]
     }
 
-    if(length(experiments) == 0) {
-      return(NULL)
-    }
-
-    # Create a checkbox for each experiment
-    checkboxes <- lapply(experiments, function(exp) {
-      checkbox_id <- paste0("exp_check_", gsub("[^A-Za-z0-9]", "_", exp))
-      div(
-        style = "display: inline-block; margin-right: 15px;",
-        checkboxInput(checkbox_id, exp, value = FALSE)
-      )
-    })
-
-    div(
-      style = "margin-bottom: 10px;",
-      checkboxes
-    )
+    updateSelectizeInput(session, "experiment_selector_msc",
+                        choices = experiments,
+                        server = TRUE)
   })
 
-  # Handler for "Apply Experiment Filter" button
+  # Handler for "Add to Selection" button
   observeEvent(input$apply_experiment_filter, {
     req(rv$all_results)
+    req(input$experiment_selector_msc)
 
-    # Get unique experiments
-    experiments <- unique(rv$all_results$Experiment[!is.na(rv$all_results$Correlation)])
+    selected_experiments <- input$experiment_selector_msc
 
-    if(length(rv$loaded_experiment_names) > 0) {
-      experiments <- experiments[experiments %in% rv$loaded_experiment_names]
-    }
-
-    # Find which experiments are checked
-    checked_experiments <- c()
-    for(exp in experiments) {
-      checkbox_id <- paste0("exp_check_", gsub("[^A-Za-z0-9]", "_", exp))
-      if(isTRUE(input[[checkbox_id]])) {
-        checked_experiments <- c(checked_experiments, exp)
-      }
-    }
-
-    if(length(checked_experiments) == 0) {
+    if(length(selected_experiments) == 0) {
+      showNotification("Please select at least one experiment", type = "warning")
       return()
     }
 
-    # Get the full filtered table (same as what's displayed)
+    # Get the EXACT same filtered table as what's displayed
+    # This must match the renderDT logic exactly
     all_analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
 
     if(length(rv$loaded_experiment_names) > 0) {
       all_analyzed <- all_analyzed[all_analyzed$Experiment %in% rv$loaded_experiment_names, ]
     }
 
-    # Filter by selected gating strategies
+    # Filter by selected gating strategies (same logic as table rendering)
     available_strategies <- unique(rv$all_results$Gate_ID)
     available_strategies <- available_strategies[!is.na(available_strategies)]
 
@@ -5655,11 +5632,19 @@ GATE_STRATEGY <- list(
       if(length(selected_strategies) > 0) {
         all_analyzed <- all_analyzed[!is.na(all_analyzed$Gate_ID) &
                                      all_analyzed$Gate_ID %in% selected_strategies, ]
+      } else {
+        all_analyzed <- all_analyzed[0, ]
       }
     }
 
-    # Find rows for checked experiments
-    rows_to_add <- which(all_analyzed$Experiment %in% checked_experiments)
+    # Find rows for selected experiments only
+    rows_to_add <- which(all_analyzed$Experiment %in% selected_experiments)
+
+    cat(sprintf("\n=== Apply Experiment Filter Debug ===\n"))
+    cat(sprintf("Selected experiments: %s\n", paste(selected_experiments, collapse = ", ")))
+    cat(sprintf("Rows in filtered table: %d\n", nrow(all_analyzed)))
+    cat(sprintf("Rows matching experiments: %d\n", length(rows_to_add)))
+    cat(sprintf("Row indices: %s\n", paste(head(rows_to_add, 20), collapse = ", ")))
 
     if(length(rows_to_add) > 0) {
       # Get current selection
@@ -5668,9 +5653,18 @@ GATE_STRATEGY <- list(
       # Combine current selection with new rows (remove duplicates)
       new_selection <- sort(unique(c(current_selection, rows_to_add)))
 
+      cat(sprintf("Current selection: %d rows\n", length(current_selection)))
+      cat(sprintf("New selection: %d rows\n", length(new_selection)))
+
       # Update the selection
       dataTableProxy('comparison_sample_selector') %>%
         selectRows(new_selection)
+
+      showNotification(sprintf("Added %d samples from %d experiment(s)",
+                              length(rows_to_add), length(selected_experiments)),
+                      type = "message")
+    } else {
+      showNotification("No matching samples found", type = "warning")
     }
   }, ignoreInit = TRUE)
 
