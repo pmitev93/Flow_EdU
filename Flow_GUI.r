@@ -1667,15 +1667,15 @@ server <- function(input, output, session) {
       return()
     }
 
-    withProgress(message = 'Loading and analyzing experiments...', value = 0, {
+    # Initialize experiments list if needed
+    if(is.null(rv$experiments)) {
+      rv$experiments <- list()
+    }
 
-      # Load only selected experiments
-      if(is.null(rv$experiments)) {
-        rv$experiments <- list()
-      }
+    # Track which experiments are being loaded/analyzed
+    rv$loaded_experiment_names <- unique(c(rv$loaded_experiment_names, selected_exps))
 
-      # Track which experiments are being loaded/analyzed
-      rv$loaded_experiment_names <- unique(c(rv$loaded_experiment_names, selected_exps))
+    withProgress(message = sprintf('Loading and analyzing %d experiments...', length(selected_exps)), value = 0, {
 
       all_results <- list()
       n_exp <- length(selected_exps)
@@ -1838,7 +1838,7 @@ server <- function(input, output, session) {
           n_analyzed <- n_analyzed + 1
         }
 
-        all_results[[i]] <- exp_results
+        all_results[[exp_idx]] <- exp_results
       }
       
       # Update sample browser with loaded experiments
