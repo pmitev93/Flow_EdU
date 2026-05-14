@@ -544,8 +544,14 @@ ui <- fluidPage(
                  ),
                  fluidRow(
                    column(12,
-                          h5("Select by Experiment"),
-                          uiOutput("experiment_selection_buttons")
+                          h5("Quick Select by Experiment"),
+                          fluidRow(
+                            column(9, uiOutput("experiment_checkboxes")),
+                            column(3,
+                                   br(),
+                                   actionButton("apply_experiment_filter", "Select from Checked Experiments",
+                                               class = "btn-sm btn-info btn-block"))
+                          )
                    )
                  ),
 
@@ -5572,8 +5578,8 @@ GATE_STRATEGY <- list(
                   grouped$n),
           collapse = "\n")
   })
-  # Render experiment selection buttons
-  output$experiment_selection_buttons <- renderUI({
+  # Render experiment selection checkboxes
+  output$experiment_checkboxes <- renderUI({
     req(rv$all_results)
 
     # Get unique experiments from loaded data
@@ -5587,84 +5593,86 @@ GATE_STRATEGY <- list(
       return(NULL)
     }
 
-    # Create a button for each experiment
-    buttons <- lapply(experiments, function(exp) {
-      button_id <- paste0("select_exp_", gsub("[^A-Za-z0-9]", "_", exp))
-      actionButton(button_id, exp, class = "btn-sm btn-info", style = "margin: 2px;")
+    # Create a checkbox for each experiment
+    checkboxes <- lapply(experiments, function(exp) {
+      checkbox_id <- paste0("exp_check_", gsub("[^A-Za-z0-9]", "_", exp))
+      div(
+        style = "display: inline-block; margin-right: 15px;",
+        checkboxInput(checkbox_id, exp, value = FALSE)
+      )
     })
 
     div(
       style = "margin-bottom: 10px;",
-      buttons
+      checkboxes
     )
   })
 
-  # Create observers for each experiment button dynamically
-  observe({
+  # Handler for "Apply Experiment Filter" button
+  observeEvent(input$apply_experiment_filter, {
     req(rv$all_results)
 
+    # Get unique experiments
     experiments <- unique(rv$all_results$Experiment[!is.na(rv$all_results$Correlation)])
 
     if(length(rv$loaded_experiment_names) > 0) {
       experiments <- experiments[experiments %in% rv$loaded_experiment_names]
     }
 
-    lapply(experiments, function(exp) {
-      button_id <- paste0("select_exp_", gsub("[^A-Za-z0-9]", "_", exp))
+    # Find which experiments are checked
+    checked_experiments <- c()
+    for(exp in experiments) {
+      checkbox_id <- paste0("exp_check_", gsub("[^A-Za-z0-9]", "_", exp))
+      if(isTRUE(input[[checkbox_id]])) {
+        checked_experiments <- c(checked_experiments, exp)
+      }
+    }
 
-      observeEvent(input[[button_id]], {
-        req(rv$all_results)
+    if(length(checked_experiments) == 0) {
+      return()
+    }
 
-        # Filter to analyzed samples from THIS experiment only
-        analyzed <- rv$all_results[!is.na(rv$all_results$Correlation) &
-                                   rv$all_results$Experiment == exp, ]
+    # Get the full filtered table (same as what's displayed)
+    all_analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
 
-        # Filter by selected gating strategies
-        available_strategies <- unique(rv$all_results$Gate_ID)
-        available_strategies <- available_strategies[!is.na(available_strategies)]
+    if(length(rv$loaded_experiment_names) > 0) {
+      all_analyzed <- all_analyzed[all_analyzed$Experiment %in% rv$loaded_experiment_names, ]
+    }
 
-        if(length(available_strategies) > 0) {
-          selected_strategies <- c()
-          for(strategy in available_strategies) {
-            checkbox_id <- paste0("msc_gate_", strategy)
-            if(isTRUE(input[[checkbox_id]])) {
-              selected_strategies <- c(selected_strategies, strategy)
-            }
-          }
+    # Filter by selected gating strategies
+    available_strategies <- unique(rv$all_results$Gate_ID)
+    available_strategies <- available_strategies[!is.na(available_strategies)]
 
-          if(length(selected_strategies) > 0) {
-            analyzed <- analyzed[!is.na(analyzed$Gate_ID) &
-                                analyzed$Gate_ID %in% selected_strategies, ]
-          } else {
-            analyzed <- analyzed[0, ]
-          }
+    if(length(available_strategies) > 0) {
+      selected_strategies <- c()
+      for(strategy in available_strategies) {
+        checkbox_id <- paste0("msc_gate_", strategy)
+        if(isTRUE(input[[checkbox_id]])) {
+          selected_strategies <- c(selected_strategies, strategy)
         }
+      }
 
-        # Get row indices of this experiment's samples in the full filtered table
-        if(nrow(analyzed) > 0) {
-          # Get the full filtered table (same as what's displayed)
-          all_analyzed <- rv$all_results[!is.na(rv$all_results$Correlation), ]
+      if(length(selected_strategies) > 0) {
+        all_analyzed <- all_analyzed[!is.na(all_analyzed$Gate_ID) &
+                                     all_analyzed$Gate_ID %in% selected_strategies, ]
+      }
+    }
 
-          if(length(rv$loaded_experiment_names) > 0) {
-            all_analyzed <- all_analyzed[all_analyzed$Experiment %in% rv$loaded_experiment_names, ]
-          }
+    # Find rows for checked experiments
+    rows_to_add <- which(all_analyzed$Experiment %in% checked_experiments)
 
-          if(length(available_strategies) > 0 && length(selected_strategies) > 0) {
-            all_analyzed <- all_analyzed[!is.na(all_analyzed$Gate_ID) &
-                                        all_analyzed$Gate_ID %in% selected_strategies, ]
-          }
+    if(length(rows_to_add) > 0) {
+      # Get current selection
+      current_selection <- input$comparison_sample_selector_rows_selected
 
-          # Find which rows in the displayed table belong to this experiment
-          rows_to_select <- which(all_analyzed$Experiment == exp)
+      # Combine current selection with new rows (remove duplicates)
+      new_selection <- sort(unique(c(current_selection, rows_to_add)))
 
-          if(length(rows_to_select) > 0) {
-            dataTableProxy('comparison_sample_selector') %>%
-              selectRows(rows_to_select)
-          }
-        }
-      }, ignoreInit = TRUE)
-    })
-  })
+      # Update the selection
+      dataTableProxy('comparison_sample_selector') %>%
+        selectRows(new_selection)
+    }
+  }, ignoreInit = TRUE)
 
 
   # Clear selection
