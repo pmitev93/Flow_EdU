@@ -13,9 +13,6 @@ setwd("/Users/petar.mitev/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Exp
 # Paths ####
 master_path <- "Experiments/"
 
-cat("Found", length(experiment_folders), "experiments\n")
-print(experiment_folders)
-
 # Channel Mapping ####
 CHANNELS <- list(
   FSC_A = "FSC-A",
