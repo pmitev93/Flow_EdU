@@ -637,6 +637,9 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  # Stop the app when the browser tab is closed
+  session$onSessionEnded(function() { stopApp() })
+
   # ==============================================================================
   # GATING STRATEGY CREATOR PANEL TOGGLES
   # ==============================================================================
