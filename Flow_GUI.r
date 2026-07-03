@@ -2517,7 +2517,7 @@ server <- function(input, output, session) {
                                                                channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
 
-        plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use)
+        plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp))
       }
 
     } else if(input$overview_gate == "correlation") {
