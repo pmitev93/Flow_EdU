@@ -2402,13 +2402,13 @@ server <- function(input, output, session) {
       plot_live_gate_overview(exp, gates = gates_to_use)
 
     } else if(input$overview_gate == "gate4") {
-      plot_sphase_outlier_gate_overview(exp, gates = gates_to_use)
+      plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
 
     } else if(input$overview_gate == "gate5") {
-      plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use)
+      plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
 
     } else if(input$overview_gate == "gate6") {
-      plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use)
+      plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
 
     } else if(input$overview_gate == "gate7") {
       # Get strategy metadata
@@ -2705,11 +2705,11 @@ server <- function(input, output, session) {
 
       # Row 2: Gates 3, 4
       plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
       # Row 3: Gates 5, 6
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
       # Row 4: Gates 7, 8
       if(use_quadrant) {
@@ -2725,7 +2725,7 @@ server <- function(input, output, session) {
                                        edu_threshold = edu_threshold)
       } else {
         # Show traditional Gate 7 and correlation plot
-        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
+        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
                                        gates = gates_to_use, channels = get_exp_channels(exp),
                                        show_sample_name = FALSE)
@@ -2740,11 +2740,11 @@ server <- function(input, output, session) {
 
       # Row 2: Gates 3, 4
       plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
       # Row 3: Gates 5, 6
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
     }
   })
 
@@ -2894,11 +2894,11 @@ server <- function(input, output, session) {
 
         # Row 2: Gates 3, 4
         plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-        plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
         # Row 3: Gates 5, 6
-        plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-        plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+        plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
         # Row 4: Gates 7, 8
         if(use_quadrant) {
@@ -2914,7 +2914,7 @@ server <- function(input, output, session) {
                                          edu_threshold = edu_threshold)
         } else {
           # Show traditional Gate 7 and correlation plot
-          plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
+          plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
           plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
                                          gates = gates_to_use, channels = get_exp_channels(exp),
                                          show_sample_name = FALSE)
@@ -2929,11 +2929,11 @@ server <- function(input, output, session) {
 
         # Row 2: Gates 3, 4
         plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-        plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
         # Row 3: Gates 5, 6
-        plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-        plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+        plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+        plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
       }
 
       dev.off()
@@ -3127,17 +3127,17 @@ server <- function(input, output, session) {
           plot_live_gate_single(fcs, exp_name, gates = gates_to_use)
 
         } else if(selected_gate == "gate4") {
-          plot_sphase_outlier_gate_single(fcs, exp_name, gates = gates_to_use)
+          plot_sphase_outlier_gate_single(fcs, exp_name, gates = gates_to_use, channels = get_exp_channels(exp))
 
         } else if(selected_gate == "gate5") {
-          plot_fxcycle_quantile_gate_single(fcs, exp_name, gates = gates_to_use)
+          plot_fxcycle_quantile_gate_single(fcs, exp_name, gates = gates_to_use, channels = get_exp_channels(exp))
 
         } else if(selected_gate == "gate6") {
-          plot_edu_fxcycle_gate_single(fcs, exp_name, gates = gates_to_use)
+          plot_edu_fxcycle_gate_single(fcs, exp_name, gates = gates_to_use, channels = get_exp_channels(exp))
 
         } else if(selected_gate == "gate7") {
           if(!is.null(ha_threshold)) {
-            plot_ha_gate_single(fcs, exp_name, ha_threshold, gates = gates_to_use)
+            plot_ha_gate_single(fcs, exp_name, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp))
           } else {
             plot.new()
             text(0.5, 0.5, "No threshold", cex = 1.2)
@@ -3667,9 +3667,9 @@ server <- function(input, output, session) {
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
 
       if(use_quadrant) {
         # Show quadrant plot for Gate 7
@@ -3684,7 +3684,7 @@ server <- function(input, output, session) {
                                        edu_threshold = edu_threshold)
       } else {
         # Show traditional Gate 7 and correlation plot
-        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
+        plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
                                        gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
       }
@@ -3694,9 +3694,9 @@ server <- function(input, output, session) {
       plot_debris_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
       plot_live_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
-      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, show_sample_name = FALSE)
+      plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+      plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
+      plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
     }
   })
 
@@ -3758,9 +3758,9 @@ server <- function(input, output, session) {
            "gate1" = plot_debris_gate_single(fcs, sample_name, gates = gates_to_use),
            "gate2" = plot_singlet_gate_single(fcs, sample_name, gates = gates_to_use),
            "gate3" = plot_live_gate_single(fcs, sample_name, gates = gates_to_use),
-           "gate4" = plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use),
-           "gate5" = plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use),
-           "gate6" = plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use),
+           "gate4" = plot_sphase_outlier_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp)),
+           "gate5" = plot_fxcycle_quantile_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp)),
+           "gate6" = plot_edu_fxcycle_gate_single(fcs, sample_name, gates = gates_to_use, channels = get_exp_channels(exp)),
            "gate7" = {
              if(!is.null(ha_threshold)) {
                if(use_quadrant) {
@@ -3770,7 +3770,7 @@ server <- function(input, output, session) {
                                                 edu_threshold = edu_threshold)
                } else {
                  # Show traditional HA gate
-                 plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use)
+                 plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp))
                }
              } else {
                plot.new()
@@ -4817,9 +4817,9 @@ GATE_STRATEGY <- list(
       GATES
     }
 
-    plot_sphase_outlier_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
+    plot_sphase_outlier_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use, channels = get_exp_channels(exp))
   })
-  
+
   output$gate5_plot <- renderPlot({
     req(rv$experiments, input$gate5_experiment, input$gate5_sample, input$gate5_gate_strategy)
     exp <- rv$experiments[[input$gate5_experiment]]
@@ -4834,7 +4834,7 @@ GATE_STRATEGY <- list(
       GATES
     }
 
-    plot_fxcycle_quantile_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
+    plot_fxcycle_quantile_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use, channels = get_exp_channels(exp))
   })
 
   output$gate6_plot <- renderPlot({
@@ -4851,7 +4851,7 @@ GATE_STRATEGY <- list(
       GATES
     }
 
-    plot_edu_fxcycle_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use)
+    plot_edu_fxcycle_gate_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], gates = gates_to_use, channels = get_exp_channels(exp))
   })
   
   output$gate7_plot <- renderPlot({
@@ -4944,7 +4944,7 @@ GATE_STRATEGY <- list(
       ha_threshold <- control_result$threshold
 
       plot_ha_gate_single(exp$flowset[[idx]], sample_name, ha_threshold,
-                          gates = gates_to_use)
+                          gates = gates_to_use, channels = get_exp_channels(exp))
     }
   })
   
@@ -4978,7 +4978,7 @@ GATE_STRATEGY <- list(
     ha_threshold <- control_result$threshold
 
     plot_edu_ha_correlation_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
-                                     gates = gates_to_use)
+                                     gates = gates_to_use, channels = get_exp_channels(exp))
   })
 
   # Conditional UI for manual axis controls
