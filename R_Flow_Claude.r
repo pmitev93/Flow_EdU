@@ -491,6 +491,11 @@ calculate_ha_threshold_from_control <- function(control_fcs, control_name, gates
   cat(sprintf("  After FxCycle quantile: %s cells\n", format(nrow(current_data), big.mark = ",")))
   
   # Gate 6: Top 50% EdU + FxCycle range
+  available_channels <- colnames(exprs(current_data))
+  if(!(channels$EdU %in% available_channels)) {
+    stop(sprintf("EdU channel '%s' not found in FCS data. Available channels: %s",
+                 channels$EdU, paste(available_channels, collapse = ", ")))
+  }
   edu_values <- exprs(current_data)[, channels$EdU]
   edu_threshold <- quantile(edu_values, probs = 0.50, na.rm = TRUE)
   
