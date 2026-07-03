@@ -2583,7 +2583,7 @@ server <- function(input, output, session) {
                                                                channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
 
-        plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use)
+        plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp))
       }
     }
   })
