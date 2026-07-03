@@ -25,6 +25,40 @@ CHANNELS <- list(
   SAMD9 = "FL10-A"
 )
 
+# Return the channel mapping for a loaded experiment, falling back to global CHANNELS.
+get_exp_channels <- function(exp) {
+  if (!is.null(exp) && !is.null(exp$channels)) exp$channels else CHANNELS
+}
+
+# Auto-detect channel mapping from FCS description fields.
+# Falls back to the global CHANNELS default for any channel not found by keyword.
+detect_channels <- function(fcs_frame, default_channels = CHANNELS) {
+  params <- pData(parameters(fcs_frame))
+  # Only consider area channels (ending in -A) to avoid duplicating with -H
+  area_params <- params[grepl("-A$", params$name), ]
+  descs <- tolower(area_params$desc)
+  names(descs) <- area_params$name
+
+  find_channel <- function(keywords, fallback) {
+    for (kw in keywords) {
+      match <- names(descs)[grepl(kw, descs, fixed = TRUE)]
+      if (length(match) > 0) return(match[1])
+    }
+    fallback
+  }
+
+  list(
+    FSC_A    = default_channels$FSC_A,
+    FSC_H    = default_channels$FSC_H,
+    SSC_A    = default_channels$SSC_A,
+    EdU      = find_channel(c("edu"), default_channels$EdU),
+    HA       = find_channel(c("ha "), default_channels$HA),
+    DCM      = find_channel(c("dcm"), default_channels$DCM),
+    FxCycle  = find_channel(c("fxcycle", "fx cycle", "dna"), default_channels$FxCycle),
+    SAMD9    = default_channels$SAMD9
+  )
+}
+
 # ==============================================================================
 # GATE LOADING
 # ==============================================================================
@@ -238,12 +272,19 @@ load_experiment <- function(experiment_path) {
   } else {
     cat("  No compensation matrix found\n")
   }
-  
+
+  # Auto-detect channel mapping from the first FCS file's description fields
+  detected_channels <- detect_channels(fs[[1]])
+  cat(sprintf("  Channel mapping: EdU=%s, HA=%s, DCM=%s, FxCycle=%s\n",
+              detected_channels$EdU, detected_channels$HA,
+              detected_channels$DCM, detected_channels$FxCycle))
+
   return(list(
     flowset = fs,
     metadata = metadata,
     experiment_name = experiment_name,
-    n_samples = length(fcs_files)
+    n_samples = length(fcs_files),
+    channels = detected_channels
   ))
 }
 

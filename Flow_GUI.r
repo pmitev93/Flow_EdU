@@ -1739,9 +1739,10 @@ server <- function(input, output, session) {
 
         control_fcs <- exp$flowset[[control_idx]]
         control_name <- exp$metadata$sample_name[control_idx]
+        exp_channels <- get_exp_channels(exp)
         control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                gates = GATES_selected,
-                                                               channels = CHANNELS)
+                                                               channels = exp_channels)
         ha_threshold <- control_result$threshold
 
         # Determine gate ID for this analysis
@@ -1811,7 +1812,7 @@ server <- function(input, output, session) {
           exp_results <- extract_correlations_with_quadrants(exp,
                                                              if(use_quadrant) NULL else ha_threshold,
                                                              gates = GATES_selected,
-                                                             channels = CHANNELS,
+                                                             channels = exp_channels,
                                                              use_quadrant = use_quadrant)
 
           # Save to cache with gate strategy ID
@@ -2500,7 +2501,7 @@ server <- function(input, output, session) {
 
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
-        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = CHANNELS)
+        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
       } else {
         # Old strategy: Calculate HA threshold
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -2513,7 +2514,7 @@ server <- function(input, output, session) {
         control_name <- exp$metadata$sample_name[control_idx]
         control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                gates = gates_to_use,
-                                                               channels = CHANNELS)
+                                                               channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
 
         plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use)
@@ -2566,7 +2567,7 @@ server <- function(input, output, session) {
 
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
-        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = CHANNELS)
+        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
       } else {
         # Old strategy: use global Empty_Vector control
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -2579,7 +2580,7 @@ server <- function(input, output, session) {
         control_name <- exp$metadata$sample_name[control_idx]
         control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                gates = gates_to_use,
-                                                               channels = CHANNELS)
+                                                               channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
 
         plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use)
@@ -2686,7 +2687,7 @@ server <- function(input, output, session) {
         control_name <- exp$metadata$sample_name[control_idx]
         control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                gates = gates_to_use,
-                                                               channels = CHANNELS)
+                                                               channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
       }
     }
@@ -2714,19 +2715,19 @@ server <- function(input, output, session) {
       if(use_quadrant) {
         # Show quadrant plot for Gate 7
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS,
+                                       gates = gates_to_use, channels = get_exp_channels(exp),
                                        show_sample_name = FALSE,
                                        edu_threshold = edu_threshold)
         # Show quadrant plot again (same as Gate 7 for quadrant strategy)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS,
+                                       gates = gates_to_use, channels = get_exp_channels(exp),
                                        show_sample_name = FALSE,
                                        edu_threshold = edu_threshold)
       } else {
         # Show traditional Gate 7 and correlation plot
         plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS,
+                                       gates = gates_to_use, channels = get_exp_channels(exp),
                                        show_sample_name = FALSE)
       }
     } else {
@@ -2861,7 +2862,7 @@ server <- function(input, output, session) {
           control_name <- exp$metadata$sample_name[control_idx]
           control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                  gates = gates_to_use,
-                                                                 channels = CHANNELS)
+                                                                 channels = get_exp_channels(exp))
           ha_threshold <- control_result$threshold
         }
       }
@@ -2903,19 +2904,19 @@ server <- function(input, output, session) {
         if(use_quadrant) {
           # Show quadrant plot for Gate 7
           plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                         gates = gates_to_use, channels = CHANNELS,
+                                         gates = gates_to_use, channels = get_exp_channels(exp),
                                          show_sample_name = FALSE,
                                          edu_threshold = edu_threshold)
           # Show quadrant plot again (same as Gate 7 for quadrant strategy)
           plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                         gates = gates_to_use, channels = CHANNELS,
+                                         gates = gates_to_use, channels = get_exp_channels(exp),
                                          show_sample_name = FALSE,
                                          edu_threshold = edu_threshold)
         } else {
           # Show traditional Gate 7 and correlation plot
           plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
           plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                         gates = gates_to_use, channels = CHANNELS,
+                                         gates = gates_to_use, channels = get_exp_channels(exp),
                                          show_sample_name = FALSE)
         }
       } else {
@@ -3101,7 +3102,7 @@ server <- function(input, output, session) {
             tryCatch({
               control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                      gates = gates_to_use,
-                                                                     channels = CHANNELS)
+                                                                     channels = get_exp_channels(exp))
               ha_threshold <- control_result$threshold
               cat(sprintf("Calculated HA threshold for %s: %s\n", exp_name,
                          if(!is.null(ha_threshold)) sprintf("%.2f", ha_threshold) else "NULL"))
@@ -3146,7 +3147,7 @@ server <- function(input, output, session) {
         } else if(selected_gate == "correlation") {
           if(!is.null(ha_threshold)) {
             plot_edu_ha_correlation_single(fcs, exp_name, ha_threshold,
-                                          gates = gates_to_use, channels = CHANNELS)
+                                          gates = gates_to_use, channels = get_exp_channels(exp))
           } else {
             plot.new()
             text(0.5, 0.5, "No threshold", cex = 1.2)
@@ -3654,7 +3655,7 @@ server <- function(input, output, session) {
         control_name <- exp$metadata$sample_name[control_idx]
         control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                gates = gates_to_use,
-                                                               channels = CHANNELS)
+                                                               channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
       }
     }
@@ -3673,19 +3674,19 @@ server <- function(input, output, session) {
       if(use_quadrant) {
         # Show quadrant plot for Gate 7
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS,
+                                       gates = gates_to_use, channels = get_exp_channels(exp),
                                        show_sample_name = FALSE,
                                        edu_threshold = edu_threshold)
         # Show quadrant plot again (same as Gate 7 for quadrant strategy)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS,
+                                       gates = gates_to_use, channels = get_exp_channels(exp),
                                        show_sample_name = FALSE,
                                        edu_threshold = edu_threshold)
       } else {
         # Show traditional Gate 7 and correlation plot
         plot_ha_gate_single(fcs, sample_name, ha_threshold, gates = gates_to_use, show_sample_name = FALSE)
         plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                       gates = gates_to_use, channels = CHANNELS, show_sample_name = FALSE)
+                                       gates = gates_to_use, channels = get_exp_channels(exp), show_sample_name = FALSE)
       }
     } else {
       par(mfrow = c(3, 2), mar = c(5, 4, 3, 1))
@@ -3747,7 +3748,7 @@ server <- function(input, output, session) {
         control_name <- exp$metadata$sample_name[control_idx]
         control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                                gates = gates_to_use,
-                                                               channels = CHANNELS)
+                                                               channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
       }
     }
@@ -3765,7 +3766,7 @@ server <- function(input, output, session) {
                if(use_quadrant) {
                  # Show quadrant plot for Gate 7
                  plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                                gates = gates_to_use, channels = CHANNELS,
+                                                gates = gates_to_use, channels = get_exp_channels(exp),
                                                 edu_threshold = edu_threshold)
                } else {
                  # Show traditional HA gate
@@ -3782,12 +3783,12 @@ server <- function(input, output, session) {
                if(use_quadrant) {
                  # Show quadrant plot with thresholds
                  plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                                gates = gates_to_use, channels = CHANNELS,
+                                                gates = gates_to_use, channels = get_exp_channels(exp),
                                                 edu_threshold = edu_threshold)
                } else {
                  # Show traditional correlation plot
                  plot_edu_ha_correlation_single(fcs, sample_name, ha_threshold,
-                                                gates = gates_to_use, channels = CHANNELS)
+                                                gates = gates_to_use, channels = get_exp_channels(exp))
                }
              } else {
                plot.new()
@@ -4918,7 +4919,7 @@ GATE_STRATEGY <- list(
         plot_edu_ha_correlation_single(test_fcs, sample_name,
                                        ha_threshold = quadrant_result$ha_threshold,
                                        gates = gates_to_use,
-                                       channels = CHANNELS,
+                                       channels = get_exp_channels(exp),
                                        show_sample_name = TRUE,
                                        edu_threshold = quadrant_result$edu_threshold)
       }, error = function(e) {
@@ -4939,7 +4940,7 @@ GATE_STRATEGY <- list(
       control_name <- exp$metadata$sample_name[control_idx]
       control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                              gates = gates_to_use,
-                                                             channels = CHANNELS)
+                                                             channels = get_exp_channels(exp))
       ha_threshold <- control_result$threshold
 
       plot_ha_gate_single(exp$flowset[[idx]], sample_name, ha_threshold,
@@ -4973,7 +4974,7 @@ GATE_STRATEGY <- list(
     control_name <- exp$metadata$sample_name[control_idx]
     control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                            gates = gates_to_use,
-                                                           channels = CHANNELS)
+                                                           channels = get_exp_channels(exp))
     ha_threshold <- control_result$threshold
 
     plot_edu_ha_correlation_single(exp$flowset[[idx]], exp$metadata$sample_name[idx], ha_threshold,
@@ -5027,7 +5028,7 @@ GATE_STRATEGY <- list(
     control_name <- exp$metadata$sample_name[control_idx]
     control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                            gates = gates_to_use,
-                                                           channels = CHANNELS)
+                                                           channels = get_exp_channels(exp))
     ha_threshold <- control_result$threshold
 
     # Determine axis limits (manual or dynamic)
@@ -5078,7 +5079,7 @@ GATE_STRATEGY <- list(
       control_name <- exp$metadata$sample_name[control_idx]
       control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
                                                              gates = gates_to_use,
-                                                             channels = CHANNELS)
+                                                             channels = get_exp_channels(exp))
       ha_threshold <- control_result$threshold
 
       # Get plot dimensions (convert px to inches for vector formats)
