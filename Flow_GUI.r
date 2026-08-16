@@ -11,13 +11,6 @@ library(DT)
 library(openxlsx)
 library(sortable)
 library(plotly)
-library(future)
-library(future.apply)
-
-# Set up parallel processing plan
-# Use multisession to load experiments in parallel
-plan(multisession, workers = availableCores() - 1)
-
 # Source the master script to load all functions
 # Make sure master script path is correct!
 source("R_Flow_Claude.r")  # Uncomment and adjust path
@@ -1636,20 +1629,20 @@ server <- function(input, output, session) {
       return()
     }
 
-    withProgress(message = sprintf('Loading %d experiments...', length(experiments_to_load)), value = 0, {
-      # Load experiments in parallel using future
-      loaded_experiments <- future_lapply(experiments_to_load, function(exp_folder) {
-        load_experiment(exp_folder)
-      }, future.seed = TRUE)
+    n_to_load <- length(experiments_to_load)
+    withProgress(message = sprintf('Loading %d experiment%s...', n_to_load, if(n_to_load == 1) "" else "s"), value = 0, {
+      loaded_experiments <- list()
+      for(i in seq_along(experiments_to_load)) {
+        exp_name <- names(experiments_to_load)[i]
+        incProgress(0, detail = sprintf("%s (%d/%d)", exp_name, i, n_to_load))
+        loaded_experiments[[exp_name]] <- load_experiment(experiments_to_load[[i]])
+        incProgress(1 / n_to_load)
+      }
 
-      # Store loaded experiments
-      names(loaded_experiments) <- names(experiments_to_load)
       rv$experiments <- c(rv$experiments, loaded_experiments)
-
-      # Track which experiments were explicitly loaded
       rv$loaded_experiment_names <- unique(c(rv$loaded_experiment_names, names(experiments_to_load)))
 
-      showNotification(sprintf("Loaded %d experiments successfully", length(loaded_experiments)),
+      showNotification(sprintf("Loaded %d experiment%s successfully", n_to_load, if(n_to_load == 1) "" else "s"),
                        type = "message", duration = 3)
     })
   })
