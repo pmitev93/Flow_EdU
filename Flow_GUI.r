@@ -715,6 +715,20 @@ server <- function(input, output, session) {
     dir.create(CACHE_DIR, recursive = TRUE)
   }
 
+  # HA threshold sidecar: maps experiment_name -> ha_threshold
+  # Lets analyze_selected skip FCS loading when analysis cache already exists
+  HA_THRESHOLD_CACHE_FILE <- file.path(CACHE_DIR, "ha_thresholds.rds")
+
+  load_ha_threshold_cache <- function() {
+    if (file.exists(HA_THRESHOLD_CACHE_FILE)) readRDS(HA_THRESHOLD_CACHE_FILE) else list()
+  }
+
+  save_ha_threshold_to_cache <- function(exp_name, ha_threshold) {
+    ht_cache <- load_ha_threshold_cache()
+    ht_cache[[exp_name]] <- ha_threshold
+    saveRDS(ht_cache, HA_THRESHOLD_CACHE_FILE)
+  }
+
   # User preferences file
   PREFS_FILE <- file.path(CACHE_DIR, "user_preferences.rds")
 
@@ -1714,30 +1728,6 @@ server <- function(input, output, session) {
           GATE_STRATEGY_selected <<- NULL
         })
 
-        # Load experiment if not already loaded
-        if(is.null(rv$experiments[[exp_name]])) {
-          rv$experiments[[exp_name]] <- load_experiment(exp_folder)
-        }
-
-        exp <- rv$experiments[[exp_name]]
-
-        # Find control for HA threshold
-        control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
-
-        if(is.null(control_idx)) {
-          showNotification(sprintf("No control found for %s", exp_name),
-                           type = "warning")
-          next
-        }
-
-        control_fcs <- exp$flowset[[control_idx]]
-        control_name <- exp$metadata$sample_name[control_idx]
-        exp_channels <- get_exp_channels(exp)
-        control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
-                                                               gates = GATES_selected,
-                                                               channels = exp_channels)
-        ha_threshold <- control_result$threshold
-
         # Determine gate ID for this analysis
         # Use filename-based ID to avoid collisions (e.g., quadrant vs quadrant2)
         gate_id_from_file <- gsub("^gates_(.*)\\.r$", "\\1", gate_file)
@@ -1749,9 +1739,46 @@ server <- function(input, output, session) {
           "gdef"
         }
 
-        # Check cache first
-        cache_data <- load_from_cache(exp_name, GATES_selected, ha_threshold,
-                                       gate_id = gate_id_for_cache)
+        # Try to find analysis cache without loading FCS:
+        # look up the stored ha_threshold from the sidecar file.
+        ht_cache <- load_ha_threshold_cache()
+        cached_ha_threshold <- ht_cache[[exp_name]]
+        cache_data <- if (!is.null(cached_ha_threshold)) {
+          load_from_cache(exp_name, GATES_selected, cached_ha_threshold,
+                          gate_id = gate_id_for_cache)
+        } else {
+          NULL
+        }
+
+        if (is.null(cache_data)) {
+          # Cache miss — must load FCS to compute ha_threshold
+          if (is.null(rv$experiments[[exp_name]])) {
+            incProgress(0, detail = sprintf("Loading FCS: %s (%d/%d)", exp_name, exp_idx, n_exp))
+            rv$experiments[[exp_name]] <- load_experiment_cached(exp_folder, CACHE_DIR)
+          }
+          exp <- rv$experiments[[exp_name]]
+
+          control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+          if (is.null(control_idx)) {
+            showNotification(sprintf("No control found for %s", exp_name), type = "warning")
+            next
+          }
+          control_fcs <- exp$flowset[[control_idx]]
+          control_name <- exp$metadata$sample_name[control_idx]
+          exp_channels <- get_exp_channels(exp)
+          control_result <- calculate_ha_threshold_from_control(control_fcs, control_name,
+                                                                 gates = GATES_selected,
+                                                                 channels = exp_channels)
+          ha_threshold <- control_result$threshold
+          save_ha_threshold_to_cache(exp_name, ha_threshold)
+
+          # Now check analysis cache with the freshly computed threshold
+          cache_data <- load_from_cache(exp_name, GATES_selected, ha_threshold,
+                                         gate_id = gate_id_for_cache)
+        } else {
+          ha_threshold <- cached_ha_threshold
+          incProgress(1/(n_exp*2), detail = sprintf("Found cache: %s", exp_name))
+        }
 
         if(!is.null(cache_data)) {
           # Use cached results
