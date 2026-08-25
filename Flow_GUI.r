@@ -1635,7 +1635,7 @@ server <- function(input, output, session) {
       for(i in seq_along(experiments_to_load)) {
         exp_name <- names(experiments_to_load)[i]
         incProgress(0, detail = sprintf("%s (%d/%d)", exp_name, i, n_to_load))
-        loaded_experiments[[exp_name]] <- load_experiment(experiments_to_load[[i]])
+        loaded_experiments[[exp_name]] <- load_experiment_cached(experiments_to_load[[i]], CACHE_DIR)
         incProgress(1 / n_to_load)
       }
 
