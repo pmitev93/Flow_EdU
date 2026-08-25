@@ -1271,8 +1271,11 @@ server <- function(input, output, session) {
           incProgress(1/length(exp_names), detail = exp_name)
 
           # Find ALL cache files for this experiment (scan all subfolders for all gate strategies)
+          # Exclude flowset cache files (stored in flowsets/ subdir but filter here as safety net)
           pattern <- paste0("^", exp_name, "_.*\\.rds$")
           cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
+          cache_files <- cache_files[!grepl("_flowset\\.rds$", cache_files)]
+          cache_files <- cache_files[!grepl("/flowsets/", cache_files, fixed = TRUE)]
 
           cat(sprintf("\nExperiment: %s\n", exp_name))
           cat(sprintf("  Found %d cache files: %s\n", length(cache_files),
