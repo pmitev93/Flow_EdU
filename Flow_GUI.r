@@ -185,11 +185,13 @@ ui <- fluidPage(
                  uiOutput("overview_plot_ui"),
                  hr(),
                  div(style = "background-color: #f5f5f5; padding: 12px 15px; border-radius: 4px;",
-                   h5("Layout Controls", style = "margin-top: 0; color: #555; font-weight: bold;"),
+                   h5("Layout & Export Controls", style = "margin-top: 0; color: #555; font-weight: bold;"),
                    fluidRow(
                      column(2,
                        numericInput("overview_plot_h", "Height (px):",
-                                    value = 800, min = 400, max = 4000, step = 100)
+                                    value = 800, min = 400, max = 4000, step = 100),
+                       numericInput("overview_export_width", "Export width (px):",
+                                    value = 1200, min = 400, max = 6000, step = 100)
                      ),
                      column(2,
                        checkboxInput("overview_auto_cols", "Auto columns", value = TRUE),
@@ -204,9 +206,17 @@ ui <- fluidPage(
                                    min = 0.5, max = 3.0, value = 1.0, step = 0.1,
                                    width = "100%")
                      ),
-                     column(4,
+                     column(2,
+                       selectInput("overview_export_fmt", "Export format:",
+                                   choices = c("SVG (vector)" = "svg",
+                                               "PDF (vector)" = "pdf",
+                                               "PNG (raster)" = "png"),
+                                   selected = "svg")
+                     ),
+                     column(2,
                        br(),
-                       helpText("These controls are at the bottom so you can crop them from screenshots.")
+                       downloadButton("download_overview_export", "Download",
+                                      class = "btn-primary btn-block")
                      )
                    )
                  )
@@ -2665,6 +2675,86 @@ server <- function(input, output, session) {
       }
     }
   })
+
+  # Download handler for Overview Plots tab (vector export)
+  output$download_overview_export <- downloadHandler(
+    filename = function() {
+      fmt <- input$overview_export_fmt
+      paste0("gate_overview_", input$overview_experiment, "_",
+             input$overview_gate, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".", fmt)
+    },
+    content = function(file) {
+      req(rv$experiments, input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
+
+      exp <- rv$experiments[[input$overview_experiment]]
+      exp_name <- input$overview_experiment
+
+      n_cols_val <- if (isTRUE(input$overview_auto_cols) || is.null(input$overview_n_cols)) NULL else max(1L, as.integer(input$overview_n_cols))
+      font_scale_val <- if (is.null(input$overview_font_scale)) 1 else input$overview_font_scale
+
+      h_px <- if (!is.null(input$overview_plot_h)) input$overview_plot_h else 800
+      w_px <- if (!is.null(input$overview_export_width)) input$overview_export_width else 1200
+      fmt  <- input$overview_export_fmt
+
+      if (fmt == "svg") svg(file, width = w_px / 96, height = h_px / 96)
+      else if (fmt == "pdf") pdf(file, width = w_px / 96, height = h_px / 96)
+      else png(file, width = w_px, height = h_px, res = 150)
+
+      composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
+      gates_to_use <- if (!is.null(rv$experiment_gates[[composite_key]])) rv$experiment_gates[[composite_key]] else GATES
+
+      tryCatch({
+        if (input$overview_gate == "gate1") {
+          plot_debris_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, font_scale = font_scale_val)
+        } else if (input$overview_gate == "gate2") {
+          plot_singlet_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, font_scale = font_scale_val)
+        } else if (input$overview_gate == "gate3") {
+          plot_live_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, font_scale = font_scale_val)
+        } else if (input$overview_gate == "gate4") {
+          plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+        } else if (input$overview_gate == "gate5") {
+          plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+        } else if (input$overview_gate == "gate6") {
+          plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+        } else if (input$overview_gate %in% c("gate7", "correlation")) {
+          gate_strategy_key <- paste0("GATE_STRATEGY_", input$overview_gate_strategy)
+          gate_strategy <- rv$gate_strategies[[gate_strategy_key]]
+          use_quadrant <- !is.null(gate_strategy$analysis_type) &&
+                          gate_strategy$analysis_type == "quadrant_ratio" &&
+                          !is.null(gates_to_use$quadrant)
+
+          if (use_quadrant) {
+            plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+          } else {
+            ht_cache <- load_ha_threshold_cache()
+            ha_threshold <- ht_cache[[exp_name]]
+            if (is.null(ha_threshold)) {
+              control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
+              if (!is.null(control_idx)) {
+                cr <- calculate_ha_threshold_from_control(exp$flowset[[control_idx]],
+                                                           exp$metadata$sample_name[control_idx],
+                                                           gates = gates_to_use,
+                                                           channels = get_exp_channels(exp))
+                ha_threshold <- cr$threshold
+              }
+            }
+            if (!is.null(ha_threshold)) {
+              if (input$overview_gate == "gate7") {
+                plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+              } else {
+                plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+              }
+            }
+          }
+        }
+      }, error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.5)
+      })
+
+      dev.off()
+    }
+  )
 
   # Render sample overview plot (all gates for one sample)
   output$sample_overview_plot <- renderPlot({
