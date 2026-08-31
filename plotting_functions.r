@@ -162,14 +162,14 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
 }
 
 # Overview: All samples on one plot 
-plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   n_samples <- length(experiment$flowset)
   
   # Calculate grid dimensions
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
   
   # Custom axis formatting function
   format_axis <- function(x) {
@@ -330,7 +330,7 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
          cex = 1.5)
 }
 
-plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   # Apply Gate 1 first (debris removal)
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -341,10 +341,10 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
   fcs_data <- Subset(fcs_data, debris_filter)
   
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
   
   format_axis <- function(x) {
     ifelse(x == 0, "0", 
@@ -526,12 +526,12 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
          cex = 1.5)
 }
 
-plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
   
   format_axis <- function(x) {
     ifelse(x == 0, "0", 
@@ -747,12 +747,12 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
          cex = 1.5)
 }
 
-plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
   
   format_axis <- function(x) {
     ifelse(x == 0, "0", 
@@ -936,12 +936,12 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
 )
 }
 
-plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -1099,12 +1099,12 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
          cex = 1.4)
 }
 
-plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -1295,12 +1295,12 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
          cex = 1.4)
 }
 
-plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS) {
+plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -1811,13 +1811,13 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
   ))
 }
 
-plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS) {
+plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   # Count only Dox+ samples
   n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
-  n_cols <- ceiling(sqrt(n_dox_plus))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_dox_plus))
   n_rows <- ceiling(n_dox_plus / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0), cex = font_scale)
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -2065,13 +2065,13 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
 }
 
 ## Quadrant Correlation Overview ----
-plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS) {
+plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
   # Count ALL samples (both Dox+ and Dox-)
   n_samples <- length(experiment$flowset)
-  n_cols <- ceiling(sqrt(n_samples))
+  if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0), cex = font_scale)
 
   for(i in seq_along(experiment$flowset)) {
     sample_name <- experiment$metadata$sample_name[i]

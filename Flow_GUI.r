@@ -182,7 +182,34 @@ ui <- fluidPage(
                           )
                    )
                  ),
-                 plotOutput("overview_plot", height = "800px")
+                 uiOutput("overview_plot_ui"),
+                 hr(),
+                 div(style = "background-color: #f5f5f5; padding: 12px 15px; border-radius: 4px;",
+                   h5("Layout Controls", style = "margin-top: 0; color: #555; font-weight: bold;"),
+                   fluidRow(
+                     column(2,
+                       numericInput("overview_plot_h", "Height (px):",
+                                    value = 800, min = 400, max = 4000, step = 100)
+                     ),
+                     column(2,
+                       checkboxInput("overview_auto_cols", "Auto columns", value = TRUE),
+                       conditionalPanel(
+                         "input.overview_auto_cols == false",
+                         numericInput("overview_n_cols", "Cols per row:",
+                                      value = 4, min = 1, max = 16, step = 1)
+                       )
+                     ),
+                     column(4,
+                       sliderInput("overview_font_scale", "Label size scale:",
+                                   min = 0.5, max = 3.0, value = 1.0, step = 0.1,
+                                   width = "100%")
+                     ),
+                     column(4,
+                       br(),
+                       helpText("These controls are at the bottom so you can crop them from screenshots.")
+                     )
+                   )
+                 )
         ),
 
         # Sample Overview Tab
@@ -2404,12 +2431,26 @@ server <- function(input, output, session) {
     }
   })
 
+  # Dynamic height for overview plot
+  output$overview_plot_ui <- renderUI({
+    h <- if (!is.null(input$overview_plot_h)) input$overview_plot_h else 800
+    plotOutput("overview_plot", height = paste0(h, "px"))
+  })
+
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
     req(rv$experiments, input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
 
     exp <- rv$experiments[[input$overview_experiment]]
     exp_name <- input$overview_experiment
+
+    # Layout controls
+    n_cols_val <- if (isTRUE(input$overview_auto_cols) || is.null(input$overview_n_cols)) {
+      NULL
+    } else {
+      max(1L, as.integer(input$overview_n_cols))
+    }
+    font_scale_val <- if (is.null(input$overview_font_scale)) 1 else input$overview_font_scale
 
     # Use gates for this experiment+strategy combination
     composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
@@ -2420,22 +2461,28 @@ server <- function(input, output, session) {
     }
 
     if(input$overview_gate == "gate1") {
-      plot_debris_gate_overview(exp, gates = gates_to_use)
+      plot_debris_gate_overview(exp, gates = gates_to_use,
+                                n_cols = n_cols_val, font_scale = font_scale_val)
 
     } else if(input$overview_gate == "gate2") {
-      plot_singlet_gate_overview(exp, gates = gates_to_use)
+      plot_singlet_gate_overview(exp, gates = gates_to_use,
+                                 n_cols = n_cols_val, font_scale = font_scale_val)
 
     } else if(input$overview_gate == "gate3") {
-      plot_live_gate_overview(exp, gates = gates_to_use)
+      plot_live_gate_overview(exp, gates = gates_to_use,
+                              n_cols = n_cols_val, font_scale = font_scale_val)
 
     } else if(input$overview_gate == "gate4") {
-      plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
+      plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
+                                        n_cols = n_cols_val, font_scale = font_scale_val)
 
     } else if(input$overview_gate == "gate5") {
-      plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
+      plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
+                                          n_cols = n_cols_val, font_scale = font_scale_val)
 
     } else if(input$overview_gate == "gate6") {
-      plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
+      plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
+                                     n_cols = n_cols_val, font_scale = font_scale_val)
 
     } else if(input$overview_gate == "gate7") {
       # Get strategy metadata
@@ -2528,7 +2575,8 @@ server <- function(input, output, session) {
 
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
-        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
+        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
+                                            n_cols = n_cols_val, font_scale = font_scale_val)
       } else {
         # Old strategy: Calculate HA threshold
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -2544,7 +2592,8 @@ server <- function(input, output, session) {
                                                                channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
 
-        plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp))
+        plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp),
+                              n_cols = n_cols_val, font_scale = font_scale_val)
       }
 
     } else if(input$overview_gate == "correlation") {
@@ -2594,7 +2643,8 @@ server <- function(input, output, session) {
 
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
-        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp))
+        plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
+                                           n_cols = n_cols_val, font_scale = font_scale_val)
       } else {
         # Old strategy: use global Empty_Vector control
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -2610,7 +2660,8 @@ server <- function(input, output, session) {
                                                                channels = get_exp_channels(exp))
         ha_threshold <- control_result$threshold
 
-        plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp))
+        plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp),
+                                         n_cols = n_cols_val, font_scale = font_scale_val)
       }
     }
   })
