@@ -715,6 +715,13 @@ server <- function(input, output, session) {
     dir.create(CACHE_DIR, recursive = TRUE)
   }
 
+  # Flowset cache lives OUTSIDE analysis_cache so it is never picked up
+  # by any of the analysis cache scanners (which all search analysis_cache/)
+  FLOWSET_CACHE_DIR <- "flowset_cache"
+  if(!dir.exists(FLOWSET_CACHE_DIR)) {
+    dir.create(FLOWSET_CACHE_DIR, recursive = TRUE)
+  }
+
   # HA threshold sidecar: maps experiment_name -> ha_threshold
   # Lets analyze_selected skip FCS loading when analysis cache already exists
   HA_THRESHOLD_CACHE_FILE <- file.path(CACHE_DIR, "ha_thresholds.rds")
@@ -1271,11 +1278,8 @@ server <- function(input, output, session) {
           incProgress(1/length(exp_names), detail = exp_name)
 
           # Find ALL cache files for this experiment (scan all subfolders for all gate strategies)
-          # Exclude flowset cache files (stored in flowsets/ subdir but filter here as safety net)
           pattern <- paste0("^", exp_name, "_.*\\.rds$")
           cache_files <- list.files(CACHE_DIR, pattern = pattern, full.names = TRUE, recursive = TRUE)
-          cache_files <- cache_files[!grepl("_flowset\\.rds$", cache_files)]
-          cache_files <- cache_files[!grepl("/flowsets/", cache_files, fixed = TRUE)]
 
           cat(sprintf("\nExperiment: %s\n", exp_name))
           cat(sprintf("  Found %d cache files: %s\n", length(cache_files),
@@ -1652,7 +1656,7 @@ server <- function(input, output, session) {
       for(i in seq_along(experiments_to_load)) {
         exp_name <- names(experiments_to_load)[i]
         incProgress(0, detail = sprintf("%s (%d/%d)", exp_name, i, n_to_load))
-        loaded_experiments[[exp_name]] <- load_experiment_cached(experiments_to_load[[i]], CACHE_DIR)
+        loaded_experiments[[exp_name]] <- load_experiment_cached(experiments_to_load[[i]], FLOWSET_CACHE_DIR)
         incProgress(1 / n_to_load)
       }
 
@@ -1757,7 +1761,7 @@ server <- function(input, output, session) {
           # Cache miss — must load FCS to compute ha_threshold
           if (is.null(rv$experiments[[exp_name]])) {
             incProgress(0, detail = sprintf("Loading FCS: %s (%d/%d)", exp_name, exp_idx, n_exp))
-            rv$experiments[[exp_name]] <- load_experiment_cached(exp_folder, CACHE_DIR)
+            rv$experiments[[exp_name]] <- load_experiment_cached(exp_folder, FLOWSET_CACHE_DIR)
           }
           exp <- rv$experiments[[exp_name]]
 

@@ -289,10 +289,10 @@ load_experiment <- function(experiment_path) {
 }
 
 # Load experiment with flowset-level RDS cache to avoid re-parsing FCS files
-load_experiment_cached <- function(experiment_path, cache_dir = "analysis_cache") {
+load_experiment_cached <- function(experiment_path, cache_dir = "flowset_cache") {
   experiment_name <- basename(experiment_path)
-  flowset_dir <- file.path(cache_dir, "flowsets")
-  cache_file <- file.path(flowset_dir, paste0(experiment_name, "_flowset.rds"))
+  if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
+  cache_file <- file.path(cache_dir, paste0(experiment_name, "_flowset.rds"))
 
   if (file.exists(cache_file)) {
     fcs_files <- list.files(experiment_path, pattern = "\\.fcs$",
@@ -306,7 +306,6 @@ load_experiment_cached <- function(experiment_path, cache_dir = "analysis_cache"
   result <- load_experiment(experiment_path)
 
   if (!is.null(result)) {
-    if (!dir.exists(flowset_dir)) dir.create(flowset_dir, recursive = TRUE)
     saveRDS(result, cache_file)
     cat(sprintf("  Saved flowset cache: %s\n", experiment_name))
   }
