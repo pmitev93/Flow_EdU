@@ -8,7 +8,10 @@ library(tidyverse)
 library(sp) 
 
 # Working Directory ####
-setwd("/Users/petar.mitev/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Experiments/Flow/R_New")
+# Working directory is set by the launcher (run_app.command / run_app.bat)
+# or by RStudio's "Session > Set Working Directory > To Source File Location".
+# Do not hardcode a path here — it breaks on other machines and when OneDrive
+# hasn't mounted yet.
 
 # Paths ####
 master_path <- "Experiments/"
