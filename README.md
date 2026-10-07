@@ -175,8 +175,7 @@ If you use this tool in your research, please cite: "Pending"
 ## Technical Details
 
 **Language**: R  
-**Framework**: Shiny  
-**License**: [To be added]  
+**Framework**: Shiny   
 **Author**: Petar Mitev
 
 **Contact**: pmitev93@gmail.com
