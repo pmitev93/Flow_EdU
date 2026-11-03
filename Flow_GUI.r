@@ -199,7 +199,8 @@ ui <- fluidPage(
                          "input.overview_auto_cols == false",
                          numericInput("overview_n_cols", "Cols per row:",
                                       value = 4, min = 1, max = 16, step = 1)
-                       )
+                       ),
+                       checkboxInput("overview_show_dox_neg", "Show Dox−", value = TRUE)
                      ),
                      column(2,
                        sliderInput("overview_title_scale", "Title size:",
@@ -2484,6 +2485,13 @@ server <- function(input, output, session) {
     exp <- rv$experiments[[input$overview_experiment]]
     exp_name <- input$overview_experiment
 
+    # Optionally hide Dox- samples
+    if (!isTRUE(input$overview_show_dox_neg)) {
+      keep <- !grepl("Dox-|Dox−", exp$metadata$sample_name, ignore.case = TRUE)
+      exp$flowset  <- exp$flowset[keep]
+      exp$metadata <- exp$metadata[keep, , drop = FALSE]
+    }
+
     # Layout controls
     n_cols_val <- if (isTRUE(input$overview_auto_cols) || is.null(input$overview_n_cols)) {
       NULL
@@ -2720,6 +2728,13 @@ server <- function(input, output, session) {
       exp <- rv$experiments[[input$overview_experiment]]
       exp_name <- input$overview_experiment
 
+      # Optionally hide Dox- samples
+      if (!isTRUE(input$overview_show_dox_neg)) {
+        keep <- !grepl("Dox-|Dox−", exp$metadata$sample_name, ignore.case = TRUE)
+        exp$flowset  <- exp$flowset[keep]
+        exp$metadata <- exp$metadata[keep, , drop = FALSE]
+      }
+
       n_cols_val      <- if (isTRUE(input$overview_auto_cols) || is.null(input$overview_n_cols)) NULL else max(1L, as.integer(input$overview_n_cols))
       title_scale_val <- if (is.null(input$overview_title_scale)) 1 else input$overview_title_scale
       axis_scale_val  <- if (is.null(input$overview_axis_scale))  1 else input$overview_axis_scale
@@ -2728,8 +2743,8 @@ server <- function(input, output, session) {
       w_px <- if (!is.null(input$overview_export_width)) input$overview_export_width else 1200
       fmt  <- input$overview_export_fmt
 
-      if (fmt == "svg") svg(file, width = w_px / 96, height = h_px / 96)
-      else if (fmt == "pdf") pdf(file, width = w_px / 96, height = h_px / 96)
+      if (fmt == "svg") svg(file, width = w_px / 72, height = h_px / 72)
+      else if (fmt == "pdf") pdf(file, width = w_px / 72, height = h_px / 72)
       else png(file, width = w_px, height = h_px, res = 150)
 
       composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
