@@ -3378,10 +3378,14 @@ server <- function(input, output, session) {
           if(is.null(rv$experiments)) {
             rv$experiments <- list()
           }
-          rv$experiments[[exp_name]] <- load_experiment(exp_folder)
-
-          showNotification(sprintf("Loaded %s for browsing", exp_name),
-                           type = "message", duration = 2)
+          tryCatch({
+            rv$experiments[[exp_name]] <- load_experiment_cached(exp_folder, FLOWSET_CACHE_DIR)
+            showNotification(sprintf("Loaded %s for browsing", exp_name),
+                             type = "message", duration = 2)
+          }, error = function(e) {
+            showNotification(sprintf("Failed to load %s: %s", exp_name, e$message),
+                             type = "error", duration = 8)
+          })
         })
       }
     }
