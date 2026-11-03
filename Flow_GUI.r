@@ -2210,17 +2210,35 @@ server <- function(input, output, session) {
                      type = "message")
   })
   
-  # Update overview experiment selector when experiments are loaded
+  # Update overview experiment selector from folder scan (no FCS load needed)
   observe({
-    req(rv$experiments)
+    req(rv$experiment_folders)
     updateSelectInput(session, "overview_experiment",
-                      choices = names(rv$experiments))
+                      choices = names(rv$experiment_folders))
   })
 
   # Update overview gating strategy selector when experiment changes
   observeEvent(input$overview_experiment, {
     req(input$overview_experiment)
     exp_name <- input$overview_experiment
+
+    # Auto-load experiment into memory if not already there
+    if (is.null(rv$experiments[[exp_name]]) && !(exp_name %in% rv$failed_experiments)) {
+      exp_folder <- rv$experiment_folders[[exp_name]]
+      if (!is.null(exp_folder)) {
+        withProgress(message = paste("Loading", exp_name, "..."), value = 0.5, {
+          tryCatch({
+            if (is.null(rv$experiments)) rv$experiments <- list()
+            rv$experiments[[exp_name]] <- load_experiment_cached(exp_folder, FLOWSET_CACHE_DIR)
+          }, error = function(e) {
+            rv$failed_experiments <- c(rv$failed_experiments, exp_name)
+            showNotification(paste("Cannot load", exp_name, "- FCS files may not be available"),
+                             type = "error", duration = 8)
+          })
+        })
+      }
+    }
+
     available_gates <- rv$experiment_available_gates[[exp_name]]
 
     # If not populated yet, check cache directory directly
@@ -2276,11 +2294,11 @@ server <- function(input, output, session) {
     save_gating_preference(exp_name, gate_strategy)
   }, ignoreInit = TRUE)  # Don't save on initial load, only on user changes
 
-  # Update sample overview experiment selector when experiments are loaded
+  # Update sample overview experiment selector from folder scan
   observe({
-    req(rv$experiments)
+    req(rv$experiment_folders)
     updateSelectInput(session, "sample_overview_experiment",
-                      choices = names(rv$experiments))
+                      choices = names(rv$experiment_folders))
   })
 
   # Update sample overview gating strategy selector when experiment changes
@@ -2460,7 +2478,8 @@ server <- function(input, output, session) {
 
   # Render overview plot based on selected gate
   output$overview_plot <- renderPlot({
-    req(rv$experiments, input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
+    req(input$overview_experiment, input$overview_gate, input$overview_gate_strategy)
+    req(rv$experiments[[input$overview_experiment]])
 
     exp <- rv$experiments[[input$overview_experiment]]
     exp_name <- input$overview_experiment
