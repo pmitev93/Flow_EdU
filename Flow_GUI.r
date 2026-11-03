@@ -1033,6 +1033,7 @@ server <- function(input, output, session) {
   # Reactive values to store data
   rv <- reactiveValues(
     experiments = NULL,
+    failed_experiments = character(0),
     all_results = NULL,
     ha_thresholds = list(),
     experiment_gates = list(),  # Store which gates were used for each experiment (by experiment+gate_id)
@@ -1551,15 +1552,20 @@ server <- function(input, output, session) {
         exp_name <- input[[exp_input]]
         exp_folder <- rv$experiment_folders[[exp_name]]
 
-        if(!is.null(exp_folder)) {
+        if(!is.null(exp_folder) && !(exp_name %in% rv$failed_experiments)) {
           withProgress(message = paste('Loading', exp_name), value = 0.5, {
             if(is.null(rv$experiments)) {
               rv$experiments <- list()
             }
-            rv$experiments[[exp_name]] <- load_experiment(exp_folder)
-
-            showNotification(sprintf("Loaded %s for browsing", exp_name),
-                             type = "message", duration = 2)
+            tryCatch({
+              rv$experiments[[exp_name]] <- load_experiment_cached(exp_folder, FLOWSET_CACHE_DIR)
+              showNotification(sprintf("Loaded %s for browsing", exp_name),
+                               type = "message", duration = 2)
+            }, error = function(e) {
+              rv$failed_experiments <- c(rv$failed_experiments, exp_name)
+              showNotification(sprintf("Cannot load %s (FCS files may not be downloaded from OneDrive)", exp_name),
+                               type = "warning", duration = 5)
+            })
           })
         }
       }
