@@ -2214,7 +2214,7 @@ server <- function(input, output, session) {
   observe({
     req(rv$experiment_folders)
     updateSelectInput(session, "overview_experiment",
-                      choices = names(rv$experiment_folders))
+                      choices = c("-- select --" = "", names(rv$experiment_folders)))
   })
 
   # Update overview gating strategy selector when experiment changes
@@ -2223,7 +2223,7 @@ server <- function(input, output, session) {
     exp_name <- input$overview_experiment
 
     # Auto-load experiment into memory if not already there
-    if (is.null(rv$experiments[[exp_name]]) && !(exp_name %in% rv$failed_experiments)) {
+    if (is.null(rv$experiments[[exp_name]]) && exp_name != "") {
       exp_folder <- rv$experiment_folders[[exp_name]]
       if (!is.null(exp_folder)) {
         withProgress(message = paste("Loading", exp_name, "..."), value = 0.5, {
@@ -2298,7 +2298,7 @@ server <- function(input, output, session) {
   observe({
     req(rv$experiment_folders)
     updateSelectInput(session, "sample_overview_experiment",
-                      choices = names(rv$experiment_folders))
+                      choices = c("-- select --" = "", names(rv$experiment_folders)))
   })
 
   # Update sample overview gating strategy selector when experiment changes
