@@ -201,8 +201,13 @@ ui <- fluidPage(
                                       value = 4, min = 1, max = 16, step = 1)
                        )
                      ),
-                     column(4,
-                       sliderInput("overview_font_scale", "Label size scale:",
+                     column(2,
+                       sliderInput("overview_title_scale", "Title size:",
+                                   min = 0.5, max = 3.0, value = 1.0, step = 0.1,
+                                   width = "100%")
+                     ),
+                     column(2,
+                       sliderInput("overview_axis_scale", "Axis label size:",
                                    min = 0.5, max = 3.0, value = 1.0, step = 0.1,
                                    width = "100%")
                      ),
@@ -2460,7 +2465,8 @@ server <- function(input, output, session) {
     } else {
       max(1L, as.integer(input$overview_n_cols))
     }
-    font_scale_val <- if (is.null(input$overview_font_scale)) 1 else input$overview_font_scale
+    title_scale_val <- if (is.null(input$overview_title_scale)) 1 else input$overview_title_scale
+    axis_scale_val  <- if (is.null(input$overview_axis_scale))  1 else input$overview_axis_scale
 
     # Use gates for this experiment+strategy combination
     composite_key <- paste0(exp_name, "::", input$overview_gate_strategy)
@@ -2472,27 +2478,27 @@ server <- function(input, output, session) {
 
     if(input$overview_gate == "gate1") {
       plot_debris_gate_overview(exp, gates = gates_to_use,
-                                n_cols = n_cols_val, font_scale = font_scale_val)
+                                n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
 
     } else if(input$overview_gate == "gate2") {
       plot_singlet_gate_overview(exp, gates = gates_to_use,
-                                 n_cols = n_cols_val, font_scale = font_scale_val)
+                                 n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
 
     } else if(input$overview_gate == "gate3") {
       plot_live_gate_overview(exp, gates = gates_to_use,
-                              n_cols = n_cols_val, font_scale = font_scale_val)
+                              n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
 
     } else if(input$overview_gate == "gate4") {
       plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
-                                        n_cols = n_cols_val, font_scale = font_scale_val)
+                                        n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
 
     } else if(input$overview_gate == "gate5") {
       plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
-                                          n_cols = n_cols_val, font_scale = font_scale_val)
+                                          n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
 
     } else if(input$overview_gate == "gate6") {
       plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
-                                     n_cols = n_cols_val, font_scale = font_scale_val)
+                                     n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
 
     } else if(input$overview_gate == "gate7") {
       # Get strategy metadata
@@ -2586,7 +2592,7 @@ server <- function(input, output, session) {
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
         plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
-                                            n_cols = n_cols_val, font_scale = font_scale_val)
+                                            n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
       } else {
         # Old strategy: Calculate HA threshold
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -2603,7 +2609,7 @@ server <- function(input, output, session) {
         ha_threshold <- control_result$threshold
 
         plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp),
-                              n_cols = n_cols_val, font_scale = font_scale_val)
+                              n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
       }
 
     } else if(input$overview_gate == "correlation") {
@@ -2654,7 +2660,7 @@ server <- function(input, output, session) {
       if(use_quadrant) {
         # Quadrant strategy: show quadrant plots for all Dox+ samples
         plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp),
-                                           n_cols = n_cols_val, font_scale = font_scale_val)
+                                           n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
       } else {
         # Old strategy: use global Empty_Vector control
         control_idx <- find_control_sample(exp$metadata, "Empty_Vector_Dox-")
@@ -2671,7 +2677,7 @@ server <- function(input, output, session) {
         ha_threshold <- control_result$threshold
 
         plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp),
-                                         n_cols = n_cols_val, font_scale = font_scale_val)
+                                         n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
       }
     }
   })
@@ -2689,8 +2695,9 @@ server <- function(input, output, session) {
       exp <- rv$experiments[[input$overview_experiment]]
       exp_name <- input$overview_experiment
 
-      n_cols_val <- if (isTRUE(input$overview_auto_cols) || is.null(input$overview_n_cols)) NULL else max(1L, as.integer(input$overview_n_cols))
-      font_scale_val <- if (is.null(input$overview_font_scale)) 1 else input$overview_font_scale
+      n_cols_val      <- if (isTRUE(input$overview_auto_cols) || is.null(input$overview_n_cols)) NULL else max(1L, as.integer(input$overview_n_cols))
+      title_scale_val <- if (is.null(input$overview_title_scale)) 1 else input$overview_title_scale
+      axis_scale_val  <- if (is.null(input$overview_axis_scale))  1 else input$overview_axis_scale
 
       h_px <- if (!is.null(input$overview_plot_h)) input$overview_plot_h else 800
       w_px <- if (!is.null(input$overview_export_width)) input$overview_export_width else 1200
@@ -2705,17 +2712,17 @@ server <- function(input, output, session) {
 
       tryCatch({
         if (input$overview_gate == "gate1") {
-          plot_debris_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, font_scale = font_scale_val)
+          plot_debris_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
         } else if (input$overview_gate == "gate2") {
-          plot_singlet_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, font_scale = font_scale_val)
+          plot_singlet_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
         } else if (input$overview_gate == "gate3") {
-          plot_live_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, font_scale = font_scale_val)
+          plot_live_gate_overview(exp, gates = gates_to_use, n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
         } else if (input$overview_gate == "gate4") {
-          plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+          plot_sphase_outlier_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
         } else if (input$overview_gate == "gate5") {
-          plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+          plot_fxcycle_quantile_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
         } else if (input$overview_gate == "gate6") {
-          plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+          plot_edu_fxcycle_gate_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
         } else if (input$overview_gate %in% c("gate7", "correlation")) {
           gate_strategy_key <- paste0("GATE_STRATEGY_", input$overview_gate_strategy)
           gate_strategy <- rv$gate_strategies[[gate_strategy_key]]
@@ -2724,7 +2731,7 @@ server <- function(input, output, session) {
                           !is.null(gates_to_use$quadrant)
 
           if (use_quadrant) {
-            plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+            plot_quadrant_correlation_overview(exp, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
           } else {
             ht_cache <- load_ha_threshold_cache()
             ha_threshold <- ht_cache[[exp_name]]
@@ -2740,9 +2747,9 @@ server <- function(input, output, session) {
             }
             if (!is.null(ha_threshold)) {
               if (input$overview_gate == "gate7") {
-                plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+                plot_ha_gate_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
               } else {
-                plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, font_scale = font_scale_val)
+                plot_edu_ha_correlation_overview(exp, ha_threshold, gates = gates_to_use, channels = get_exp_channels(exp), n_cols = n_cols_val, title_scale = title_scale_val, axis_scale = axis_scale_val)
               }
             }
           }

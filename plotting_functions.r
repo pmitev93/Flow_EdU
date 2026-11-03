@@ -162,14 +162,14 @@ plot_debris_gate_single <- function(fcs_data, sample_name, gates = GATES, channe
 }
 
 # Overview: All samples on one plot 
-plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   n_samples <- length(experiment$flowset)
   
   # Calculate grid dimensions
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
   
   # Custom axis formatting function
   format_axis <- function(x) {
@@ -197,8 +197,8 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
          main = sample_name,
          xlim = c(0, 20e6),
          ylim = c(0, 20e6),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          xaxs = "i",
@@ -232,7 +232,7 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
     # Color code based on threshold (use QC threshold from gate strategy)
     threshold <- if(!is.null(gates$qc_thresholds$gate2_singlet)) gates$qc_thresholds$gate2_singlet else 75
     text_col <- ifelse(pct < threshold, "red", "black")
-    text(17e6, 1e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(17e6, 1e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
     
     # Add BIG warning if below threshold (use QC threshold from gate strategy)
     threshold <- if(!is.null(gates$qc_thresholds$gate2_singlet)) gates$qc_thresholds$gate2_singlet else 75
@@ -240,7 +240,7 @@ plot_debris_gate_overview <- function(experiment, gates = GATES, channels = CHAN
       # Red border around plot
       box(col = "red", lwd = 4)
       # Big warning text in center
-      text(10e6, 10e6, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
+      text(10e6, 10e6, "LOW\nCELL COUNT", col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -330,7 +330,7 @@ plot_singlet_gate_single <- function(fcs_data, sample_name, gates = GATES, chann
          cex = 1.5)
 }
 
-plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   # Apply Gate 1 first (debris removal)
   debris_filter <- point.in.polygon(
     exprs(fcs_data)[, channels$FSC_A],
@@ -344,7 +344,7 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
   
   format_axis <- function(x) {
     ifelse(x == 0, "0", 
@@ -377,16 +377,16 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
          main = sample_name,
          xlim = c(0, 15e6),
          ylim = c(0, 4e6),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          mgp = c(3, 0.5, 0),
          xaxs = "i",
          yaxs = "i")
     
-    axis(1, at = seq(0, 20e6, 5e6), labels = format_axis(seq(0, 20e6, 5e6)), cex.axis = 0.5)
-    axis(2, at = seq(0, 4e6, 1e6), labels = format_axis(seq(0, 4e6, 1e6)), cex.axis = 0.5)
+    axis(1, at = seq(0, 20e6, 5e6), labels = format_axis(seq(0, 20e6, 5e6)), cex.axis = 0.5 * axis_scale)
+    axis(2, at = seq(0, 4e6, 1e6), labels = format_axis(seq(0, 4e6, 1e6)), cex.axis = 0.5 * axis_scale)
 
     # Add blue tint to gate region
     polygon(gates$singlet[, 1], gates$singlet[, 2],
@@ -406,11 +406,11 @@ plot_singlet_gate_overview <- function(experiment, gates = GATES, channels = CHA
     # Use QC threshold from gate strategy
     threshold <- if(!is.null(gates$qc_thresholds$gate2_singlet)) gates$qc_thresholds$gate2_singlet else 75
     text_col <- ifelse(pct < threshold, "red", "black")
-    text(13e6, 0.5e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(13e6, 0.5e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
 
     if(pct < threshold) {
       box(col = "red", lwd = 4)
-      text(10e6, 2e6, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
+      text(10e6, 2e6, "LOW\nCELL COUNT", col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -526,12 +526,12 @@ plot_live_gate_single <- function(fcs_data, sample_name, gates = GATES, channels
          cex = 1.5)
 }
 
-plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   n_samples <- length(experiment$flowset)
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
   
   format_axis <- function(x) {
     ifelse(x == 0, "0", 
@@ -576,14 +576,14 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
          main = sample_name,
          xlim = c(100, 1000000),
          ylim = c(0, 15e6),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          log = "x")
     
     axis(1, at = c(100, 1000, 10000, 100000, 1000000), labels = c("100", "1K", "10K", "100K", "1M"), mgp = c(3, 1.0, 0))
-    axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), cex.axis = 0.5)
+    axis(2, at = seq(0, 15e6, 5e6), labels = format_axis(seq(0, 15e6, 5e6)), cex.axis = 0.5 * axis_scale)
 
     # Add gate (polygon or vertical line)
     if(is.matrix(gates$live_cells)) {
@@ -614,11 +614,11 @@ plot_live_gate_overview <- function(experiment, gates = GATES, channels = CHANNE
     # Use QC threshold from gate strategy
     threshold <- if(!is.null(gates$qc_thresholds$gate3_live)) gates$qc_thresholds$gate3_live else 50
     text_col <- ifelse(pct < threshold, "red", "black")
-    text(850000, 14e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(850000, 14e6, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
 
     if(pct < threshold) {
       box(col = "red", lwd = 4)
-      text(1000, 7.5e6, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
+      text(1000, 7.5e6, "LOW\nCELL COUNT", col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -747,12 +747,12 @@ plot_sphase_outlier_gate_single <- function(fcs_data, sample_name, gates = GATES
          cex = 1.5)
 }
 
-plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   n_samples <- length(experiment$flowset)
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
   
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
   
   format_axis <- function(x) {
     ifelse(x == 0, "0", 
@@ -806,15 +806,15 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
          main = sample_name,
          xlim = c(0, 12e6),
          ylim = c(1e3, 1e8),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          xaxs = "i",
          yaxs = "i",
          log= "y")
 
-    axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), cex.axis = 0.5)
+    axis(1, at = seq(0, 12e6, 3e6), labels = format_axis(seq(0, 12e6, 3e6)), cex.axis = 0.5 * axis_scale)
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), mgp = c(3, 0.5, 0))
 
     # Add gate (polygon or vertical lines)
@@ -848,11 +848,11 @@ plot_sphase_outlier_gate_overview <- function(experiment, gates = GATES, channel
     
     pct <- 100 * inside_gate / nrow(fcs_data)
     text_col <- ifelse(pct < 50, "red", "black")
-    text(12e6, 3e2, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(12e6, 3e2, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
     
     if(pct < 70) {
       box(col = "red", lwd = 4)
-      text(6e6, 3e5, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
+      text(6e6, 3e5, "LOW\nCELL COUNT", col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -936,12 +936,12 @@ plot_fxcycle_quantile_gate_single <- function(fcs_data, sample_name, gates = GAT
 )
 }
 
-plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   n_samples <- length(experiment$flowset)
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -972,14 +972,14 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
          main = sample_name,
          xlim = c(0, 12e6),
          ylim = c(1e3, 1e8),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          log = "y")
     
-    axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5)
-    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
+    axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5 * axis_scale)
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5 * axis_scale)
     
     # Add blue tint to gated region
     rect(xleft = lower_bound, ybottom = 1e3,
@@ -993,11 +993,11 @@ plot_fxcycle_quantile_gate_overview <- function(experiment, gates = GATES, chann
     inside_gate <- sum(fxcycle_values >= lower_bound & fxcycle_values <= upper_bound)
     pct <- 100 * inside_gate / nrow(fcs_data)
     text_col <- ifelse(pct < 50, "red", "black")
-    text(10e6, 200, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(10e6, 200, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
     
     if(pct < 50) {
       box(col = "red", lwd = 4)
-      text(6e6, 10000, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
+      text(6e6, 10000, "LOW\nCELL COUNT", col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -1099,12 +1099,12 @@ plot_edu_fxcycle_gate_single <- function(fcs_data, sample_name, gates = GATES, c
          cex = 1.4)
 }
 
-plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   n_samples <- length(experiment$flowset)
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -1143,14 +1143,14 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
          main = sample_name,
          xlim = c(0, 12e6),
          ylim = c(1e3, 1e8),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          log = "y")
     
-    axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5)
-    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
+    axis(1, at = seq(0, 12e6, 3e6), labels = format_axis_labels(seq(0, 12e6, 3e6)), cex.axis = 0.5 * axis_scale)
+    axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000), labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5 * axis_scale)
 
     # Add blue tint to gated region
     rect(xleft = fxcycle_bounds[1], ybottom = edu_threshold,
@@ -1173,11 +1173,11 @@ plot_edu_fxcycle_gate_overview <- function(experiment, gates = GATES, channels =
                          fxcycle_values <= fxcycle_bounds[2])
     pct <- 100 * inside_gate / nrow(fcs_data)
     text_col <- ifelse(pct < 30, "red", "black")
-    text(10e6, 200, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(10e6, 200, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
     
     if(pct < 30) {
       box(col = "red", lwd = 4)
-      text(6e6, 10000, "LOW\nCELL COUNT", col = "red", cex = 1.5, font = 2)
+      text(6e6, 10000, "LOW\nCELL COUNT", col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -1295,12 +1295,12 @@ plot_ha_gate_single <- function(fcs_data, sample_name, ha_threshold, gates = GAT
          cex = 1.4)
 }
 
-plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   n_samples <- length(experiment$flowset)
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2, 1.5, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.3, 0))
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -1339,12 +1339,12 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
       # Create empty plot with warning
       plot(1, 1, type = "n", xlim = c(100, 1e6), ylim = c(1e3, 1e8),
            xlab = "", ylab = "", main = sample_name, log = "xy",
-           cex.main = 1.2, cex.axis = 0.7, xaxt = "n", yaxt = "n")
+           cex.main = 1.2 * title_scale, cex.axis = 0.7 * axis_scale, xaxt = "n", yaxt = "n")
       axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
-           labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
+           labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5 * axis_scale)
       axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
-           labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
-      text(1000, 50000, sprintf("n = %d", length(x)), cex = 0.8, col = "red", font = 2)
+           labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5 * axis_scale)
+      text(1000, 50000, sprintf("n = %d", length(x)), cex = 0.8 * axis_scale, col = "red", font = 2)
       next
     }
 
@@ -1358,16 +1358,16 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
          main = sample_name,
          xlim = c(100, 1e6),
          ylim = c(1e3, 1e8),
-         cex.main = 1.2,
-         cex.axis = 0.7,
+         cex.main = 1.2 * title_scale,
+         cex.axis = 0.7 * axis_scale,
          xaxt = "n",
          yaxt = "n",
          log = "xy")
     
     axis(1, at = c(100, 1000, 10000, 100000, 1000000, 10000000),
-         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5 * axis_scale)
     axis(2, at = c(1000, 10000, 100000, 1000000, 10000000, 100000000),
-         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5)
+         labels = c("1K", "10K", "100K", "1M", "10M", "100M"), cex.axis = 0.5 * axis_scale)
 
     # Tint the HA-positive region (only if valid threshold)
     if(!is.null(ha_threshold) && length(ha_threshold) > 0 && !is.na(ha_threshold)) {
@@ -1410,11 +1410,11 @@ plot_ha_gate_overview <- function(experiment, ha_threshold, gates = GATES, chann
     }
     
     text_col <- ifelse(is_flagged, "red", "black")
-    text(8e5, 200, sprintf("%.1f%%", pct), col = text_col, cex = 0.8, font = 2, pos = 2)
+    text(8e5, 200, sprintf("%.1f%%", pct), col = text_col, cex = 0.8 * axis_scale, font = 2, pos = 2)
     
     if(is_flagged) {
       box(col = "red", lwd = 4)
-      text(10000, 10000, flag_message, col = "red", cex = 1.5, font = 2)
+      text(10000, 10000, flag_message, col = "red", cex = 1.5 * axis_scale, font = 2)
     }
   }
   
@@ -1811,13 +1811,13 @@ plot_edu_ha_correlation_publication <- function(fcs_data, sample_name, ha_thresh
   ))
 }
 
-plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   # Count only Dox+ samples
   n_dox_plus <- sum(!grepl("Dox-", experiment$metadata$sample_name, ignore.case = TRUE))
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_dox_plus))
   n_rows <- ceiling(n_dox_plus / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
 
   # Read gate parameters
   fxcycle_gate <- gates$fxcycle_quantile
@@ -1884,7 +1884,7 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
            main = sprintf("%s\nEdU vs HA Correlation", sample_name),
            xlim = c(2, 6.5),
            ylim = c(4, 7),
-           cex.main = 1.1,
+           cex.main = 1.1 * title_scale,
            xaxs = "i",
            yaxs = "i")
 
@@ -1892,7 +1892,7 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
 
       # Add r and n at top center
       text(4.25, 6.8, sprintf("r=%.3f, n=%s", correlation, format(length(ha_log), big.mark = ",")),
-           col = "black", cex = 0.7, font = 2)
+           col = "black", cex = 0.7 * axis_scale, font = 2)
 
       # Add R² in top left
       text(2.15, 6.8, sprintf("R²=%.3f", r_squared), col = "black", cex = 0.7, font = 2, pos = 4)
@@ -1905,12 +1905,12 @@ plot_edu_ha_correlation_overview <- function(experiment, ha_threshold, gates = G
       is_flagged <- length(ha_log) < 500 && !is_empty_vector
       if(is_flagged) {
         box(col = "red", lwd = 4)
-        text(5, 5.5, "LOW\nCELL COUNT", col = "red", cex = 1, font = 2)
+        text(5, 5.5, "LOW\nCELL COUNT", col = "red", cex = 1 * axis_scale, font = 2)
       }
     } else {
       # Too few cells to plot
       plot.new()
-      text(0.5, 0.5, "Too few\ncells", col = "red", cex = 1.5, font = 2)
+      text(0.5, 0.5, "Too few\ncells", col = "red", cex = 1.5 * axis_scale, font = 2)
       box(col = "red", lwd = 4)
     }
   }
@@ -2065,13 +2065,13 @@ extract_correlations <- function(experiment, ha_threshold, gates = GATES, channe
 }
 
 ## Quadrant Correlation Overview ----
-plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, font_scale = 1) {
+plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channels = CHANNELS, n_cols = NULL, title_scale = 1, axis_scale = 1) {
   # Count ALL samples (both Dox+ and Dox-)
   n_samples <- length(experiment$flowset)
   if (is.null(n_cols) || n_cols < 1) n_cols <- ceiling(sqrt(n_samples))
   n_rows <- ceiling(n_samples / n_cols)
 
-  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0), cex = font_scale)
+  par(mfrow = c(n_rows, n_cols), mar = c(2, 2.5, 2, 0.5), oma = c(0, 0, 0, 0), mgp = c(3, 0.6, 0))
 
   for(i in seq_along(experiment$flowset)) {
     sample_name <- experiment$metadata$sample_name[i]
@@ -2205,7 +2205,7 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
            main = plot_title,
            xlim = c(2, 6.5),
            ylim = c(4, 7),
-           cex.main = 0.9,
+           cex.main = 0.9 * title_scale,
            xaxs = "i",
            yaxs = "i")
 
@@ -2223,10 +2223,10 @@ plot_quadrant_correlation_overview <- function(experiment, gates = GATES, channe
       abline(h = edu_threshold_log, col = "black", lwd = 1, lty = 1)
 
       # Quadrant percentages
-      text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.6, font = 2)
-      text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.6, font = 2)
-      text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.6, font = 2)
-      text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.6, font = 2)
+      text(2.8, 6.5, sprintf("%.1f%%", q2_pct), col = "black", cex = 0.6 * axis_scale, font = 2)
+      text(5.5, 6.5, sprintf("%.1f%%", q1_pct), col = "blue", cex = 0.6 * axis_scale, font = 2)
+      text(2.8, 4.5, sprintf("%.1f%%", q3_pct), col = "black", cex = 0.6 * axis_scale, font = 2)
+      text(5.5, 4.5, sprintf("%.1f%%", q4_pct), col = "red", cex = 0.6 * axis_scale, font = 2)
 
     }, error = function(e) {
       plot.new()
